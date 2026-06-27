@@ -35,3 +35,17 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# 환경변수 파일
+.env
+*.env
+
+# 민감 정보
+application-local.properties
+
+# Python venv
+python-collector/.venv/
+
+# Python 캐시
+python-collector/__pycache__/
+*.pyc
