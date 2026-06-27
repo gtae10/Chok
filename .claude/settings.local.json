@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:JAVA_HOME; [System.Environment]::GetEnvironmentVariable\\(\"JAVA_HOME\", \"Machine\"\\); [System.Environment]::GetEnvironmentVariable\\(\"JAVA_HOME\", \"User\"\\))"
+    ]
+  }
+}

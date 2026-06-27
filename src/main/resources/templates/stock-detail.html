@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>종목 상세 - 촉</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar__inner">
+        <a th:href="@{/}" class="brand">촉<em>Chok</em></a>
+        <div class="topbar__meta">
+            <a th:href="@{/}" class="btn-ghost">← 목록으로</a>
+        </div>
+    </div>
+</header>
+
+<main class="layout layout--detail">
+
+    <section class="detail-head">
+        <h1 id="stockName">불러오는 중...</h1>
+        <div class="detail-head__sub">
+            <span id="stockTicker" class="meta-pill"></span>
+            <span id="stockMarket" class="meta-pill"></span>
+            <span id="stockRec" class="rec-badge"></span>
+        </div>
+        <p id="stockReason" class="detail-head__reason"></p>
+    </section>
+
+    <section class="score-cards">
+        <div class="score-card">
+            <span class="score-card__label">기술 점수</span>
+            <span id="techScoreVal" class="score-card__value">--</span>
+        </div>
+        <div class="score-card">
+            <span class="score-card__label">감성 점수</span>
+            <span id="sentimentScoreVal" class="score-card__value">--</span>
+        </div>
+        <div class="score-card score-card--final">
+            <span class="score-card__label">종합 점수</span>
+            <span id="finalScoreVal" class="score-card__value">--</span>
+        </div>
+    </section>
+
+    <section class="chart-section">
+        <h2>가격 추이</h2>
+        <div class="chart-wrap">
+            <svg id="priceChart" viewBox="0 0 800 320" preserveAspectRatio="none"></svg>
+        </div>
+    </section>
+
+    <section class="news-section">
+        <h2>최근 뉴스 &amp; 감성 분석</h2>
+        <ul id="newsList" class="news-list">
+            <li class="loading-row">뉴스를 불러오는 중...</li>
+        </ul>
+    </section>
+
+</main>
+
+<footer class="footer">
+    <p>본 서비스의 점수와 추천 등급은 참고용 보조 지표이며, 수익을 보장하지 않습니다. 모든 투자 판단과 책임은 사용자 본인에게 있습니다.</p>
+</footer>
+
+<script th:src="@{/js/stock-detail.js}"></script>
+</body>
+</html>
