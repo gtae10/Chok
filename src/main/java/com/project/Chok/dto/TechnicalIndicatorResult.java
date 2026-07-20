@@ -12,14 +12,19 @@ public class TechnicalIndicatorResult {
     private Double bbUpper;
     private Double bbLower;
     private Double bbPercentB;
+    private Double volumeRatio;
+    private String obvTrend;
     private Double technicalScore;
+    private Double riseProbability;
+    private String probabilitySource; // "MODEL" | "HEURISTIC"
     private String technicalReason;
 
     public TechnicalIndicatorResult(Double ma5, Double ma20, Double ma60,
                                     Double rsi, Double macd, Double macdSignal,
                                     Double macdHistogram, Double bbUpper, Double bbLower,
-                                    Double bbPercentB, Double technicalScore,
-                                    String technicalReason) {
+                                    Double bbPercentB, Double volumeRatio, String obvTrend,
+                                    Double technicalScore, Double riseProbability,
+                                    String probabilitySource, String technicalReason) {
         this.ma5 = ma5;
         this.ma20 = ma20;
         this.ma60 = ma60;
@@ -30,7 +35,11 @@ public class TechnicalIndicatorResult {
         this.bbUpper = bbUpper;
         this.bbLower = bbLower;
         this.bbPercentB = bbPercentB;
+        this.volumeRatio = volumeRatio;
+        this.obvTrend = obvTrend;
         this.technicalScore = technicalScore;
+        this.riseProbability = riseProbability;
+        this.probabilitySource = probabilitySource;
         this.technicalReason = technicalReason;
     }
 
@@ -38,7 +47,8 @@ public class TechnicalIndicatorResult {
     public static TechnicalIndicatorResult insufficient() {
         return new TechnicalIndicatorResult(
                 null, null, null, null, null, null,
-                null, null, null, null, 50.0,
+                null, null, null, null, null, null,
+                50.0, 50.0, "HEURISTIC",
                 "가격 데이터 부족으로 중립 처리"
         );
     }
@@ -53,6 +63,10 @@ public class TechnicalIndicatorResult {
     public Double getBbUpper() { return bbUpper; }
     public Double getBbLower() { return bbLower; }
     public Double getBbPercentB() { return bbPercentB; }
+    public Double getVolumeRatio() { return volumeRatio; }
+    public String getObvTrend() { return obvTrend; }
     public Double getTechnicalScore() { return technicalScore; }
+    public Double getRiseProbability() { return riseProbability; }
+    public String getProbabilitySource() { return probabilitySource; }
     public String getTechnicalReason() { return technicalReason; }
 }

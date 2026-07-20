@@ -14,7 +14,6 @@ public class TechnicalAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(TechnicalAnalysisService.class);
 
-
     private static final int MA_SHORT = 5;
     private static final int MA_MID = 20;
     private static final int MA_LONG = 60;
@@ -24,6 +23,14 @@ public class TechnicalAnalysisService {
     private static final int MACD_SIGNAL_PERIOD = 9;
     private static final int BOLLINGER_PERIOD = 20;
     private static final double BOLLINGER_STD_MULT = 2.0;
+    private static final int VOLUME_AVG_PERIOD = 20;
+    private static final int OBV_TREND_LOOKBACK = 5;
+
+    private final RiseProbabilityService riseProbabilityService;
+
+    public TechnicalAnalysisService(RiseProbabilityService riseProbabilityService) {
+        this.riseProbabilityService = riseProbabilityService;
+    }
 
     public TechnicalIndicatorResult analyze(List<PriceHistory> priceHistory) {
         if (priceHistory == null || priceHistory.size() < MA_LONG) {
@@ -33,8 +40,10 @@ public class TechnicalAnalysisService {
         }
 
         List<Double> closes = new ArrayList<>();
+        List<Long> volumes = new ArrayList<>();
         for (PriceHistory p : priceHistory) {
             closes.add(p.getClosePrice().doubleValue());
+            volumes.add(p.getVolume() == null ? 0L : p.getVolume());
         }
 
         double currentPrice = closes.get(closes.size() - 1);
@@ -61,25 +70,75 @@ public class TechnicalAnalysisService {
                 ? (currentPrice - bbLower) / (bbUpper - bbLower)
                 : 0.5;
 
+        // 거래량 지표
+        double avgVolume20 = avgVolume(volumes, VOLUME_AVG_PERIOD);
+        double currentVolume = volumes.get(volumes.size() - 1);
+        double volumeRatio = avgVolume20 > 0 ? currentVolume / avgVolume20 : 1.0;
+        double[] obv = obvSeries(closes, volumes);
+        String obvTrend = obvTrend(obv);
+
         // 점수화
         StringBuilder reason = new StringBuilder();
-        double maScore   = scoreMa(currentPrice, ma5, ma20, ma60, reason);
-        double rsiScore  = scoreRsi(rsi, reason);
-        double macdScore = scoreMacd(macd, macdSignal, reason);
-        double bbScore   = scoreBb(bbPercentB, reason);
+        double maScore     = scoreMa(currentPrice, ma5, ma20, ma60, reason);
+        double rsiScore    = scoreRsi(rsi, reason);
+        double macdScore   = scoreMacd(macd, macdSignal, reason);
+        double bbScore     = scoreBb(bbPercentB, reason);
+        double volumeScore = scoreVolume(closes, volumeRatio, obvTrend, reason);
 
-        double finalScore = (maScore * 0.35) + (rsiScore * 0.25)
-                          + (macdScore * 0.25) + (bbScore * 0.15);
+        double finalScore = (maScore * 0.30) + (rsiScore * 0.20)
+                          + (macdScore * 0.20) + (bbScore * 0.15) + (volumeScore * 0.15);
         finalScore = clamp(finalScore, 0, 100);
+
+        // 상승확률: 학습된 모델이 있으면 그걸로, 없으면 위 점수들을 조합한 휴리스틱으로 대체
+        double[] features = buildFeatureVector(currentPrice, ma5, ma20, ma60, rsi, macdHist, bbPercentB, volumeRatio);
+        Double modelProbability = riseProbabilityService.predict(features);
+        double riseProbability;
+        String probabilitySource;
+        if (modelProbability != null) {
+            riseProbability = clamp(modelProbability, 1, 99);
+            probabilitySource = "MODEL";
+        } else {
+            riseProbability = heuristicProbability(maScore, rsiScore, macdScore, bbScore, volumeScore);
+            probabilitySource = "HEURISTIC";
+        }
 
         return new TechnicalIndicatorResult(
                 round2(ma5), round2(ma20), round2(ma60),
                 round2(rsi),
                 round2(macd), round2(macdSignal), round2(macdHist),
                 round2(bbUpper), round2(bbLower), round2(bbPercentB),
-                round2(finalScore),
+                round2(volumeRatio), obvTrend,
+                round2(finalScore), round2(riseProbability), probabilitySource,
                 reason.toString().trim()
         );
+    }
+
+    // ── 특징 벡터 (RiseProbabilityService.FEATURE_NAMES 순서와 반드시 일치해야 함) ──
+
+    private double[] buildFeatureVector(double close, double ma5, double ma20, double ma60,
+                                         double rsi, double macdHist, double bbPercentB, double volumeRatio) {
+        return new double[]{
+                (close - ma5) / close,
+                (ma5 - ma20) / ma20,
+                (ma20 - ma60) / ma60,
+                (rsi - 50) / 50,
+                macdHist / close,
+                bbPercentB,
+                Math.log(Math.max(volumeRatio, 0.01))
+        };
+    }
+
+    // 모델이 없을 때: 기존 지표 점수들을 -1~1 신호로 정규화해 가중합 후 시그모이드로 확률화.
+    // 통계적으로 학습된 값이 아니라 "지표 종합 추정치"라는 점을 호출부(reason/UI)에서 명시해야 함.
+    private double heuristicProbability(double maScore, double rsiScore, double macdScore,
+                                         double bbScore, double volumeScore) {
+        double z = ((maScore - 50) / 50) * 0.30
+                 + ((rsiScore - 50) / 50) * 0.20
+                 + ((macdScore - 50) / 50) * 0.20
+                 + ((bbScore - 50) / 50) * 0.15
+                 + ((volumeScore - 50) / 50) * 0.15;
+        double sigmoid = 1.0 / (1.0 + Math.exp(-2.2 * z));
+        return sigmoid * 100.0;
     }
 
     // ── 이동평균 ──────────────────────────────────────
@@ -208,6 +267,76 @@ public class TechnicalAnalysisService {
             reason.append("볼린저밴드 중간 구간. ");
             return 50;
         }
+    }
+
+    // ── 거래량 ─────────────────────────────────────────
+
+    private double avgVolume(List<Long> volumes, int period) {
+        int size = volumes.size();
+        int p = Math.min(period, size);
+        double sum = 0;
+        for (int i = size - p; i < size; i++) sum += volumes.get(i);
+        return sum / p;
+    }
+
+    /** OBV(On-Balance Volume): 상승일엔 거래량을 더하고 하락일엔 빼서 누적 - 가격 추세를 거래량으로 확인하는 지표 */
+    private double[] obvSeries(List<Double> closes, List<Long> volumes) {
+        int size = closes.size();
+        double[] obv = new double[size];
+        obv[0] = 0;
+        for (int i = 1; i < size; i++) {
+            double change = closes.get(i) - closes.get(i - 1);
+            if (change > 0) obv[i] = obv[i - 1] + volumes.get(i);
+            else if (change < 0) obv[i] = obv[i - 1] - volumes.get(i);
+            else obv[i] = obv[i - 1];
+        }
+        return obv;
+    }
+
+    private String obvTrend(double[] obv) {
+        int size = obv.length;
+        int lookback = Math.min(OBV_TREND_LOOKBACK, size - 1);
+        if (lookback <= 0) return "FLAT";
+        double delta = obv[size - 1] - obv[size - 1 - lookback];
+        double scale = Math.abs(obv[size - 1]) + 1.0;
+        double relativeDelta = delta / scale;
+        if (relativeDelta > 0.02) return "RISING";
+        if (relativeDelta < -0.02) return "FALLING";
+        return "FLAT";
+    }
+
+    private double scoreVolume(List<Double> closes, double volumeRatio, String obvTrend, StringBuilder reason) {
+        int size = closes.size();
+        boolean upDay = size >= 2 && closes.get(size - 1) > closes.get(size - 2);
+        boolean downDay = size >= 2 && closes.get(size - 1) < closes.get(size - 2);
+
+        double score;
+        if (upDay && volumeRatio >= 1.5) {
+            score = 80;
+            reason.append(String.format("거래량 평균 대비 %.1f배 급증(상승 확인). ", volumeRatio));
+        } else if (upDay && volumeRatio >= 1.0) {
+            score = 62;
+            reason.append("거래량 동반 상승. ");
+        } else if (downDay && volumeRatio >= 1.5) {
+            score = 20;
+            reason.append(String.format("거래량 평균 대비 %.1f배 급증(하락 확인). ", volumeRatio));
+        } else if (downDay && volumeRatio >= 1.0) {
+            score = 38;
+            reason.append("거래량 동반 하락. ");
+        } else {
+            score = 50;
+            reason.append("거래량 평이. ");
+        }
+
+        if ("RISING".equals(obvTrend)) {
+            score += 5;
+            reason.append("OBV 상승추세(매집 신호). ");
+        } else if ("FALLING".equals(obvTrend)) {
+            score -= 5;
+            reason.append("OBV 하락추세(분산 신호). ");
+        }
+
+        return clamp(score, 0, 100);
     }
 
     // ── 유틸 ─────────────────────────────────────────

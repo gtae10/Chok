@@ -65,17 +65,17 @@ class RecommendationServiceTest {
     }
 
     private void mockNormalStock(String ticker) {
-        lenient().when(priceHistoryRepository.findByTickerOrderByTradeDateAsc(ticker))
+        when(priceHistoryRepository.findByTickerOrderByTradeDateAsc(ticker))
                 .thenReturn(List.of());
-        lenient().when(technicalAnalysisService.analyze(any()))
+        when(technicalAnalysisService.analyze(any()))
                 .thenReturn(TechnicalIndicatorResult.insufficient());
-        lenient().when(newsCollectorService.fetchRecentNews(eq(ticker), anyInt()))
+        when(newsCollectorService.fetchRecentNews(eq(ticker), anyInt()))
                 .thenReturn(List.of());
-        lenient().when(newsSentimentRepository.findByTickerSince(eq(ticker), any()))
+        when(newsSentimentRepository.findByTickerSince(eq(ticker), any()))
                 .thenReturn(List.of());
-        lenient().when(technicalScoreRepository.findByTickerAndCalcDate(eq(ticker), any()))
+        when(technicalScoreRepository.findByTickerAndCalcDate(eq(ticker), any()))
                 .thenReturn(Optional.empty());
-        lenient().when(recommendationRepository.findHistoryByTicker(eq(ticker)))
+        when(recommendationRepository.findHistoryByTicker(eq(ticker)))
                 .thenReturn(List.of());
     }
 
@@ -105,7 +105,8 @@ class RecommendationServiceTest {
         when(technicalAnalysisService.analyze(any()))
                 .thenReturn(new TechnicalIndicatorResult(
                         null, null, null, null, null, null, null,
-                        null, null, null, 80.0, "상승추세"
+                        null, null, null, 1.0, "RISING",
+                        80.0, 70.0, "HEURISTIC", "상승추세"
                 ));
         when(newsCollectorService.fetchRecentNews(anyString(), anyInt()))
                 .thenReturn(List.of(new NewsArticle("호재 뉴스", "http://test.com", LocalDate.now())));
@@ -135,13 +136,16 @@ class RecommendationServiceTest {
         );
         when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(stocks);
 
+        // 첫 번째 종목에서 예외 발생
         when(priceHistoryRepository.findByTickerOrderByTradeDateAsc("005930"))
                 .thenThrow(new RuntimeException("DB 오류"));
 
+        // 두 번째 종목은 정상
         mockNormalStock("000660");
 
         int result = service.runFullAnalysis();
 
+        // 첫 번째는 실패, 두 번째는 성공 → 1개 처리
         assertThat(result).isEqualTo(1);
     }
 }

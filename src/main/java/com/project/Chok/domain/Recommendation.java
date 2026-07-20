@@ -33,6 +33,12 @@ public class Recommendation {
     @Column(name = "final_score")
     private Double finalScore;
 
+    @Column(name = "rise_probability")
+    private Double riseProbability;
+
+    @Column(name = "probability_source", length = 10)
+    private String probabilitySource;
+
     @Column(length = 20)
     private String recommendation;
 
@@ -65,6 +71,12 @@ public class Recommendation {
 
     public Double getFinalScore() { return finalScore; }
     public void setFinalScore(Double finalScore) { this.finalScore = finalScore; }
+
+    public Double getRiseProbability() { return riseProbability; }
+    public void setRiseProbability(Double riseProbability) { this.riseProbability = riseProbability; }
+
+    public String getProbabilitySource() { return probabilitySource; }
+    public void setProbabilitySource(String probabilitySource) { this.probabilitySource = probabilitySource; }
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }

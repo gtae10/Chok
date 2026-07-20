@@ -1,7 +1,9 @@
 package com.project.Chok;
 
+import com.project.Chok.config.AppProperties;
 import com.project.Chok.domain.PriceHistory;
 import com.project.Chok.dto.TechnicalIndicatorResult;
+import com.project.Chok.service.RiseProbabilityService;
 import com.project.Chok.service.TechnicalAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,7 +21,8 @@ class TechnicalAnalysisServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TechnicalAnalysisService();
+        // 테스트 환경엔 학습된 모델 파일이 없으므로 자동으로 휴리스틱 확률 계산으로 폴백됨
+        service = new TechnicalAnalysisService(new RiseProbabilityService(new AppProperties()));
     }
 
     // 테스트용 가격 데이터 생성 헬퍼

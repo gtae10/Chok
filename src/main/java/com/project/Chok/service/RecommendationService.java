@@ -8,7 +8,6 @@ import com.project.Chok.dto.TechnicalIndicatorResult;
 import com.project.Chok.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,8 +15,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class RecommendationService {
@@ -29,11 +30,12 @@ public class RecommendationService {
     private final TechnicalScoreRepository technicalScoreRepository;
     private final NewsSentimentRepository newsSentimentRepository;
     private final RecommendationRepository recommendationRepository;
+
     private final TechnicalAnalysisService technicalAnalysisService;
     private final NewsCollectorService newsCollectorService;
     private final SentimentAnalysisService sentimentAnalysisService;
+
     private final AppProperties appProperties;
-    private final Executor analysisExecutor;
 
     public RecommendationService(StockRepository stockRepository,
                                  PriceHistoryRepository priceHistoryRepository,
@@ -43,8 +45,7 @@ public class RecommendationService {
                                  TechnicalAnalysisService technicalAnalysisService,
                                  NewsCollectorService newsCollectorService,
                                  SentimentAnalysisService sentimentAnalysisService,
-                                 AppProperties appProperties,
-                                 @Qualifier("analysisExecutor") Executor analysisExecutor) {
+                                 AppProperties appProperties) {
         this.stockRepository = stockRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.technicalScoreRepository = technicalScoreRepository;
@@ -54,33 +55,60 @@ public class RecommendationService {
         this.newsCollectorService = newsCollectorService;
         this.sentimentAnalysisService = sentimentAnalysisService;
         this.appProperties = appProperties;
-        this.analysisExecutor = analysisExecutor;
     }
 
     public int runFullAnalysis() {
+        return runFullAnalysis(null);
+    }
+
+    /**
+     * 종목별 분석을 병렬로 실행한다. 뉴스 감성분석이 종목당 최대 newsPerStock번의
+     * 블로킹 API 호출을 포함하므로, 순차 실행 시 종목 수 x 뉴스 수 만큼 직렬로 대기해야 했음.
+     * 스레드풀로 동시에 여러 종목을 처리해 전체 소요 시간을 줄인다.
+     * (동시성 상한은 chok.analysis.parallelism 로 조절 — API 레이트리밋 고려해서 너무 크게 잡지 말 것)
+     */
+    public int runFullAnalysis(AnalysisStatus status) {
         List<Stock> stocks = stockRepository.findAllOrderByMarketCapDesc();
         LocalDate today = LocalDate.now();
-        log.info("전체 분석 시작: {}개 종목", stocks.size());
+        int total = stocks.size();
+        AtomicInteger processed = new AtomicInteger(0);
+        AtomicInteger completed = new AtomicInteger(0);
 
-        List<CompletableFuture<Boolean>> futures = stocks.stream()
-                .map(stock -> CompletableFuture.supplyAsync(() -> {
-                    try {
-                        analyzeStock(stock, today);
-                        return true;
-                    } catch (Exception e) {
-                        log.error("종목 분석 실패 (ticker={}): {}", stock.getTicker(), e.getMessage());
-                        return false;
-                    }
-                }, analysisExecutor))
-                .collect(Collectors.toList());
+        int poolSize = Math.max(1, appProperties.getAnalysis().getParallelism());
+        log.info("전체 분석 시작: {}개 종목, 병렬도={}", total, poolSize);
+        if (status != null) status.updateProgress(0, total);
 
-        int processed = (int) futures.stream()
-                .map(CompletableFuture::join)
-                .filter(Boolean::booleanValue)
-                .count();
+        ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+        try {
+            List<CompletableFuture<Void>> futures = stocks.stream()
+                    .map(stock -> CompletableFuture.runAsync(() -> {
+                        try {
+                            analyzeStock(stock, today);
+                            processed.incrementAndGet();
+                        } catch (Exception e) {
+                            log.error("종목 분석 실패 (ticker={}): {}", stock.getTicker(), e.getMessage());
+                        } finally {
+                            int done = completed.incrementAndGet();
+                            if (status != null) status.updateProgress(done, total);
+                        }
+                    }, executor))
+                    .toList();
 
-        log.info("전체 분석 완료: {}/{} 종목", processed, stocks.size());
-        return processed;
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        } finally {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        log.info("전체 분석 완료: {}/{} 종목", processed.get(), total);
+        return processed.get();
     }
 
     @Transactional
@@ -102,7 +130,8 @@ public class RecommendationService {
         String reason = buildReason(techResult, avgSentiment);
 
         saveRecommendation(stock, today, techResult.getTechnicalScore(),
-                avgSentiment, finalScore, recommendation, reason);
+                avgSentiment, finalScore, techResult.getRiseProbability(),
+                techResult.getProbabilitySource(), recommendation, reason);
     }
 
     private void saveTechnicalScore(String ticker, LocalDate today, TechnicalIndicatorResult r) {
@@ -122,7 +151,11 @@ public class RecommendationService {
         entity.setBbUpper(r.getBbUpper());
         entity.setBbLower(r.getBbLower());
         entity.setBbPercentB(r.getBbPercentB());
+        entity.setVolumeRatio(r.getVolumeRatio());
+        entity.setObvTrend(r.getObvTrend());
         entity.setTechnicalScore(r.getTechnicalScore());
+        entity.setRiseProbability(r.getRiseProbability());
+        entity.setProbabilitySource(r.getProbabilitySource());
         entity.setTechnicalReason(r.getTechnicalReason());
 
         technicalScoreRepository.save(entity);
@@ -194,6 +227,7 @@ public class RecommendationService {
 
     private void saveRecommendation(Stock stock, LocalDate today, double techScore,
                                     double sentimentScore, double finalScore,
+                                    double riseProbability, String probabilitySource,
                                     String recommendation, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
@@ -209,6 +243,8 @@ public class RecommendationService {
         entity.setTechnicalScore(round2(techScore));
         entity.setSentimentScore(round2(sentimentScore));
         entity.setFinalScore(round2(finalScore));
+        entity.setRiseProbability(round2(riseProbability));
+        entity.setProbabilitySource(probabilitySource);
         entity.setRecommendation(recommendation);
         entity.setReason(reason);
 

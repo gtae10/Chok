@@ -8,4 +8,4 @@ DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 
 TOP_N_STOCKS = int(os.environ.get("TOP_N_STOCKS", "100"))
 MARKETS = ["KOSPI", "KOSDAQ"]
-PRICE_HISTORY_DAYS = 120
+PRICE_HISTORY_DAYS = 365
