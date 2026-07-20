@@ -1,13 +1,15 @@
 package com.project.Chok.controller;
 
+import com.project.Chok.config.AppProperties;
+import com.project.Chok.dto.PriceHistoryResponse;
+import com.project.Chok.dto.RecommendationResponse;
 import com.project.Chok.domain.NewsSentiment;
 import com.project.Chok.domain.PriceHistory;
 import com.project.Chok.domain.Recommendation;
-import com.project.Chok.dto.PriceHistoryResponse;
-import com.project.Chok.dto.RecommendationResponse;
 import com.project.Chok.repository.NewsSentimentRepository;
 import com.project.Chok.repository.PriceHistoryRepository;
 import com.project.Chok.repository.RecommendationRepository;
+import com.project.Chok.service.AnalysisStatus;
 import com.project.Chok.service.DataCollectionService;
 import com.project.Chok.service.RecommendationService;
 import org.springframework.http.ResponseEntity;
@@ -28,54 +30,78 @@ public class RecommendationController {
     private final NewsSentimentRepository newsSentimentRepository;
     private final DataCollectionService dataCollectionService;
     private final RecommendationService recommendationService;
+    private final AnalysisStatus analysisStatus;
+    private final AppProperties appProperties;
 
     public RecommendationController(RecommendationRepository recommendationRepository,
                                     PriceHistoryRepository priceHistoryRepository,
                                     NewsSentimentRepository newsSentimentRepository,
                                     DataCollectionService dataCollectionService,
-                                    RecommendationService recommendationService) {
+                                    RecommendationService recommendationService,
+                                    AnalysisStatus analysisStatus,
+                                    AppProperties appProperties) {
         this.recommendationRepository = recommendationRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.newsSentimentRepository = newsSentimentRepository;
         this.dataCollectionService = dataCollectionService;
         this.recommendationService = recommendationService;
+        this.analysisStatus = analysisStatus;
+        this.appProperties = appProperties;
     }
 
-    // ① 시세 수집 버튼
     @PostMapping("/collection/run")
     public ResponseEntity<Map<String, Object>> runCollection() {
         try {
             String output = dataCollectionService.runCollection();
-            Map<String, Object> result = new HashMap<>();
-            result.put("status", "success");
-            result.put("output", output != null ? output : "");
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "output", output
+            ));
         } catch (Exception e) {
-            Map<String, Object> result = new HashMap<>();
-            result.put("status", "failed");
-            result.put("message", e.getMessage() != null ? e.getMessage() : "알 수 없는 오류");
-            return ResponseEntity.internalServerError().body(result);
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "status", "failed",
+                    "message", e.getMessage()
+            ));
         }
     }
 
-    // ② 분석 실행 버튼
     @PostMapping("/analysis/run")
     public ResponseEntity<Map<String, Object>> runAnalysis() {
-        try {
-            int processed = recommendationService.runFullAnalysis();
-            Map<String, Object> result = new HashMap<>();
-            result.put("status", "success");
-            result.put("processedCount", processed);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            Map<String, Object> result = new HashMap<>();
-            result.put("status", "failed");
-            result.put("message", e.getMessage() != null ? e.getMessage() : "알 수 없는 오류");
-            return ResponseEntity.internalServerError().body(result);
+        boolean started = analysisStatus.tryStart("manual");
+        if (!started) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "status", "already_running"
+            ));
         }
+
+        Thread worker = new Thread(() -> {
+            try {
+                int processed = recommendationService.runFullAnalysis(analysisStatus);
+                analysisStatus.markDone(processed);
+            } catch (Exception e) {
+                analysisStatus.markFailed(e.getMessage());
+            }
+        }, "analysis-runner");
+        worker.setDaemon(true);
+        worker.start();
+
+        return ResponseEntity.accepted().body(Map.of(
+                "status", "started"
+        ));
     }
 
-    // 최신 추천 목록
+    @GetMapping("/analysis/status")
+    public ResponseEntity<Map<String, Object>> getAnalysisStatus() {
+        Map<String, Object> body = new HashMap<>();
+        body.put("phase", analysisStatus.getPhase().name());
+        body.put("running", analysisStatus.isRunning());
+        body.put("processedCount", analysisStatus.getProcessedCount());
+        body.put("totalCount", analysisStatus.getTotalCount());
+        body.put("errorMessage", analysisStatus.getErrorMessage());
+        body.put("triggeredBy", analysisStatus.getTriggeredBy());
+        return ResponseEntity.ok(body);
+    }
+
     @GetMapping("/recommendations")
     public ResponseEntity<List<RecommendationResponse>> getRecommendations(
             @RequestParam(required = false) String filter
@@ -97,7 +123,6 @@ public class RecommendationController {
         );
     }
 
-    // 종목별 가격 히스토리
     @GetMapping("/stocks/{ticker}/prices")
     public ResponseEntity<List<PriceHistoryResponse>> getPrices(@PathVariable String ticker) {
         List<PriceHistory> prices = priceHistoryRepository.findByTickerOrderByTradeDateAsc(ticker);
@@ -106,14 +131,13 @@ public class RecommendationController {
         );
     }
 
-    // 종목별 뉴스 + 감성분석 결과
     @GetMapping("/stocks/{ticker}/news")
     public ResponseEntity<List<NewsSentiment>> getNews(@PathVariable String ticker) {
-        LocalDate fromDate = LocalDate.now().minusDays(14);
+        int lookbackDays = appProperties.getAnalysis().getNewsLookbackDays();
+        LocalDate fromDate = LocalDate.now().minusDays(Math.max(lookbackDays, 1));
         return ResponseEntity.ok(newsSentimentRepository.findByTickerSince(ticker, fromDate));
     }
 
-    // 종목별 추천 히스토리
     @GetMapping("/stocks/{ticker}/history")
     public ResponseEntity<List<RecommendationResponse>> getHistory(@PathVariable String ticker) {
         return ResponseEntity.ok(

@@ -13,47 +13,52 @@
         <span class="brand">촉<em>Chok</em></span>
         <div class="topbar__meta">
             <span id="lastUpdated" class="meta-pill">기준일 확인 중...</span>
+            <input type="text" id="searchInput" class="search-input" placeholder="종목명 또는 티커 검색...">
             <button id="collectBtn" class="btn-ghost">① 시세 수집</button>
-            <button id="analyzeBtn" class="btn-ghost">② 분석 실행</button>
+            <button id="analyzeBtn" class="btn-ghost btn-primary">② 분석 실행</button>
         </div>
     </div>
 </header>
 
 <main class="layout">
 
-    <section class="filters">
+    <div class="filters" style="margin-top: 24px;">
         <button class="filter-chip is-active" data-filter="">전체</button>
         <button class="filter-chip" data-filter="STRONG_BUY">적극 매수</button>
         <button class="filter-chip" data-filter="BUY">매수</button>
         <button class="filter-chip" data-filter="HOLD">중립</button>
         <button class="filter-chip" data-filter="SELL">매도</button>
         <button class="filter-chip" data-filter="STRONG_SELL">적극 매도</button>
-    </section>
+    </div>
 
-    <section class="table-wrap">
+    <div class="table-wrap">
         <table class="stock-table">
             <thead>
             <tr>
                 <th>#</th>
-                <th>종목명</th>
+                <th class="sortable" data-sort="name">종목명<span class="sort-arrow"></span></th>
                 <th>시장</th>
-                <th>기술점수</th>
-                <th>감성점수</th>
-                <th>종합점수</th>
+                <th class="sortable" data-sort="technicalScore">기술점수<span class="sort-arrow"></span></th>
+                <th class="sortable" data-sort="sentimentScore">감성점수<span class="sort-arrow"></span></th>
+                <th class="sortable" data-sort="finalScore">종합점수<span class="sort-arrow"></span></th>
+                <th class="sortable" data-sort="riseProbability">상승확률<span class="sort-arrow"></span></th>
                 <th>추천</th>
             </tr>
             </thead>
             <tbody id="stockTableBody">
-            <tr class="loading-row">
-                <td colspan="7">데이터를 불러오는 중...</td>
-            </tr>
+            <tr class="loading-row"><td colspan="8">데이터를 불러오는 중...</td></tr>
             </tbody>
         </table>
         <div id="emptyState" class="empty-state" hidden>
             <p>분석된 데이터가 없습니다.</p>
             <p>① 시세 수집 → ② 분석 실행 버튼을 순서대로 눌러주세요.</p>
         </div>
-    </section>
+    </div>
+
+    <p class="prob-caveat">
+        상승확률은 실제 통계 검증된 예측이 아닌 참고용 지표입니다.
+        <span id="probSourceNote"></span>
+    </p>
 
     <div id="statusMsg" class="status-msg" hidden></div>
 

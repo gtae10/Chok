@@ -38,8 +38,20 @@ public class TechnicalScore {
     @Column(name = "bb_percent_b")
     private Double bbPercentB;
 
+    @Column(name = "volume_ratio")
+    private Double volumeRatio;
+
+    @Column(name = "obv_trend", length = 10)
+    private String obvTrend;
+
     @Column(name = "technical_score")
     private Double technicalScore;
+
+    @Column(name = "rise_probability")
+    private Double riseProbability;
+
+    @Column(name = "probability_source", length = 10)
+    private String probabilitySource;
 
     @Column(name = "technical_reason", columnDefinition = "TEXT")
     private String technicalReason;
@@ -83,8 +95,20 @@ public class TechnicalScore {
     public Double getBbPercentB() { return bbPercentB; }
     public void setBbPercentB(Double bbPercentB) { this.bbPercentB = bbPercentB; }
 
+    public Double getVolumeRatio() { return volumeRatio; }
+    public void setVolumeRatio(Double volumeRatio) { this.volumeRatio = volumeRatio; }
+
+    public String getObvTrend() { return obvTrend; }
+    public void setObvTrend(String obvTrend) { this.obvTrend = obvTrend; }
+
     public Double getTechnicalScore() { return technicalScore; }
     public void setTechnicalScore(Double technicalScore) { this.technicalScore = technicalScore; }
+
+    public Double getRiseProbability() { return riseProbability; }
+    public void setRiseProbability(Double riseProbability) { this.riseProbability = riseProbability; }
+
+    public String getProbabilitySource() { return probabilitySource; }
+    public void setProbabilitySource(String probabilitySource) { this.probabilitySource = probabilitySource; }
 
     public String getTechnicalReason() { return technicalReason; }
     public void setTechnicalReason(String technicalReason) { this.technicalReason = technicalReason; }

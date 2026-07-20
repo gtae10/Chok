@@ -19,7 +19,7 @@
 
 <main class="layout layout--detail">
 
-    <section class="detail-head">
+    <div class="detail-head">
         <h1 id="stockName">불러오는 중...</h1>
         <div class="detail-head__sub">
             <span id="stockTicker" class="meta-pill"></span>
@@ -27,9 +27,9 @@
             <span id="stockRec" class="rec-badge"></span>
         </div>
         <p id="stockReason" class="detail-head__reason"></p>
-    </section>
+    </div>
 
-    <section class="score-cards">
+    <div class="score-cards">
         <div class="score-card">
             <span class="score-card__label">기술 점수</span>
             <span id="techScoreVal" class="score-card__value">--</span>
@@ -42,21 +42,47 @@
             <span class="score-card__label">종합 점수</span>
             <span id="finalScoreVal" class="score-card__value">--</span>
         </div>
-    </section>
+        <div class="score-card">
+            <span class="score-card__label">상승 확률</span>
+            <span id="riseProbVal" class="score-card__value">--</span>
+            <span id="probSourceTag" class="prob-tag"></span>
+        </div>
+    </div>
 
-    <section class="chart-section">
+    <p class="prob-caveat">상승확률은 실제 통계 검증된 예측이 아닌 참고용 지표입니다.</p>
+
+    <div class="chart-section">
         <h2>가격 추이</h2>
+        <div class="chart-range">
+            <button data-range="1">1일</button>
+            <button data-range="7">1주</button>
+            <button data-range="30">1개월</button>
+            <button data-range="365">1년</button>
+            <button data-range="all" class="is-active">전체</button>
+        </div>
         <div class="chart-wrap">
             <svg id="priceChart" viewBox="0 0 800 320" preserveAspectRatio="none"></svg>
+            <div id="priceTooltip" class="chart-tooltip" hidden></div>
         </div>
-    </section>
+    </div>
 
-    <section class="news-section">
-        <h2>최근 뉴스 &amp; 감성 분석</h2>
+    <div class="chart-section">
+        <h2>추천 점수 추이</h2>
+        <div class="chart-legend">
+            <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>
+            <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#3E7BFA"></i>상승확률</span>
+        </div>
+        <div class="chart-wrap">
+            <svg id="historyChart" viewBox="0 0 800 260" preserveAspectRatio="none"></svg>
+        </div>
+    </div>
+
+    <div class="news-section">
+        <h2>최근 뉴스 감성 분석</h2>
         <ul id="newsList" class="news-list">
-            <li class="loading-row">뉴스를 불러오는 중...</li>
+            <li style="list-style:none; text-align:center; color:#5C6786; padding:32px;">불러오는 중...</li>
         </ul>
-    </section>
+    </div>
 
 </main>
 

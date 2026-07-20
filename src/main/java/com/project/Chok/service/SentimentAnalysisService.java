@@ -55,7 +55,7 @@ public class SentimentAnalysisService {
                     "system", SYSTEM_PROMPT,
                     "messages", List.of(
                             Map.of("role", "user",
-                                    "content", "종목명: " + stockName + "\n뉴스 헤드라인: " + headline)
+                                   "content", "종목명: " + stockName + "\n뉴스 헤드라인: " + headline)
                     )
             );
 
@@ -66,12 +66,6 @@ public class SentimentAnalysisService {
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(requestBody)
                     .retrieve()
-                    .onStatus(status -> status.is4xxClientError(), response ->
-                            response.bodyToMono(String.class)
-                                    .doOnNext(body -> log.error("Claude API 400 에러 응답: {}", body))
-                                    .then(reactor.core.publisher.Mono.error(
-                                            new RuntimeException("400 Bad Request")))
-                    )
                     .bodyToMono(String.class)
                     .block();
 
@@ -90,8 +84,8 @@ public class SentimentAnalysisService {
             text = text.replaceAll("```json", "").replaceAll("```", "").trim();
 
             JsonNode result = objectMapper.readTree(text);
-            double score   = Math.max(-1.0, Math.min(1.0, result.path("score").asDouble(0.0)));
-            String label   = result.path("label").asText("NEUTRAL");
+            double score  = Math.max(-1.0, Math.min(1.0, result.path("score").asDouble(0.0)));
+            String label  = result.path("label").asText("NEUTRAL");
             String summary = result.path("summary").asText("");
 
             return new SentimentResult(score, label, summary);

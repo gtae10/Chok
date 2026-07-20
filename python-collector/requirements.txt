@@ -1,3 +1,5 @@
 finance-datareader>=0.9.0
 mysql-connector-python==9.1.0
 pandas>=2.0.0
+scikit-learn>=1.4.0
+numpy>=1.26.0
