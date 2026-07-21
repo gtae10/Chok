@@ -129,6 +129,7 @@ a { color: inherit; text-decoration: none; }
 }
 .prob-tag--model { background: rgba(201,169,106,0.18); color: #C9A96A; }
 .prob-tag--heuristic { background: rgba(137,147,176,0.16); color: #8993B0; }
+.prob-horizon { display: block; color: #5C6786; font-size: 0.68rem; margin-top: 2px; }
 
 .prob-caveat { margin-top: 10px; color: #5C6786; font-size: 0.74rem; }
 

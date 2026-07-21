@@ -106,7 +106,7 @@ class RecommendationServiceTest {
                 .thenReturn(new TechnicalIndicatorResult(
                         null, null, null, null, null, null, null,
                         null, null, null, 1.0, "RISING",
-                        80.0, 70.0, "HEURISTIC", "상승추세"
+                        80.0, 70.0, "HEURISTIC", null, "상승추세"
                 ));
         when(newsCollectorService.fetchRecentNews(anyString(), anyInt()))
                 .thenReturn(List.of(new NewsArticle("호재 뉴스", "http://test.com", LocalDate.now())));

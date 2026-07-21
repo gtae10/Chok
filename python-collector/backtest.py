@@ -194,6 +194,38 @@ def calc_score_v2(closes: pd.Series, volumes: pd.Series) -> float:
         + (bb_score * 0.15) + (volume_score * 0.15)
 
 
+def eligible_candidates(price_data: Dict[str, pd.DataFrame], entry_date) -> list:
+    """해당 시점 기준 최소 60일 이상 이력이 있는 종목들의 (티커, 종목명, 진입가) 목록"""
+    candidates = []
+    for ticker, df in price_data.items():
+        history = df[df.index <= entry_date]
+        if len(history) < 60:
+            continue
+        candidates.append({
+            "ticker": ticker, "name": history["name"].iloc[0],
+            "history": history, "entry_price": history["close_price"].iloc[-1],
+        })
+    return candidates
+
+
+def _resolve_return(price_data, ticker, entry_price, exit_date):
+    exit_prices = price_data[ticker][price_data[ticker].index >= exit_date]["close_price"]
+    if exit_prices.empty:
+        return None
+    exit_price = exit_prices.iloc[0]
+    return (exit_price - entry_price) / entry_price * 100
+
+
+def _rebalance_dates(all_dates):
+    rebalance_dates = []
+    prev_month = None
+    for date in all_dates:
+        if date.month != prev_month:
+            rebalance_dates.append(date)
+            prev_month = date.month
+    return rebalance_dates
+
+
 # 백테스팅 (점수 함수를 인자로 받아 v1/v2 공통으로 재사용)
 
 def run_backtest(price_data: Dict[str, pd.DataFrame], score_fn) -> pd.DataFrame:
@@ -203,12 +235,7 @@ def run_backtest(price_data: Dict[str, pd.DataFrame], score_fn) -> pd.DataFrame:
         logger.error("데이터가 부족합니다. 최소 %d일 이상 필요합니다.", HOLD_DAYS + 60)
         return pd.DataFrame()
 
-    rebalance_dates = []
-    prev_month = None
-    for date in all_dates:
-        if date.month != prev_month:
-            rebalance_dates.append(date)
-            prev_month = date.month
+    rebalance_dates = _rebalance_dates(all_dates)
 
     results = []
     for entry_date in rebalance_dates:
@@ -217,28 +244,17 @@ def run_backtest(price_data: Dict[str, pd.DataFrame], score_fn) -> pd.DataFrame:
             break
         exit_date = exit_candidates[HOLD_DAYS - 1]
 
-        scores = []
-        for ticker, df in price_data.items():
-            history = df[df.index <= entry_date]
-            if len(history) < 60:
-                continue
-            score = score_fn(history["close_price"], history["volume"])
-            scores.append({
-                "ticker": ticker, "name": history["name"].iloc[0],
-                "score": score, "entry_price": history["close_price"].iloc[-1],
-            })
-
-        if not scores:
+        candidates = eligible_candidates(price_data, entry_date)
+        if not candidates:
             continue
 
-        top = sorted(scores, key=lambda x: x["score"], reverse=True)[:TOP_N]
+        scored = [{**c, "score": score_fn(c["history"]["close_price"], c["history"]["volume"])} for c in candidates]
+        top = sorted(scored, key=lambda x: x["score"], reverse=True)[:TOP_N]
+
         for stock in top:
-            df = price_data[stock["ticker"]]
-            exit_prices = df[df.index >= exit_date]["close_price"]
-            if exit_prices.empty:
+            returns = _resolve_return(price_data, stock["ticker"], stock["entry_price"], exit_date)
+            if returns is None:
                 continue
-            exit_price = exit_prices.iloc[0]
-            returns = (exit_price - stock["entry_price"]) / stock["entry_price"] * 100
             results.append({
                 "entry_date": entry_date.strftime("%Y-%m-%d"),
                 "exit_date": exit_date.strftime("%Y-%m-%d"),
@@ -248,6 +264,59 @@ def run_backtest(price_data: Dict[str, pd.DataFrame], score_fn) -> pd.DataFrame:
             })
 
     return pd.DataFrame(results)
+
+
+def run_backtest_random(price_data: Dict[str, pd.DataFrame], rng: np.random.Generator) -> pd.DataFrame:
+    """점수 없이 매달 무작위로 TOP_N개 종목을 뽑는 베이스라인. 지표가 실제로 가치가
+    있는지 확인하려면 '아무거나 사도 오르는 시장이었나'부터 걸러내야 하기 때문에 필요함."""
+    all_dates = sorted(set(date for df in price_data.values() for date in df.index))
+    if len(all_dates) < HOLD_DAYS + 60:
+        return pd.DataFrame()
+
+    rebalance_dates = _rebalance_dates(all_dates)
+    results = []
+    for entry_date in rebalance_dates:
+        exit_candidates = [d for d in all_dates if d > entry_date]
+        if len(exit_candidates) < HOLD_DAYS:
+            break
+        exit_date = exit_candidates[HOLD_DAYS - 1]
+
+        candidates = eligible_candidates(price_data, entry_date)
+        if not candidates:
+            continue
+
+        picked_idx = rng.choice(len(candidates), size=min(TOP_N, len(candidates)), replace=False)
+        picked = [candidates[i] for i in picked_idx]
+
+        for stock in picked:
+            returns = _resolve_return(price_data, stock["ticker"], stock["entry_price"], exit_date)
+            if returns is None:
+                continue
+            results.append({
+                "entry_date": entry_date.strftime("%Y-%m-%d"), "exit_date": exit_date.strftime("%Y-%m-%d"),
+                "ticker": stock["ticker"], "name": stock["name"],
+                "returns(%)": round(returns, 2), "win": returns > 0,
+            })
+
+    return pd.DataFrame(results)
+
+
+def run_random_baseline(price_data: Dict[str, pd.DataFrame], n_trials: int = 50) -> pd.DataFrame:
+    """무작위 선택을 n_trials번 반복해서, 한 번의 운이 아니라 평균적으로
+    '아무 지표 없이 찍었을 때' 어느 정도 성과가 나는지를 추정한다."""
+    logger.info("무작위 베이스라인 %d회 반복 실행 중...", n_trials)
+    trial_summaries = []
+    for i in range(n_trials):
+        rng = np.random.default_rng(seed=i)
+        df = run_backtest_random(price_data, rng)
+        if df.empty:
+            continue
+        trial_summaries.append({
+            "win_rate": df["win"].mean() * 100,
+            "avg_return": df["returns(%)"].mean(),
+            "median_return": df["returns(%)"].median(),
+        })
+    return pd.DataFrame(trial_summaries)
 
 
 def summarize(df: pd.DataFrame, label: str) -> dict:
@@ -285,14 +354,34 @@ def main():
     summary_v1 = summarize(df_v1, "v1_no_volume")
     summary_v2 = summarize(df_v2, "v2_with_volume")
 
+    logger.info("무작위 베이스라인 실행 중 (지표 없이 매달 무작위 5종목 선택, 50회 반복)...")
+    random_trials = run_random_baseline(price_data, n_trials=50)
+    if not random_trials.empty:
+        summary_random = {
+            "label": "random_baseline",
+            "trades": f"{len(random_trials)}회 반복 평균",
+            "win_rate(%)": round(random_trials["win_rate"].mean(), 1),
+            "avg_return(%)": round(random_trials["avg_return"].mean(), 2),
+            "median_return(%)": round(random_trials["median_return"].mean(), 2),
+            "std_return(%)": round(random_trials["avg_return"].std(), 2),  # 반복 시행 간 평균수익률의 편차
+            "min_return(%)": round(random_trials["avg_return"].min(), 2),
+            "max_return(%)": round(random_trials["avg_return"].max(), 2),
+        }
+    else:
+        summary_random = {"label": "random_baseline", "trades": 0}
+
     print("\n" + "=" * 64)
-    print("v1(거래량 제외) vs v2(거래량 포함) 백테스트 비교")
+    print("v1(거래량 제외) vs v2(거래량 포함) vs random(무작위) 백테스트 비교")
     print("=" * 64)
-    comparison = pd.DataFrame([summary_v1, summary_v2]).set_index("label")
+    comparison = pd.DataFrame([summary_v1, summary_v2, summary_random]).set_index("label")
     print(comparison.to_string())
     comparison.to_csv("backtest_comparison.csv", encoding="utf-8-sig")
 
     print("\n해석 가이드:")
+    print("- v1/v2가 random_baseline보다 뚜렷이 낫지 않으면, 이 기간엔 지표 자체가")
+    print("  큰 의미가 없었다는 뜻 (그냥 아무거나 사도 오르는 시장이었을 가능성)")
+    print("- random_baseline의 std_return(%)은 '무작위로 뽑을 때마다 평균수익률이")
+    print("  얼마나 들쭉날쭉한지'를 보여줌 - 이 폭보다 v1/v2가 뚜렷이 높아야 의미있음")
     print("- win_rate/avg_return이 v2 > v1 이면 거래량 지표가 실제로 도움된 것")
     print("- std_return(변동성)이 v2 < v1 이면 더 안정적인 선택을 했다는 뜻")
     print("- 거래 횟수(trades)가 적으면(예: 10회 미만) 우연일 가능성이 크니 기간을 늘려서 재검증 필요")

@@ -1,6 +1,7 @@
 package com.project.Chok.service;
 
 import com.project.Chok.config.AppProperties;
+import com.project.Chok.config.PythonEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -15,9 +16,11 @@ public class DataCollectionService {
     private static final Logger log = LoggerFactory.getLogger(DataCollectionService.class);
 
     private final AppProperties appProperties;
+    private final PythonEnvironment pythonEnvironment;
 
-    public DataCollectionService(AppProperties appProperties) {
+    public DataCollectionService(AppProperties appProperties, PythonEnvironment pythonEnvironment) {
         this.appProperties = appProperties;
+        this.pythonEnvironment = pythonEnvironment;
     }
 
     public String runCollection() {
@@ -25,10 +28,10 @@ public class DataCollectionService {
 
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                    collector.getPythonExecutable(),
-                    collector.getScriptPath()
+                    pythonEnvironment.pythonExecutable(),
+                    pythonEnvironment.collectScriptPath()
             );
-            pb.directory(new java.io.File(collector.getWorkingDirectory()));
+            pb.directory(pythonEnvironment.workingDirectory());
             pb.redirectErrorStream(true);
 
             Process process = pb.start();

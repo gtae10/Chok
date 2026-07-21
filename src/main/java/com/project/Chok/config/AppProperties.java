@@ -12,6 +12,15 @@ public class AppProperties {
     private Collector collector = new Collector();
     private Scheduler scheduler = new Scheduler();
     private Model model = new Model();
+    private PythonCollector pythonCollector = new PythonCollector();
+
+    public PythonCollector getPythonCollector() {
+        return pythonCollector;
+    }
+
+    public void setPythonCollector(PythonCollector pythonCollector) {
+        this.pythonCollector = pythonCollector;
+    }
 
     public Anthropic getAnthropic() {
         return anthropic;
@@ -101,19 +110,7 @@ public class AppProperties {
     // chok.collector.*
     // ─────────────────────────────────────────
     public static class Collector {
-        private String pythonExecutable;
-        private String scriptPath;
-        private String workingDirectory;
-        private int timeoutSeconds;
-
-        public String getPythonExecutable() { return pythonExecutable; }
-        public void setPythonExecutable(String pythonExecutable) { this.pythonExecutable = pythonExecutable; }
-
-        public String getScriptPath() { return scriptPath; }
-        public void setScriptPath(String scriptPath) { this.scriptPath = scriptPath; }
-
-        public String getWorkingDirectory() { return workingDirectory; }
-        public void setWorkingDirectory(String workingDirectory) { this.workingDirectory = workingDirectory; }
+        private int timeoutSeconds = 120;
 
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
@@ -137,17 +134,10 @@ public class AppProperties {
     // chok.model.* - rise-probability logistic regression model
     // ─────────────────────────────────────────
     public static class Model {
-        private String path = "python-collector/model/rise_model.json";
         private boolean retrainEnabled = false;
         private String retrainCron = "0 0 20 * * SUN";
-        private String pythonExecutable;
-        private String trainScriptPath;
-        private String workingDirectory;
         private int timeoutSeconds = 300;
         private int minSamples = 500;
-
-        public String getPath() { return path; }
-        public void setPath(String path) { this.path = path; }
 
         public boolean isRetrainEnabled() { return retrainEnabled; }
         public void setRetrainEnabled(boolean retrainEnabled) { this.retrainEnabled = retrainEnabled; }
@@ -155,19 +145,21 @@ public class AppProperties {
         public String getRetrainCron() { return retrainCron; }
         public void setRetrainCron(String retrainCron) { this.retrainCron = retrainCron; }
 
-        public String getPythonExecutable() { return pythonExecutable; }
-        public void setPythonExecutable(String pythonExecutable) { this.pythonExecutable = pythonExecutable; }
-
-        public String getTrainScriptPath() { return trainScriptPath; }
-        public void setTrainScriptPath(String trainScriptPath) { this.trainScriptPath = trainScriptPath; }
-
-        public String getWorkingDirectory() { return workingDirectory; }
-        public void setWorkingDirectory(String workingDirectory) { this.workingDirectory = workingDirectory; }
-
         public int getTimeoutSeconds() { return timeoutSeconds; }
         public void setTimeoutSeconds(int timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
 
         public int getMinSamples() { return minSamples; }
         public void setMinSamples(int minSamples) { this.minSamples = minSamples; }
+    }
+
+    // ─────────────────────────────────────────
+    // chok.python-collector.* - python-collector 폴더 위치 하나만 지정하면
+    // 파이썬 실행파일/스크립트/모델파일 경로는 PythonEnvironment가 전부 계산해줌
+    // ─────────────────────────────────────────
+    public static class PythonCollector {
+        private String baseDir = "python-collector";
+
+        public String getBaseDir() { return baseDir; }
+        public void setBaseDir(String baseDir) { this.baseDir = baseDir; }
     }
 }

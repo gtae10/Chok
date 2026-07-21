@@ -72,7 +72,8 @@ function renderHeader(item) {
     } else {
         riseProbEl.textContent = fmt(item.riseProbability) + "%";
         const isModel = item.probabilitySource === "MODEL";
-        probTagEl.textContent = isModel ? "학습 기반" : "추정치";
+        const horizon = (isModel && item.probabilityHorizonDays) ? " · " + item.probabilityHorizonDays + "영업일 기준" : "";
+        probTagEl.textContent = (isModel ? "학습 기반" : "추정치") + horizon;
         probTagEl.className = "prob-tag " + (isModel ? "prob-tag--model" : "prob-tag--heuristic");
     }
 }

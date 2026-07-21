@@ -1,7 +1,7 @@
 package com.project.Chok.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.project.Chok.config.AppProperties;
+import com.project.Chok.config.PythonEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,14 +29,14 @@ public class RiseProbabilityService {
             "macdHistNorm", "bbPercentB", "logVolumeRatio"
     );
 
-    private final AppProperties appProperties;
+    private final PythonEnvironment pythonEnvironment;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private volatile ModelData cachedModel;
     private volatile long cachedModelLastModified = -1;
 
-    public RiseProbabilityService(AppProperties appProperties) {
-        this.appProperties = appProperties;
+    public RiseProbabilityService(PythonEnvironment pythonEnvironment) {
+        this.pythonEnvironment = pythonEnvironment;
     }
 
     /** 모델이 있으면 표준화 + 시그모이드로 확률(0~100)을 계산, 없으면 null */
@@ -62,6 +62,12 @@ public class RiseProbabilityService {
         return loadModelIfAvailable() != null;
     }
 
+    /** 모델이 사용됐다면 그 모델이 학습된 예측기간(영업일), 없으면 null */
+    public Integer getModelForwardDays() {
+        ModelData model = loadModelIfAvailable();
+        return model == null ? null : model.forwardDays;
+    }
+
     public ModelMeta getMeta() {
         ModelData model = loadModelIfAvailable();
         if (model == null) return null;
@@ -69,7 +75,7 @@ public class RiseProbabilityService {
     }
 
     private ModelData loadModelIfAvailable() {
-        String path = appProperties.getModel().getPath();
+        String path = pythonEnvironment.modelOutputPath();
         if (path == null || path.isBlank()) return null;
 
         File file = new File(path);

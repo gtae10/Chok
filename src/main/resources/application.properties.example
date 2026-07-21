@@ -24,10 +24,12 @@ chok.analysis.news-per-stock=5
 chok.analysis.news-lookback-days=3
 chok.analysis.parallelism=5
 
-# chok.collector.* - python script settings for price collection
-chok.collector.python-executable=C:\\path\\to\\python-collector\\.venv\\Scripts\\python.exe
-chok.collector.script-path=C:\\path\\to\\python-collector\\collect.py
-chok.collector.working-directory=C:\\path\\to\\python-collector
+# chok.python-collector.* - python-collector 폴더 위치 (상대경로 기본값, 프로젝트 루트 기준)
+# 이 값 하나만 있으면 파이썬 실행파일/스크립트/모델파일 경로는 자동으로 계산됨 (OS도 자동 감지)
+# 다른 위치에 두고 싶으면 절대경로로 바꿔도 됨: chok.python-collector.base-dir=C:\\path\\to\\python-collector
+chok.python-collector.base-dir=python-collector
+
+# chok.collector.* - price collection settings
 chok.collector.timeout-seconds=120
 
 # chok.scheduler.* - automatic daily collection + analysis
@@ -35,11 +37,7 @@ chok.scheduler.enabled=true
 chok.scheduler.cron=0 30 18 * * MON-FRI
 
 # chok.model.* - rise-probability logistic regression model
-chok.model.path=python-collector\\model\\rise_model.json
 chok.model.retrain-enabled=false
 chok.model.retrain-cron=0 0 20 * * SUN
-chok.model.python-executable=C:\\path\\to\\python-collector\\.venv\\Scripts\\python.exe
-chok.model.train-script-path=C:\\path\\to\\python-collector\\train_model.py
-chok.model.working-directory=C:\\path\\to\\python-collector
 chok.model.timeout-seconds=300
 chok.model.min-samples=500

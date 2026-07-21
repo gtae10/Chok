@@ -39,6 +39,9 @@ public class Recommendation {
     @Column(name = "probability_source", length = 10)
     private String probabilitySource;
 
+    @Column(name = "probability_horizon_days")
+    private Integer probabilityHorizonDays;
+
     @Column(length = 20)
     private String recommendation;
 
@@ -77,6 +80,9 @@ public class Recommendation {
 
     public String getProbabilitySource() { return probabilitySource; }
     public void setProbabilitySource(String probabilitySource) { this.probabilitySource = probabilitySource; }
+
+    public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
+    public void setProbabilityHorizonDays(Integer probabilityHorizonDays) { this.probabilityHorizonDays = probabilityHorizonDays; }
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
