@@ -6,116 +6,116 @@
         "fold": 3,
         "trainSize": 2603,
         "testSize": 2700,
-        "baselineAccuracy": 0.66,
-        "noVolumeAccuracy": 0.6096296296296296,
-        "noVolumeAuc": 0.5749372201805026,
-        "fullAccuracy": 0.6122222222222222,
-        "fullAuc": 0.5756090314913844
+        "baselineAccuracy": 0.5,
+        "noVolumeAccuracy": 0.572962962962963,
+        "noVolumeAuc": 0.5885360768175584,
+        "fullAccuracy": 0.575925925925926,
+        "fullAuc": 0.5894238683127572
       },
       {
         "fold": 4,
         "trainSize": 5303,
         "testSize": 2725,
-        "baselineAccuracy": 0.6741284403669725,
-        "noVolumeAccuracy": 0.6293577981651376,
-        "noVolumeAuc": 0.5793125052107088,
-        "fullAccuracy": 0.6286238532110092,
-        "fullAuc": 0.5761603328968599
+        "baselineAccuracy": 0.5045871559633027,
+        "noVolumeAccuracy": 0.5177981651376147,
+        "noVolumeAuc": 0.5250294949494949,
+        "fullAccuracy": 0.5214678899082569,
+        "fullAuc": 0.5255445117845118
       },
       {
         "fold": 5,
         "trainSize": 8003,
-        "testSize": 2640,
-        "baselineAccuracy": 0.6647727272727273,
-        "noVolumeAccuracy": 0.6575757575757576,
-        "noVolumeAuc": 0.5513203599079306,
-        "fullAccuracy": 0.6568181818181819,
-        "fullAuc": 0.5520311619746647
+        "testSize": 2654,
+        "baselineAccuracy": 0.5026375282592314,
+        "noVolumeAccuracy": 0.5301431801055011,
+        "noVolumeAuc": 0.5347905592658216,
+        "fullAccuracy": 0.5320271288620949,
+        "fullAuc": 0.5345395484076144
       }
     ],
-    "baselineAccuracyMean": 0.6663003892132332,
-    "baselineAccuracyStd": 0.005868192228964964,
-    "noVolumeAccuracyMean": 0.6321877284568416,
-    "noVolumeAccuracyStd": 0.019675944286506236,
-    "noVolumeAucMean": 0.5685233617663806,
-    "noVolumeAucStd": 0.012294802004106282,
-    "fullAccuracyMean": 0.6325547524171378,
-    "fullAccuracyStd": 0.018417181823823688,
-    "fullAucMean": 0.5679335087876364,
-    "fullAucStd": 0.011246909469714812
+    "baselineAccuracyMean": 0.5024082280741781,
+    "baselineAccuracyStd": 0.0018797045670468282,
+    "noVolumeAccuracyMean": 0.540301436068693,
+    "noVolumeAccuracyStd": 0.023638687963282858,
+    "noVolumeAucMean": 0.549452043677625,
+    "noVolumeAucStd": 0.027922402344228024,
+    "fullAccuracyMean": 0.5431403148987592,
+    "fullAccuracyStd": 0.02358031099087498,
+    "fullAucMean": 0.5498359761682945,
+    "fullAucStd": 0.028232706497889393
   },
   "sweep": {
     "labelMode": "relative",
     "results": [
       {
         "horizon": 3,
-        "samples": 21191,
-        "baselineAcc": 0.5677057846635352,
-        "noVolumeAuc": 0.47305611888863996,
-        "fullAuc": 0.47041753993937013
+        "samples": 21205,
+        "baselineAcc": 0.5024597931495365,
+        "noVolumeAuc": 0.46290534180583726,
+        "fullAuc": 0.46171760524832683
       },
       {
         "horizon": 5,
-        "samples": 20973,
-        "baselineAcc": 0.5716815606447531,
-        "noVolumeAuc": 0.48303574806803135,
-        "fullAuc": 0.4819710126907088
+        "samples": 20987,
+        "baselineAcc": 0.5024334316550261,
+        "noVolumeAuc": 0.4650093311365362,
+        "fullAuc": 0.4638288815107118
       },
       {
         "horizon": 10,
-        "samples": 20428,
-        "baselineAcc": 0.5815043084268103,
-        "noVolumeAuc": 0.4722051739792475,
-        "fullAuc": 0.4715630142784013
+        "samples": 20442,
+        "baselineAcc": 0.5023026040764546,
+        "noVolumeAuc": 0.4686985167308727,
+        "fullAuc": 0.4677329900920821
       },
       {
         "horizon": 20,
-        "samples": 19338,
-        "baselineAcc": 0.6009275843042028,
-        "noVolumeAuc": 0.49059197113118264,
-        "fullAuc": 0.4922152428668364
+        "samples": 19352,
+        "baselineAcc": 0.5021248637300524,
+        "noVolumeAuc": 0.47904826721935256,
+        "fullAuc": 0.4789306799137384
       },
       {
         "horizon": 30,
-        "samples": 18248,
-        "baselineAcc": 0.627799479371503,
-        "noVolumeAuc": 0.5312604584217564,
-        "fullAuc": 0.530979363051855
+        "samples": 18262,
+        "baselineAcc": 0.5024100118314547,
+        "noVolumeAuc": 0.5141783805051816,
+        "fullAuc": 0.5134425387219631
       },
       {
         "horizon": 40,
-        "samples": 17158,
-        "baselineAcc": 0.6412901576493715,
-        "noVolumeAuc": 0.552482566939727,
-        "fullAuc": 0.5481190267745605
+        "samples": 17172,
+        "baselineAcc": 0.5021096923411651,
+        "noVolumeAuc": 0.5370014527295875,
+        "fullAuc": 0.5336089624323774
       },
       {
         "horizon": 50,
-        "samples": 16068,
-        "baselineAcc": 0.6663003892132332,
-        "noVolumeAuc": 0.5685233617663806,
-        "fullAuc": 0.5679335087876364
+        "samples": 16082,
+        "baselineAcc": 0.5024082280741781,
+        "noVolumeAuc": 0.549452043677625,
+        "fullAuc": 0.5498359761682945
       },
       {
         "horizon": 60,
-        "samples": 14978,
-        "baselineAcc": 0.6727075693287295,
-        "noVolumeAuc": 0.6031118525019394,
-        "fullAuc": 0.6037147575089982
+        "samples": 14992,
+        "baselineAcc": 0.5019180091683039,
+        "noVolumeAuc": 0.565281991648458,
+        "fullAuc": 0.5652572598308375
       },
       {
         "horizon": 70,
-        "samples": 13888,
-        "baselineAcc": 0.6852333941219312,
-        "noVolumeAuc": 0.6163354354814403,
-        "fullAuc": 0.6157160055866164
+        "samples": 13902,
+        "baselineAcc": 0.5020207052892367,
+        "noVolumeAuc": 0.5561508368610429,
+        "fullAuc": 0.5549912050154695
       },
       {
         "horizon": 80,
-        "samples": 12798,
-        "baselineAcc": 0.6725536992840095,
-        "noVolumeAuc": 0.6106185351561288,
-        "fullAuc": 0.6163283928597294
+        "samples": 12812,
+        "baselineAcc": 0.5021337126600285,
+        "noVolumeAuc": 0.5431215432348576,
+        "fullAuc": 0.5451701965016412
       }
     ]
   }

@@ -131,7 +131,8 @@ public class RecommendationService {
 
         saveRecommendation(stock, today, techResult.getTechnicalScore(),
                 avgSentiment, finalScore, techResult.getRiseProbability(),
-                techResult.getProbabilitySource(), recommendation, reason);
+                techResult.getProbabilitySource(), techResult.getProbabilityHorizonDays(),
+                recommendation, reason);
     }
 
     private void saveTechnicalScore(String ticker, LocalDate today, TechnicalIndicatorResult r) {
@@ -156,6 +157,7 @@ public class RecommendationService {
         entity.setTechnicalScore(r.getTechnicalScore());
         entity.setRiseProbability(r.getRiseProbability());
         entity.setProbabilitySource(r.getProbabilitySource());
+        entity.setProbabilityHorizonDays(r.getProbabilityHorizonDays());
         entity.setTechnicalReason(r.getTechnicalReason());
 
         technicalScoreRepository.save(entity);
@@ -228,6 +230,7 @@ public class RecommendationService {
     private void saveRecommendation(Stock stock, LocalDate today, double techScore,
                                     double sentimentScore, double finalScore,
                                     double riseProbability, String probabilitySource,
+                                    Integer probabilityHorizonDays,
                                     String recommendation, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
@@ -245,6 +248,7 @@ public class RecommendationService {
         entity.setFinalScore(round2(finalScore));
         entity.setRiseProbability(round2(riseProbability));
         entity.setProbabilitySource(probabilitySource);
+        entity.setProbabilityHorizonDays(probabilityHorizonDays);
         entity.setRecommendation(recommendation);
         entity.setReason(reason);
 

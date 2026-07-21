@@ -77,7 +77,9 @@ function renderProbability(item) {
     const isModel = item.probabilitySource === "MODEL";
     const tagClass = isModel ? "prob-tag--model" : "prob-tag--heuristic";
     const tagLabel = isModel ? "학습" : "추정";
-    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>';
+    const horizon = (isModel && item.probabilityHorizonDays)
+        ? '<span class="prob-horizon">(' + item.probabilityHorizonDays + '영업일 기준)</span>' : "";
+    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>' + horizon;
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

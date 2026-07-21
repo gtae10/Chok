@@ -53,6 +53,9 @@ public class TechnicalScore {
     @Column(name = "probability_source", length = 10)
     private String probabilitySource;
 
+    @Column(name = "probability_horizon_days")
+    private Integer probabilityHorizonDays;
+
     @Column(name = "technical_reason", columnDefinition = "TEXT")
     private String technicalReason;
 
@@ -109,6 +112,9 @@ public class TechnicalScore {
 
     public String getProbabilitySource() { return probabilitySource; }
     public void setProbabilitySource(String probabilitySource) { this.probabilitySource = probabilitySource; }
+
+    public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
+    public void setProbabilityHorizonDays(Integer probabilityHorizonDays) { this.probabilityHorizonDays = probabilityHorizonDays; }
 
     public String getTechnicalReason() { return technicalReason; }
     public void setTechnicalReason(String technicalReason) { this.technicalReason = technicalReason; }

@@ -17,6 +17,7 @@ public class TechnicalIndicatorResult {
     private Double technicalScore;
     private Double riseProbability;
     private String probabilitySource; // "MODEL" | "HEURISTIC"
+    private Integer probabilityHorizonDays; // MODEL일 때만 값 있음 (학습된 예측기간, 영업일)
     private String technicalReason;
 
     public TechnicalIndicatorResult(Double ma5, Double ma20, Double ma60,
@@ -24,7 +25,8 @@ public class TechnicalIndicatorResult {
                                     Double macdHistogram, Double bbUpper, Double bbLower,
                                     Double bbPercentB, Double volumeRatio, String obvTrend,
                                     Double technicalScore, Double riseProbability,
-                                    String probabilitySource, String technicalReason) {
+                                    String probabilitySource, Integer probabilityHorizonDays,
+                                    String technicalReason) {
         this.ma5 = ma5;
         this.ma20 = ma20;
         this.ma60 = ma60;
@@ -40,6 +42,7 @@ public class TechnicalIndicatorResult {
         this.technicalScore = technicalScore;
         this.riseProbability = riseProbability;
         this.probabilitySource = probabilitySource;
+        this.probabilityHorizonDays = probabilityHorizonDays;
         this.technicalReason = technicalReason;
     }
 
@@ -48,7 +51,7 @@ public class TechnicalIndicatorResult {
         return new TechnicalIndicatorResult(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null,
-                50.0, 50.0, "HEURISTIC",
+                50.0, 50.0, "HEURISTIC", null,
                 "가격 데이터 부족으로 중립 처리"
         );
     }
@@ -68,5 +71,6 @@ public class TechnicalIndicatorResult {
     public Double getTechnicalScore() { return technicalScore; }
     public Double getRiseProbability() { return riseProbability; }
     public String getProbabilitySource() { return probabilitySource; }
+    public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
     public String getTechnicalReason() { return technicalReason; }
 }

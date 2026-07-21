@@ -7,7 +7,9 @@ train_model.py
 
 라벨은 두 가지 모드를 지원한다 (파일 상단 LABEL_MODE 설정):
 - absolute : N일 뒤 종가가 지금보다 높았는가 (예전 방식) - 시장 전체 상승/하락 국면에 라벨이 크게 좌우됨
-- relative : N일 뒤 수익률이 "그날 전체 종목 평균 수익률"보다 높았는가 (기본값)
+- relative : N일 뒤 수익률이 "그날 전체 종목 수익률의 중앙값"보다 높았는가 (기본값)
+             평균이 아닌 중앙값을 쓰는 이유: 수익률 분포가 오른쪽으로 길게 늘어져 있어
+             평균 기준으로 하면 기간이 길어질수록 클래스 불균형이 심해지는 문제가 있음
              시장 전체가 오르든 내리든 "그 안에서 상대적으로 잘한 종목"을 맞히는 문제로 바뀌어서
              국면 변화(베이스라인이 폴드마다 크게 요동치던 문제)에 덜 흔들릴 것으로 기대.
 
@@ -140,13 +142,18 @@ def build_dataset(price_df: pd.DataFrame, horizons) -> pd.DataFrame:
     dataset = dataset.dropna(subset=FEATURE_NAMES)
 
     # 기간별로 절대/상대 라벨 생성
+    # 상대라벨은 평균(mean) 대신 중앙값(median) 기준으로 비교한다.
+    # 주식 수익률은 오른쪽 꼬리가 긴 분포라(가끔 나오는 대박 종목이 평균을 끌어올림),
+    # 평균을 기준으로 삼으면 기간이 길어질수록 "평균보다 잘한 종목"이 점점 소수가 되어
+    # 클래스 불균형이 커지고 베이스라인이 기간에 비례해 계속 올라가는 착시가 생긴다.
+    # 중앙값은 정의상 위/아래가 항상 절반씩이라 기간과 무관하게 클래스가 균형을 유지한다.
     for h in horizons:
         col = f"fwd_return_{h}"
         dataset[f"label_abs_{h}"] = (dataset[col] > 0).astype(float)
         dataset.loc[dataset[col].isna(), f"label_abs_{h}"] = np.nan
 
-        market_avg = dataset.groupby("trade_date")[col].transform("mean")
-        dataset[f"label_rel_{h}"] = (dataset[col] > market_avg).astype(float)
+        market_median = dataset.groupby("trade_date")[col].transform("median")
+        dataset[f"label_rel_{h}"] = (dataset[col] > market_median).astype(float)
         dataset.loc[dataset[col].isna(), f"label_rel_{h}"] = np.nan
 
     return dataset

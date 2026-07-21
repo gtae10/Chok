@@ -1,12 +1,12 @@
 package com.project.Chok.service;
 
 import com.project.Chok.config.AppProperties;
+import com.project.Chok.config.PythonEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
@@ -21,25 +21,22 @@ public class ModelTrainingService {
     private static final Logger log = LoggerFactory.getLogger(ModelTrainingService.class);
 
     private final AppProperties appProperties;
+    private final PythonEnvironment pythonEnvironment;
 
-    public ModelTrainingService(AppProperties appProperties) {
+    public ModelTrainingService(AppProperties appProperties, PythonEnvironment pythonEnvironment) {
         this.appProperties = appProperties;
+        this.pythonEnvironment = pythonEnvironment;
     }
 
     public String retrain() {
         AppProperties.Model model = appProperties.getModel();
 
-        if (model.getPythonExecutable() == null || model.getTrainScriptPath() == null) {
-            throw new IllegalStateException(
-                    "chok.model.python-executable / chok.model.train-script-path 설정이 비어있음");
-        }
-
         try {
             ProcessBuilder pb = new ProcessBuilder(
-                    model.getPythonExecutable(),
-                    model.getTrainScriptPath()
+                    pythonEnvironment.pythonExecutable(),
+                    pythonEnvironment.trainScriptPath()
             );
-            pb.directory(new File(model.getWorkingDirectory()));
+            pb.directory(pythonEnvironment.workingDirectory());
             pb.redirectErrorStream(true);
 
             Process process = pb.start();

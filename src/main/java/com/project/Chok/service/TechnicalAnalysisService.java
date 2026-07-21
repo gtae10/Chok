@@ -94,12 +94,15 @@ public class TechnicalAnalysisService {
         Double modelProbability = riseProbabilityService.predict(features);
         double riseProbability;
         String probabilitySource;
+        Integer probabilityHorizonDays;
         if (modelProbability != null) {
             riseProbability = clamp(modelProbability, 1, 99);
             probabilitySource = "MODEL";
+            probabilityHorizonDays = riseProbabilityService.getModelForwardDays();
         } else {
             riseProbability = heuristicProbability(maScore, rsiScore, macdScore, bbScore, volumeScore);
             probabilitySource = "HEURISTIC";
+            probabilityHorizonDays = null; // 휴리스틱은 특정 예측기간을 주장하지 않음
         }
 
         return new TechnicalIndicatorResult(
@@ -108,7 +111,7 @@ public class TechnicalAnalysisService {
                 round2(macd), round2(macdSignal), round2(macdHist),
                 round2(bbUpper), round2(bbLower), round2(bbPercentB),
                 round2(volumeRatio), obvTrend,
-                round2(finalScore), round2(riseProbability), probabilitySource,
+                round2(finalScore), round2(riseProbability), probabilitySource, probabilityHorizonDays,
                 reason.toString().trim()
         );
     }
