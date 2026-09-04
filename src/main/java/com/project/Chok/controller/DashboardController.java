@@ -15,4 +15,9 @@ public class DashboardController {
     public String stockDetail() {
         return "stock-detail";
     }
+
+    @GetMapping("/performance")
+    public String performance() {
+        return "performance";
+    }
 }

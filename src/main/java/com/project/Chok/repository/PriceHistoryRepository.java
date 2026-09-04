@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface PriceHistoryRepository extends JpaRepository<PriceHistory, Long> {
 
@@ -15,4 +16,11 @@ public interface PriceHistoryRepository extends JpaRepository<PriceHistory, Long
 
     @Query("SELECT p FROM PriceHistory p WHERE p.ticker = :ticker AND p.tradeDate >= :fromDate ORDER BY p.tradeDate ASC")
     List<PriceHistory> findByTickerSince(@Param("ticker") String ticker, @Param("fromDate") LocalDate fromDate);
+
+    @Query("SELECT p FROM PriceHistory p WHERE p.ticker = :ticker AND p.tradeDate = :tradeDate")
+    Optional<PriceHistory> findByTickerAndTradeDate(@Param("ticker") String ticker, @Param("tradeDate") LocalDate tradeDate);
+
+    @Query("SELECT p FROM PriceHistory p WHERE p.ticker = :ticker AND p.tradeDate = " +
+           "(SELECT MAX(p2.tradeDate) FROM PriceHistory p2 WHERE p2.ticker = :ticker)")
+    Optional<PriceHistory> findLatestByTicker(@Param("ticker") String ticker);
 }

@@ -12,6 +12,7 @@ import com.project.Chok.repository.RecommendationRepository;
 import com.project.Chok.service.AnalysisStatus;
 import com.project.Chok.service.DataCollectionService;
 import com.project.Chok.service.RecommendationService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -132,17 +133,29 @@ public class RecommendationController {
     }
 
     @GetMapping("/stocks/{ticker}/news")
-    public ResponseEntity<List<NewsSentiment>> getNews(@PathVariable String ticker) {
+    public ResponseEntity<List<NewsSentiment>> getNews(
+            @PathVariable String ticker,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "30") int size) {
         int lookbackDays = appProperties.getAnalysis().getNewsLookbackDays();
         LocalDate fromDate = LocalDate.now().minusDays(Math.max(lookbackDays, 1));
-        return ResponseEntity.ok(newsSentimentRepository.findByTickerSince(ticker, fromDate));
+        int pageSize = Math.min(Math.max(size, 1), 100); // 방어적으로 상한선
+        List<NewsSentiment> news = newsSentimentRepository.findByTickerSince(
+                ticker, fromDate, PageRequest.of(Math.max(page, 0), pageSize));
+        long total = newsSentimentRepository.countByTickerSince(ticker, fromDate);
+        return ResponseEntity.ok().header("X-Total-Count", String.valueOf(total)).body(news);
     }
 
     @GetMapping("/stocks/{ticker}/history")
-    public ResponseEntity<List<RecommendationResponse>> getHistory(@PathVariable String ticker) {
-        return ResponseEntity.ok(
-                recommendationRepository.findHistoryByTicker(ticker)
-                        .stream().map(RecommendationResponse::new).collect(Collectors.toList())
-        );
+    public ResponseEntity<List<RecommendationResponse>> getHistory(
+            @PathVariable String ticker,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "400") int size) {
+        int pageSize = Math.min(Math.max(size, 1), 1000); // 방어적으로 상한선
+        List<RecommendationResponse> history = recommendationRepository
+                .findHistoryByTicker(ticker, PageRequest.of(Math.max(page, 0), pageSize))
+                .stream().map(RecommendationResponse::new).collect(Collectors.toList());
+        long total = recommendationRepository.countByTicker(ticker);
+        return ResponseEntity.ok().header("X-Total-Count", String.valueOf(total)).body(history);
     }
 }

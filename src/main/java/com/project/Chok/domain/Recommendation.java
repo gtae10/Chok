@@ -45,6 +45,11 @@ public class Recommendation {
     @Column(length = 20)
     private String recommendation;
 
+    // HOLD 구간 내에서 50점 대비 어느 쪽에 가까운지 세분화한 부가 정보.
+    // SLIGHTLY_POSITIVE / SLIGHTLY_NEGATIVE / UNCERTAIN 중 하나, HOLD가 아니면 null.
+    @Column(name = "recommendation_nuance", length = 20)
+    private String recommendationNuance;
+
     @Column(columnDefinition = "TEXT")
     private String reason;
 
@@ -86,6 +91,9 @@ public class Recommendation {
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
+
+    public String getRecommendationNuance() { return recommendationNuance; }
+    public void setRecommendationNuance(String recommendationNuance) { this.recommendationNuance = recommendationNuance; }
 
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }

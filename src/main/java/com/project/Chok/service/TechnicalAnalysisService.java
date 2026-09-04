@@ -25,6 +25,7 @@ public class TechnicalAnalysisService {
     private static final double BOLLINGER_STD_MULT = 2.0;
     private static final int VOLUME_AVG_PERIOD = 20;
     private static final int OBV_TREND_LOOKBACK = 5;
+    private static final int MOMENTUM_PERIOD = 90; // 중기 모멘텀(누적수익률) 계산 기간, 영업일 기준
 
     private final RiseProbabilityService riseProbabilityService;
 
@@ -33,9 +34,10 @@ public class TechnicalAnalysisService {
     }
 
     public TechnicalIndicatorResult analyze(List<PriceHistory> priceHistory) {
-        if (priceHistory == null || priceHistory.size() < MA_LONG) {
+        int minRequired = Math.max(MA_LONG, MOMENTUM_PERIOD);
+        if (priceHistory == null || priceHistory.size() < minRequired) {
             log.warn("가격 데이터 부족: 최소 {}일 필요, 현재 {}일",
-                    MA_LONG, priceHistory == null ? 0 : priceHistory.size());
+                    minRequired, priceHistory == null ? 0 : priceHistory.size());
             return TechnicalIndicatorResult.insufficient();
         }
 
@@ -77,6 +79,9 @@ public class TechnicalAnalysisService {
         double[] obv = obvSeries(closes, volumes);
         String obvTrend = obvTrend(obv);
 
+        // 중기 모멘텀 (90영업일 누적수익률) - 로지스틱 회귀 특징으로만 사용, technicalScore 가중치는 안 건드림
+        double momentum90 = momentum(closes, MOMENTUM_PERIOD);
+
         // 점수화
         StringBuilder reason = new StringBuilder();
         double maScore     = scoreMa(currentPrice, ma5, ma20, ma60, reason);
@@ -90,7 +95,7 @@ public class TechnicalAnalysisService {
         finalScore = clamp(finalScore, 0, 100);
 
         // 상승확률: 학습된 모델이 있으면 그걸로, 없으면 위 점수들을 조합한 휴리스틱으로 대체
-        double[] features = buildFeatureVector(currentPrice, ma5, ma20, ma60, rsi, macdHist, bbPercentB, volumeRatio);
+        double[] features = buildFeatureVector(currentPrice, ma5, ma20, ma60, rsi, macdHist, bbPercentB, volumeRatio, momentum90);
         Double modelProbability = riseProbabilityService.predict(features);
         double riseProbability;
         String probabilitySource;
@@ -119,7 +124,8 @@ public class TechnicalAnalysisService {
     // ── 특징 벡터 (RiseProbabilityService.FEATURE_NAMES 순서와 반드시 일치해야 함) ──
 
     private double[] buildFeatureVector(double close, double ma5, double ma20, double ma60,
-                                         double rsi, double macdHist, double bbPercentB, double volumeRatio) {
+                                         double rsi, double macdHist, double bbPercentB,
+                                         double volumeRatio, double momentum90) {
         return new double[]{
                 (close - ma5) / close,
                 (ma5 - ma20) / ma20,
@@ -127,8 +133,18 @@ public class TechnicalAnalysisService {
                 (rsi - 50) / 50,
                 macdHist / close,
                 bbPercentB,
-                Math.log(Math.max(volumeRatio, 0.01))
+                Math.log(Math.max(volumeRatio, 0.01)),
+                momentum90
         };
+    }
+
+    /** N영업일 전 대비 현재까지의 누적수익률. 중기(수개월) 모멘텀을 나타내는 팩터. */
+    private double momentum(List<Double> closes, int period) {
+        int size = closes.size();
+        if (size <= period) return 0.0;
+        double past = closes.get(size - 1 - period);
+        double current = closes.get(size - 1);
+        return past != 0 ? (current - past) / past : 0.0;
     }
 
     // 모델이 없을 때: 기존 지표 점수들을 -1~1 신호로 정규화해 가중합 후 시그모이드로 확률화.

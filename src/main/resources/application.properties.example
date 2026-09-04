@@ -10,12 +10,29 @@ spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
 
 spring.sql.init.mode=never
-spring.sql.init.schema-locations=classpath:db/schema.sql
 
-# chok.anthropic.* - Claude API for news sentiment analysis
+# chok.sentiment.* - news sentiment analysis provider selection
+# provider: 여기 지정한 이름의 빈(openai 또는 anthropic)이 실제 감성분석에 사용됨
+# max-concurrent-calls: chok.analysis.parallelism(종목 병렬도)과는 별개로 LLM API로 나가는
+# 동시 요청 수 자체를 제한한다 (레이트리밋 대응 - 종목 병렬도를 올려도 이 값은 그대로 적용됨)
+chok.sentiment.provider=openai
+chok.sentiment.max-concurrent-calls=3
+
+# chok.openai.* - OpenAI API for news sentiment analysis
+chok.openai.api-key=CHANGE_ME
+chok.openai.model=gpt-4o-mini
+chok.openai.base-url=https://api.openai.com/v1/chat/completions
+
+# chok.anthropic.* - Anthropic Claude API (chok.sentiment.provider=anthropic 일 때 사용)
 chok.anthropic.api-key=CHANGE_ME
-chok.anthropic.model=claude-sonnet-4-6
+chok.anthropic.model=claude-sonnet-4-5
 chok.anthropic.base-url=https://api.anthropic.com/v1/messages
+
+# chok.news.* - 같은 사건을 다루는 헤드라인(언론사만 다름) 중복 제거
+# dedup-similarity-threshold: 문자 2-gram Jaccard 유사도가 이 값 이상이면 같은 사건으로 보고
+# LLM 호출 전 단계에서 건너뜀. 실제 뉴스로 보정한 값 - 서로 다른 사건은 보통 0.1 근처,
+# 같은 사건은 리드 문구가 달라도 대개 0.25~0.7 사이로 나와서 0.3으로 설정 (필요시 조정 가능)
+chok.news.dedup-similarity-threshold=0.3
 
 # chok.analysis.* - final score weights (technical 65% + sentiment 35%)
 chok.analysis.weight-technical=0.65

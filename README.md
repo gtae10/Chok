@@ -13,7 +13,7 @@
 ## 프로젝트 소개
 
 촉(Chok)은 KOSPI/KOSDAQ 시가총액 상위 100개 종목을 대상으로
-**기술적 분석(거래량 포함) + Claude AI 뉴스 감성 분석**을 결합해
+**기술적 분석(거래량 포함) + OpenAI 뉴스 감성 분석**을 결합해
 종목별 추천 점수와 상승확률을 산출하는 웹 대시보드다.
 
 단순히 지표를 계산해서 보여주는 데서 그치지 않고, **"상승확률"이 실제로 통계적
@@ -26,7 +26,7 @@
 
 - 시가총액 상위 100개 종목 자동 수집 (FinanceDataReader)
 - 기술적 지표 계산: 이동평균(MA5/20/60), RSI, MACD, 볼린저밴드, **거래량비율 + OBV**
-- 네이버 금융 뉴스 크롤링 + Claude API 감성 분석
+- 네이버 금융 뉴스 크롤링 + OpenAI API 감성 분석
 - 기술점수 + 감성점수 가중 결합으로 최종 추천 등급 산출 (STRONG_BUY ~ STRONG_SELL)
 - **상승확률**: 로지스틱 회귀 모델(학습됐을 때) 또는 지표 종합 추정치(휴리스틱) — 어느 쪽
   근거인지 화면에 항상 뱃지로 구분 표시
@@ -47,7 +47,7 @@
 | Database | MySQL 8.0 |
 | 데이터 수집 | Python, FinanceDataReader |
 | 모델링 | Python, scikit-learn (로지스틱 회귀) |
-| AI 분석 | Claude API (claude-sonnet-4-6) |
+| AI 분석 | OpenAI API (gpt-4o-mini) |
 | Build | Gradle |
 
 ---
@@ -68,7 +68,7 @@
     │             ├── 기술적 지표 계산 (MA/RSI/MACD/볼린저밴드/거래량/OBV)
     │             ├── 상승확률 계산 (학습모델 있으면 사용, 없으면 휴리스틱)
     │             ├── 네이버 금융 뉴스 크롤링 (jsoup)
-    │             └── Claude API 감성 분석
+    │             └── OpenAI API 감성 분석
     │                   └── 최종 추천 점수 → MySQL 저장
     │
     └── 평일 18:30 자동 스케줄러 (선택) → 위 ①②를 자동 실행
@@ -95,7 +95,7 @@
 - **거래량비율 + OBV 추세 (15%)** — 상승/하락을 거래량이 얼마나 "확인"해주는지 반영
 
 **감성점수 (0~100)**:
-- Claude API로 뉴스 헤드라인 분석
+- OpenAI API로 뉴스 헤드라인 분석
 - POSITIVE(+) / NEUTRAL(0) / NEGATIVE(-) 분류
 
 **상승확률 (0~100%)**:
@@ -158,7 +158,7 @@ CREATE DATABASE chok;
 ### 3. 설정 파일
 
 `src/main/resources/application.properties.example`을 복사해서
-`application.properties`로 만들고 실제 값(DB 비밀번호, Claude API 키, 로컬 파이썬 경로 등)을
+`application.properties`로 만들고 실제 값(DB 비밀번호, OpenAI API 키, 로컬 파이썬 경로 등)을
 채운다. 이 파일은 `.gitignore`에 등록되어 있어 git에 커밋되지 않는다.
 
 ### 4. Python 수집기 설정
@@ -198,7 +198,7 @@ Chok/
 │   └── service/
 │       ├── TechnicalAnalysisService     기술적 지표 + 거래량 지표 계산
 │       ├── RiseProbabilityService       학습모델 로드 및 상승확률 계산
-│       ├── SentimentAnalysisService     Claude API 뉴스 감성 분석
+│       ├── SentimentAnalysisService     OpenAI API 뉴스 감성 분석
 │       ├── NewsCollectorService         네이버 금융 뉴스 크롤링
 │       ├── DataCollectionService        Python 수집기 실행 (ProcessBuilder)
 │       ├── ModelTrainingService         Python 학습 스크립트 실행
@@ -232,7 +232,7 @@ Chok/
 
 ## 알려진 제한사항 / TODO
 
-- 뉴스 감성분석은 Claude API 크레딧이 있어야 실제로 동작 (`chok.anthropic.api-key`)
+- 뉴스 감성분석은 OpenAI API 크레딧이 있어야 실제로 동작 (`chok.openai.api-key`)
 - `backtest.py`(v1/거래량제외 vs v2/거래량포함 수익률 비교)는 최소 90거래일 데이터가
   있어야 유의미 — 아직 실행 결과 미검증
 - 상승확률 모델의 실제 예측력은 위 검증 결과 아직 뚜렷하지 않음 — 데이터가 더 쌓이거나

@@ -34,6 +34,8 @@ public class RecommendationService {
     private final TechnicalAnalysisService technicalAnalysisService;
     private final NewsCollectorService newsCollectorService;
     private final SentimentAnalysisService sentimentAnalysisService;
+    private final NewsDeduplicationService newsDeduplicationService;
+    private final PerformanceTrackingService performanceTrackingService;
 
     private final AppProperties appProperties;
 
@@ -45,6 +47,8 @@ public class RecommendationService {
                                  TechnicalAnalysisService technicalAnalysisService,
                                  NewsCollectorService newsCollectorService,
                                  SentimentAnalysisService sentimentAnalysisService,
+                                 NewsDeduplicationService newsDeduplicationService,
+                                 PerformanceTrackingService performanceTrackingService,
                                  AppProperties appProperties) {
         this.stockRepository = stockRepository;
         this.priceHistoryRepository = priceHistoryRepository;
@@ -54,6 +58,8 @@ public class RecommendationService {
         this.technicalAnalysisService = technicalAnalysisService;
         this.newsCollectorService = newsCollectorService;
         this.sentimentAnalysisService = sentimentAnalysisService;
+        this.newsDeduplicationService = newsDeduplicationService;
+        this.performanceTrackingService = performanceTrackingService;
         this.appProperties = appProperties;
     }
 
@@ -62,10 +68,11 @@ public class RecommendationService {
     }
 
     /**
-     * 종목별 분석을 병렬로 실행한다. 뉴스 감성분석이 종목당 최대 newsPerStock번의
-     * 블로킹 API 호출을 포함하므로, 순차 실행 시 종목 수 x 뉴스 수 만큼 직렬로 대기해야 했음.
+     * 종목별 분석을 병렬로 실행한다. 뉴스 감성분석이 종목당 블로킹 API 호출 1번(뉴스 여러 건을
+     * 배치로 묶어서 요청)을 포함하므로, 순차 실행 시 종목 수만큼 직렬로 대기해야 했음.
      * 스레드풀로 동시에 여러 종목을 처리해 전체 소요 시간을 줄인다.
-     * (동시성 상한은 chok.analysis.parallelism 로 조절 — API 레이트리밋 고려해서 너무 크게 잡지 말 것)
+     * (동시성 상한은 chok.analysis.parallelism 로 조절 — LLM API로 나가는 동시 요청 수 자체는
+     * chok.sentiment.max-concurrent-calls로 별도 제한됨)
      */
     public int runFullAnalysis(AnalysisStatus status) {
         List<Stock> stocks = stockRepository.findAllOrderByMarketCapDesc();
@@ -108,6 +115,13 @@ public class RecommendationService {
         }
 
         log.info("전체 분석 완료: {}/{} 종목", processed.get(), total);
+
+        try {
+            performanceTrackingService.saveSnapshot(today);
+        } catch (Exception e) {
+            log.error("성과 스냅샷 저장 실패 (date={}): {}", today, e.getMessage());
+        }
+
         return processed.get();
     }
 
@@ -127,12 +141,13 @@ public class RecommendationService {
         finalScore = Math.max(0, Math.min(100, finalScore));
 
         String recommendation = toRecommendation(finalScore);
+        String nuance = toRecommendationNuance(recommendation, finalScore);
         String reason = buildReason(techResult, avgSentiment);
 
         saveRecommendation(stock, today, techResult.getTechnicalScore(),
                 avgSentiment, finalScore, techResult.getRiseProbability(),
                 techResult.getProbabilitySource(), techResult.getProbabilityHorizonDays(),
-                recommendation, reason);
+                recommendation, nuance, reason);
     }
 
     private void saveTechnicalScore(String ticker, LocalDate today, TechnicalIndicatorResult r) {
@@ -169,31 +184,40 @@ public class RecommendationService {
 
         if (articles.isEmpty()) return 0.0;
 
+        List<NewsArticle> toAnalyze = articles.stream()
+                .filter(article -> !newsSentimentRepository.existsByTickerAndHeadlineAndDate(
+                        stock.getTicker(), article.getHeadline(), article.getDate()))
+                .toList();
+
+        // 여러 언론사가 같은 사건을 토씨만 다르게 보도한 헤드라인을 LLM 호출 전에 걸러낸다
+        // (완전 일치 dedup만으로는 못 잡음 - 토큰 절약을 위해 배치 구성 이전 단계에서 처리)
+        toAnalyze = newsDeduplicationService.filterSimilarDuplicates(stock.getTicker(), toAnalyze);
+
         double sum = 0;
         int count = 0;
 
-        for (NewsArticle article : articles) {
-            if (newsSentimentRepository.existsByTickerAndHeadlineAndDate(
-                    stock.getTicker(), article.getHeadline(), article.getDate())) {
-                continue;
+        if (!toAnalyze.isEmpty()) {
+            List<SentimentResult> sentiments = sentimentAnalysisService.analyzeBatch(
+                    stock.getName(), toAnalyze);
+
+            for (int i = 0; i < toAnalyze.size(); i++) {
+                NewsArticle article = toAnalyze.get(i);
+                SentimentResult sentiment = sentiments.get(i);
+
+                NewsSentiment entity = new NewsSentiment();
+                entity.setTicker(stock.getTicker());
+                entity.setNewsDate(article.getDate());
+                entity.setHeadline(article.getHeadline());
+                entity.setUrl(article.getUrl());
+                entity.setSentimentScore(sentiment.getScore());
+                entity.setSentimentLabel(sentiment.getLabel());
+                entity.setSummary(sentiment.getSummary());
+                entity.setAnalyzedAt(LocalDateTime.now());
+                newsSentimentRepository.save(entity);
+
+                sum += sentiment.getScore();
+                count++;
             }
-
-            SentimentResult sentiment = sentimentAnalysisService.analyze(
-                    stock.getName(), article.getHeadline());
-
-            NewsSentiment entity = new NewsSentiment();
-            entity.setTicker(stock.getTicker());
-            entity.setNewsDate(article.getDate());
-            entity.setHeadline(article.getHeadline());
-            entity.setUrl(article.getUrl());
-            entity.setSentimentScore(sentiment.getScore());
-            entity.setSentimentLabel(sentiment.getLabel());
-            entity.setSummary(sentiment.getSummary());
-            entity.setAnalyzedAt(LocalDateTime.now());
-            newsSentimentRepository.save(entity);
-
-            sum += sentiment.getScore();
-            count++;
         }
 
         if (count == 0) {
@@ -211,12 +235,30 @@ public class RecommendationService {
         return (sentiment + 1.0) / 2.0 * 100.0;
     }
 
+    // HOLD 구간을 40~60(폭 20)에서 45~55(폭 10)로 좁힘 - 기존엔 실제 DB 데이터의 80%가
+    // HOLD로 몰려서 "중립"만 계속 뜨는 문제가 있었음. BUY/SELL은 그만큼 넓어짐(각 15→20).
+    private static final double STRONG_BUY_THRESHOLD = 75;
+    private static final double BUY_THRESHOLD = 55;
+    private static final double HOLD_THRESHOLD = 45;
+    private static final double SELL_THRESHOLD = 25;
+
+    // HOLD 안에서 50점 대비 "판단 보류"로 볼 중립 구간의 반폭 (50 ± NUANCE_NEUTRAL_BAND)
+    private static final double NUANCE_NEUTRAL_BAND = 2;
+
     private String toRecommendation(double score) {
-        if (score >= 75) return "STRONG_BUY";
-        if (score >= 60) return "BUY";
-        if (score >= 40) return "HOLD";
-        if (score >= 25) return "SELL";
+        if (score >= STRONG_BUY_THRESHOLD) return "STRONG_BUY";
+        if (score >= BUY_THRESHOLD) return "BUY";
+        if (score >= HOLD_THRESHOLD) return "HOLD";
+        if (score >= SELL_THRESHOLD) return "SELL";
         return "STRONG_SELL";
+    }
+
+    /** HOLD로 분류된 경우에만 50점 대비 어느 쪽에 가까운지 세분화, 그 외엔 null. */
+    private String toRecommendationNuance(String recommendation, double score) {
+        if (!"HOLD".equals(recommendation)) return null;
+        double diff = score - 50;
+        if (Math.abs(diff) <= NUANCE_NEUTRAL_BAND) return "UNCERTAIN";
+        return diff > 0 ? "SLIGHTLY_POSITIVE" : "SLIGHTLY_NEGATIVE";
     }
 
     private String buildReason(TechnicalIndicatorResult tech, double avgSentiment) {
@@ -231,7 +273,7 @@ public class RecommendationService {
                                     double sentimentScore, double finalScore,
                                     double riseProbability, String probabilitySource,
                                     Integer probabilityHorizonDays,
-                                    String recommendation, String reason) {
+                                    String recommendation, String recommendationNuance, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
                 .stream()
@@ -250,6 +292,7 @@ public class RecommendationService {
         entity.setProbabilitySource(probabilitySource);
         entity.setProbabilityHorizonDays(probabilityHorizonDays);
         entity.setRecommendation(recommendation);
+        entity.setRecommendationNuance(recommendationNuance);
         entity.setReason(reason);
 
         recommendationRepository.save(entity);

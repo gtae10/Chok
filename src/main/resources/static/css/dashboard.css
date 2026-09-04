@@ -131,6 +131,14 @@ a { color: inherit; text-decoration: none; }
 .prob-tag--heuristic { background: rgba(137,147,176,0.16); color: #8993B0; }
 .prob-horizon { display: block; color: #5C6786; font-size: 0.68rem; margin-top: 2px; }
 
+/* HOLD 등급 세부 뉘앙스 - 기존 rec-badge/prob-horizon 팔레트 재사용 (매수=옅은 빨강, 매도=옅은 파랑) */
+.rec-badge-wrap { display: inline-block; }
+.nuance-tag { font-size: 0.68rem; margin-top: 2px; }
+.nuance-tag:not([hidden]) { display: block; }
+.nuance-tag--positive { color: #E0938C; }
+.nuance-tag--negative { color: #8FB1FA; }
+.nuance-tag--neutral { color: #5C6786; }
+
 .prob-caveat { margin-top: 10px; color: #5C6786; font-size: 0.74rem; }
 
 .loading-row td { text-align: center; color: #5C6786; padding: 48px 18px; font-size: 0.85rem; }
@@ -184,6 +192,16 @@ a { color: inherit; text-decoration: none; }
 }
 .chart-tooltip__date { color: #5C6786; font-size: 0.7rem; margin-bottom: 2px; }
 .chart-tooltip__value { font-weight: 600; }
+.news-load-more:not([hidden]) { display: block; margin: 16px auto 0; }
+
+.daily-stats { padding: 24px 8px; }
+.daily-stats__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.daily-stats__item { text-align: center; }
+.daily-stats__label { display: block; font-size: 0.74rem; color: #5C6786; margin-bottom: 6px; }
+.daily-stats__value { font-size: 1.15rem; font-weight: 700; }
+.daily-stats__change--up { color: #E0473C; }
+.daily-stats__change--down { color: #3E7BFA; }
+.daily-stats__change--flat { color: #8993B0; }
 #priceChart { width: 100%; height: 320px; display: block; }
 
 .news-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }

@@ -14,6 +14,7 @@ public class RecommendationResponse {
     private String probabilitySource;
     private Integer probabilityHorizonDays;
     private String recommendation;
+    private String recommendationNuance;
     private String reason;
     private String date;
 
@@ -28,6 +29,7 @@ public class RecommendationResponse {
         this.probabilitySource = r.getProbabilitySource();
         this.probabilityHorizonDays = r.getProbabilityHorizonDays();
         this.recommendation = r.getRecommendation();
+        this.recommendationNuance = r.getRecommendationNuance();
         this.reason = r.getReason();
         this.date = r.getRecDate().toString();
     }
@@ -42,6 +44,7 @@ public class RecommendationResponse {
     public String getProbabilitySource() { return probabilitySource; }
     public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
     public String getRecommendation() { return recommendation; }
+    public String getRecommendationNuance() { return recommendationNuance; }
     public String getReason() { return reason; }
     public String getDate() { return date; }
 }

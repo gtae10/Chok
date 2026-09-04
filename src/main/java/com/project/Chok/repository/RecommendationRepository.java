@@ -1,6 +1,7 @@
 package com.project.Chok.repository;
 
 import com.project.Chok.domain.Recommendation;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,4 +19,11 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
 
     @Query("SELECT r FROM Recommendation r WHERE r.ticker = :ticker ORDER BY r.recDate DESC")
     List<Recommendation> findHistoryByTicker(@Param("ticker") String ticker);
+
+    // 페이지네이션 버전 - 데이터가 몇 년치 쌓여도 상세페이지에서 한 번에 다 안 불러오게
+    @Query("SELECT r FROM Recommendation r WHERE r.ticker = :ticker ORDER BY r.recDate DESC")
+    List<Recommendation> findHistoryByTicker(@Param("ticker") String ticker, Pageable pageable);
+
+    @Query("SELECT COUNT(r) FROM Recommendation r WHERE r.ticker = :ticker")
+    long countByTicker(@Param("ticker") String ticker);
 }

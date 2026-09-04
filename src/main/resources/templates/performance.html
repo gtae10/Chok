@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실전 성과 추적 - 촉</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar__inner">
+        <a th:href="@{/}" class="brand">촉<em>Chok</em></a>
+        <div class="topbar__meta">
+            <a th:href="@{/}" class="btn-ghost">← 목록으로</a>
+        </div>
+    </div>
+</header>
+
+<main class="layout">
+
+    <div class="detail-head" style="border-bottom: none; padding-bottom: 0;">
+        <h1 style="font-size: 1.5rem;">실전 성과 추적</h1>
+        <p class="detail-head__reason">분석이 완료될 때마다 그날 종합점수 상위 10개 종목을 스냅샷으로 기록하고, 지금 현재가 기준으로 수익률을 계산합니다.</p>
+    </div>
+
+    <div class="score-cards" style="grid-template-columns: repeat(3, 1fr); margin-top: 20px;">
+        <div class="score-card">
+            <span class="score-card__label">총 추적 건수</span>
+            <span id="totalCountVal" class="score-card__value">--</span>
+        </div>
+        <div class="score-card">
+            <span class="score-card__label">전체 승률</span>
+            <span id="winRateVal" class="score-card__value">--</span>
+        </div>
+        <div class="score-card score-card--final">
+            <span class="score-card__label">평균 수익률</span>
+            <span id="avgReturnVal" class="score-card__value">--</span>
+        </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top: 24px;">
+        <table class="stock-table">
+            <thead>
+            <tr>
+                <th>선정일</th>
+                <th>종목명</th>
+                <th>순위</th>
+                <th>기술점수</th>
+                <th>감성점수</th>
+                <th>종합점수</th>
+                <th>상승확률</th>
+                <th>진입가</th>
+                <th>현재가</th>
+                <th>수익률</th>
+                <th>보유일수</th>
+            </tr>
+            </thead>
+            <tbody id="performanceTableBody">
+            <tr class="loading-row"><td colspan="11">데이터를 불러오는 중...</td></tr>
+            </tbody>
+        </table>
+        <div id="emptyState" class="empty-state" hidden>
+            <p>아직 추적 기록이 없습니다.</p>
+            <p>대시보드에서 ② 분석 실행을 한 번 돌리면 그날 상위 10종목이 자동으로 기록됩니다.</p>
+        </div>
+    </div>
+
+</main>
+
+<footer class="footer">
+    <p>본 서비스의 점수와 추천 등급은 참고용 보조 지표이며, 수익을 보장하지 않습니다. 모든 투자 판단과 책임은 사용자 본인에게 있습니다.</p>
+</footer>
+
+<script th:src="@{/js/performance.js}"></script>
+</body>
+</html>

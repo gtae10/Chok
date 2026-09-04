@@ -1,5 +1,12 @@
 const REC_LABEL = { STRONG_BUY: "적극 매수", BUY: "매수", HOLD: "중립", SELL: "매도", STRONG_SELL: "적극 매도" };
 const REC_BADGE_CLASS = { STRONG_BUY: "rec-badge--strongbuy", BUY: "rec-badge--buy", HOLD: "rec-badge--hold", SELL: "rec-badge--sell", STRONG_SELL: "rec-badge--strongsell" };
+const NUANCE_LABEL = { SLIGHTLY_POSITIVE: "약간 긍정", SLIGHTLY_NEGATIVE: "약간 부정", UNCERTAIN: "판단 보류" };
+const NUANCE_CLASS = { SLIGHTLY_POSITIVE: "nuance-tag--positive", SLIGHTLY_NEGATIVE: "nuance-tag--negative", UNCERTAIN: "nuance-tag--neutral" };
+
+function renderNuance(nuance) {
+    if (!nuance || !NUANCE_LABEL[nuance]) return "";
+    return '<span class="nuance-tag ' + NUANCE_CLASS[nuance] + '">' + NUANCE_LABEL[nuance] + '</span>';
+}
 
 let allData = [];
 let currentFilter = "";
@@ -63,7 +70,7 @@ function renderTable(data) {
             '<td>' + fmt(item.sentimentScore) + '</td>' +
             '<td>' + fmt(item.finalScore) + '</td>' +
             '<td>' + renderProbability(item) + '</td>' +
-            '<td><span class="rec-badge ' + (REC_BADGE_CLASS[item.recommendation] || "") + '">' + (REC_LABEL[item.recommendation] || "-") + '</span></td>' +
+            '<td><span class="rec-badge ' + (REC_BADGE_CLASS[item.recommendation] || "") + '">' + (REC_LABEL[item.recommendation] || "-") + '</span>' + renderNuance(item.recommendationNuance) + '</td>' +
             '</tr>';
     }).join("");
     tbody.querySelectorAll("tr[data-ticker]").forEach(function(row) {

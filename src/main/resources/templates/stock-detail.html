@@ -24,7 +24,10 @@
         <div class="detail-head__sub">
             <span id="stockTicker" class="meta-pill"></span>
             <span id="stockMarket" class="meta-pill"></span>
-            <span id="stockRec" class="rec-badge"></span>
+            <span class="rec-badge-wrap">
+                <span id="stockRec" class="rec-badge"></span>
+                <span id="stockRecNuance" class="nuance-tag"></span>
+            </span>
         </div>
         <p id="stockReason" class="detail-head__reason"></p>
     </div>
@@ -54,15 +57,13 @@
     <div class="chart-section">
         <h2>가격 추이</h2>
         <div class="chart-range">
-            <button data-range="1">1일</button>
             <button data-range="7">1주</button>
             <button data-range="30">1개월</button>
             <button data-range="365">1년</button>
             <button data-range="all" class="is-active">전체</button>
         </div>
         <div class="chart-wrap">
-            <svg id="priceChart" viewBox="0 0 800 320" preserveAspectRatio="none"></svg>
-            <div id="priceTooltip" class="chart-tooltip" hidden></div>
+            <div id="dailyStats" class="daily-stats"></div>
         </div>
     </div>
 
@@ -82,6 +83,7 @@
         <ul id="newsList" class="news-list">
             <li style="list-style:none; text-align:center; color:#5C6786; padding:32px;">불러오는 중...</li>
         </ul>
+        <button id="newsLoadMoreBtn" class="btn-ghost news-load-more" hidden>더보기</button>
     </div>
 
 </main>

@@ -7,7 +7,10 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "chok")
 public class AppProperties {
 
+    private OpenAi openai = new OpenAi();
     private Anthropic anthropic = new Anthropic();
+    private Sentiment sentiment = new Sentiment();
+    private News news = new News();
     private Analysis analysis = new Analysis();
     private Collector collector = new Collector();
     private Scheduler scheduler = new Scheduler();
@@ -22,12 +25,36 @@ public class AppProperties {
         this.pythonCollector = pythonCollector;
     }
 
+    public OpenAi getOpenai() {
+        return openai;
+    }
+
+    public void setOpenai(OpenAi openai) {
+        this.openai = openai;
+    }
+
     public Anthropic getAnthropic() {
         return anthropic;
     }
 
     public void setAnthropic(Anthropic anthropic) {
         this.anthropic = anthropic;
+    }
+
+    public Sentiment getSentiment() {
+        return sentiment;
+    }
+
+    public void setSentiment(Sentiment sentiment) {
+        this.sentiment = sentiment;
+    }
+
+    public News getNews() {
+        return news;
+    }
+
+    public void setNews(News news) {
+        this.news = news;
     }
 
     public Analysis getAnalysis() {
@@ -63,7 +90,25 @@ public class AppProperties {
     }
 
     // ─────────────────────────────────────────
-    // chok.anthropic.*
+    // chok.openai.*
+    // ─────────────────────────────────────────
+    public static class OpenAi {
+        private String apiKey;
+        private String model;
+        private String baseUrl;
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+
+        public String getModel() { return model; }
+        public void setModel(String model) { this.model = model; }
+
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+    }
+
+    // ─────────────────────────────────────────
+    // chok.anthropic.* - Claude용 대체 감성분석 프로바이더
     // ─────────────────────────────────────────
     public static class Anthropic {
         private String apiKey;
@@ -78,6 +123,31 @@ public class AppProperties {
 
         public String getBaseUrl() { return baseUrl; }
         public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+    }
+
+    // ─────────────────────────────────────────
+    // chok.sentiment.* - 감성분석 프로바이더 선택 및 동시성 상한
+    // (종목 병렬도 chok.analysis.parallelism과는 별개의 자원이므로 분리해서 관리)
+    // ─────────────────────────────────────────
+    public static class Sentiment {
+        private String provider = "openai";
+        private int maxConcurrentCalls = 3;
+
+        public String getProvider() { return provider; }
+        public void setProvider(String provider) { this.provider = provider; }
+
+        public int getMaxConcurrentCalls() { return maxConcurrentCalls; }
+        public void setMaxConcurrentCalls(int maxConcurrentCalls) { this.maxConcurrentCalls = maxConcurrentCalls; }
+    }
+
+    // ─────────────────────────────────────────
+    // chok.news.* - 뉴스 수집/저장 단계의 유사 헤드라인(같은 사건, 다른 언론사) 중복 제거
+    // ─────────────────────────────────────────
+    public static class News {
+        private double dedupSimilarityThreshold = 0.3;
+
+        public double getDedupSimilarityThreshold() { return dedupSimilarityThreshold; }
+        public void setDedupSimilarityThreshold(double dedupSimilarityThreshold) { this.dedupSimilarityThreshold = dedupSimilarityThreshold; }
     }
 
     // ─────────────────────────────────────────

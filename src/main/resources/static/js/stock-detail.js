@@ -1,5 +1,7 @@
 const REC_LABEL = { STRONG_BUY: "적극 매수", BUY: "매수", HOLD: "중립", SELL: "매도", STRONG_SELL: "적극 매도" };
 const REC_BADGE_CLASS = { STRONG_BUY: "rec-badge--strongbuy", BUY: "rec-badge--buy", HOLD: "rec-badge--hold", SELL: "rec-badge--sell", STRONG_SELL: "rec-badge--strongsell" };
+const NUANCE_LABEL = { SLIGHTLY_POSITIVE: "약간 긍정", SLIGHTLY_NEGATIVE: "약간 부정", UNCERTAIN: "판단 보류" };
+const NUANCE_CLASS = { SLIGHTLY_POSITIVE: "nuance-tag--positive", SLIGHTLY_NEGATIVE: "nuance-tag--negative", UNCERTAIN: "nuance-tag--neutral" };
 const SENTIMENT_LABEL = { POSITIVE: "긍정", NEUTRAL: "중립", NEGATIVE: "부정" };
 const SENTIMENT_CLASS = { POSITIVE: "sentiment-tag--positive", NEUTRAL: "sentiment-tag--neutral", NEGATIVE: "sentiment-tag--negative" };
 
@@ -25,14 +27,44 @@ async function loadStockDetail() {
     try {
         const res = await fetch("/api/stocks/" + ticker + "/prices");
         fullPrices = await res.json();
-        renderChart(applyRange(fullPrices, currentRange));
+        showRangeView();
     } catch(e) { console.error(e); }
 
+    newsTicker = ticker;
+    newsPage = 0;
+    allNews = [];
     try {
-        const res = await fetch("/api/stocks/" + ticker + "/news");
-        renderNews(await res.json());
+        await loadNewsPage();
     } catch(e) { console.error(e); }
 }
+
+let allNews = [];
+let newsPage = 0;
+let newsTicker = null;
+const NEWS_PAGE_SIZE = 30;
+
+async function loadNewsPage() {
+    const res = await fetch("/api/stocks/" + newsTicker + "/news?page=" + newsPage + "&size=" + NEWS_PAGE_SIZE);
+    const batch = await res.json();
+    const total = parseInt(res.headers.get("X-Total-Count") || "0", 10);
+
+    allNews = allNews.concat(batch);
+    renderNews(allNews);
+
+    const btn = document.getElementById("newsLoadMoreBtn");
+    const loadedSoFar = (newsPage + 1) * NEWS_PAGE_SIZE;
+    if (batch.length === NEWS_PAGE_SIZE && loadedSoFar < total) {
+        btn.hidden = false;
+        btn.textContent = "더보기 (" + allNews.length + "/" + total + ")";
+    } else {
+        btn.hidden = true;
+    }
+}
+
+document.getElementById("newsLoadMoreBtn").addEventListener("click", function() {
+    newsPage += 1;
+    loadNewsPage().catch(console.error);
+});
 
 function applyRange(prices, range) {
     if (range === "all" || prices.length === 0) return prices;
@@ -43,12 +75,69 @@ function applyRange(prices, range) {
     return prices.filter(function(p) { return new Date(p.date) >= cutoff; });
 }
 
+const RANGE_COMPARE_LABEL = { "7": "전주대비", "30": "전월대비", "365": "전년대비", "all": "전일대비" };
+
+function showRangeView() {
+    renderPeriodStats(fullPrices, currentRange);
+}
+
+function renderPeriodStats(fullPrices, range) {
+    const container = document.getElementById("dailyStats");
+
+    if (!fullPrices || fullPrices.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:#5C6786;">데이터가 없습니다</p>';
+        return;
+    }
+
+    const latest = fullPrices[fullPrices.length - 1];
+    // "전체"는 하루 단위(전일대비)로 고정, 나머지는 그 기간 시작 시점을 기준값으로 삼음
+    const periodData = range === "all"
+        ? fullPrices.slice(Math.max(fullPrices.length - 2, 0))
+        : applyRange(fullPrices, range);
+    const base = periodData.length >= 2 ? periodData[0] : null;
+
+    let changeHtml = "-";
+    if (base != null) {
+        const diff = latest.close - base.close;
+        const pct = (diff / base.close * 100).toFixed(2);
+        const cls = diff > 0 ? "daily-stats__change--up" : diff < 0 ? "daily-stats__change--down" : "daily-stats__change--flat";
+        const sign = diff > 0 ? "+" : "";
+        changeHtml = '<span class="' + cls + '">' + sign + diff.toLocaleString() + '원 (' + sign + pct + '%)</span>';
+    }
+
+    // 1일 외 기간은 그 기간 전체의 고가/저가/시가를 보여줌 (오늘 하루치가 아니라 기간 흐름을 보여주기 위함)
+    const statsRange = range === "all" ? [latest] : (periodData.length > 0 ? periodData : [latest]);
+    const periodHigh = Math.max.apply(null, statsRange.map(function(p) { return p.high; }));
+    const periodLow = Math.min.apply(null, statsRange.map(function(p) { return p.low; }));
+    const periodOpen = statsRange[0].open;
+
+    function statItem(label, valueHtml) {
+        return '<div class="daily-stats__item"><span class="daily-stats__label">' + label + '</span>' +
+            '<span class="daily-stats__value">' + valueHtml + '</span></div>';
+    }
+
+    const dateLabel = (range === "all")
+        ? latest.date + ' 기준'
+        : (base ? base.date + ' ~ ' + latest.date : latest.date + ' 기준');
+
+    container.innerHTML =
+        '<p style="text-align:center;color:#5C6786;font-size:0.8rem;margin-bottom:16px;">' + dateLabel + '</p>' +
+        '<div class="daily-stats__grid">' +
+            statItem("종가", latest.close.toLocaleString() + "원") +
+            statItem(RANGE_COMPARE_LABEL[range] || "전일대비", changeHtml) +
+            statItem("거래량", latest.volume.toLocaleString() + "주") +
+            statItem("시가", periodOpen.toLocaleString() + "원") +
+            statItem("고가", periodHigh.toLocaleString() + "원") +
+            statItem("저가", periodLow.toLocaleString() + "원") +
+        '</div>';
+}
+
 document.querySelectorAll(".chart-range button").forEach(function(btn) {
     btn.addEventListener("click", function() {
         document.querySelectorAll(".chart-range button").forEach(function(b) { b.classList.remove("is-active"); });
         btn.classList.add("is-active");
         currentRange = btn.dataset.range;
-        renderChart(applyRange(fullPrices, currentRange));
+        showRangeView();
     });
 });
 
@@ -59,6 +148,17 @@ function renderHeader(item) {
     const badge = document.getElementById("stockRec");
     badge.textContent = REC_LABEL[item.recommendation] || "-";
     badge.className = "rec-badge " + (REC_BADGE_CLASS[item.recommendation] || "");
+
+    const nuanceEl = document.getElementById("stockRecNuance");
+    const nuance = item.recommendationNuance;
+    if (nuance && NUANCE_LABEL[nuance]) {
+        nuanceEl.textContent = NUANCE_LABEL[nuance];
+        nuanceEl.className = "nuance-tag " + NUANCE_CLASS[nuance];
+        nuanceEl.hidden = false;
+    } else {
+        nuanceEl.textContent = "";
+        nuanceEl.hidden = true;
+    }
     document.getElementById("stockReason").textContent = item.reason || "";
     document.getElementById("techScoreVal").textContent = fmt(item.technicalScore);
     document.getElementById("sentimentScoreVal").textContent = fmt(item.sentimentScore);
@@ -80,101 +180,6 @@ function renderHeader(item) {
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }
 function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
-
-function renderChart(prices) {
-    const svg = document.getElementById("priceChart");
-    const tooltip = document.getElementById("priceTooltip");
-    tooltip.hidden = true;
-
-    if (!prices || prices.length === 0) {
-        svg.innerHTML = '<text x="400" y="160" fill="#5C6786" font-size="14" text-anchor="middle">가격 데이터가 없습니다</text>';
-        return;
-    }
-    if (prices.length === 1) {
-        svg.innerHTML = '<text x="400" y="160" fill="#5C6786" font-size="14" text-anchor="middle">일별 시세라 1일 단위 추이는 표시할 수 없어요. 1주 이상을 선택해보세요.</text>';
-        return;
-    }
-
-    const W = 800, H = 320, PL = 60, PR = 16, PT = 20, PB = 30;
-    const closes = prices.map(function(p) { return p.close; });
-    const maxP = Math.max.apply(null, closes);
-    const minP = Math.min.apply(null, closes);
-    const range = maxP - minP || 1;
-    const pw = W - PL - PR, ph = H - PT - PB;
-    const pts = prices.map(function(p, i) {
-        return {
-            x: PL + (i / (prices.length - 1 || 1)) * pw,
-            y: PT + (1 - (p.close - minP) / range) * ph,
-            date: p.date, close: p.close
-        };
-    });
-    const isUp = closes[closes.length - 1] >= closes[0];
-    const color = isUp ? "#E0473C" : "#3E7BFA";
-    const line = pts.map(function(pt, i) { return (i === 0 ? "M" : "L") + " " + pt.x.toFixed(1) + " " + pt.y.toFixed(1); }).join(" ");
-    const area = line + " L " + pts[pts.length-1].x.toFixed(1) + " " + (H-PB) + " L " + pts[0].x.toFixed(1) + " " + (H-PB) + " Z";
-    let grid = "";
-    for (let i = 0; i <= 4; i++) {
-        const y = PT + (i / 4) * ph;
-        const p = maxP - (i / 4) * range;
-        grid += '<line x1="' + PL + '" y1="' + y + '" x2="' + (W-PR) + '" y2="' + y + '" stroke="#283454" stroke-width="1"/>';
-        grid += '<text x="' + (PL-8) + '" y="' + (y+4) + '" fill="#5C6786" font-size="11" text-anchor="end">' + Math.round(p).toLocaleString() + '</text>';
-    }
-    svg.innerHTML =
-        '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' +
-        '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.2"/>' +
-        '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
-        '</linearGradient></defs>' +
-        grid +
-        '<path d="' + area + '" fill="url(#g)"/>' +
-        '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round"/>' +
-        '<text x="' + PL + '" y="' + (H-8) + '" fill="#5C6786" font-size="11">' + pts[0].date + '</text>' +
-        '<text x="' + (W-PR) + '" y="' + (H-8) + '" fill="#5C6786" font-size="11" text-anchor="end">' + pts[pts.length-1].date + '</text>' +
-        '<line id="hoverLine" x1="0" y1="' + PT + '" x2="0" y2="' + (H-PB) + '" stroke="#8993B0" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>' +
-        '<circle id="hoverDot" r="4" fill="' + color + '" stroke="#0E1525" stroke-width="2" visibility="hidden"/>';
-
-    attachChartHover(svg, tooltip, pts, PL, W - PR, function(p) {
-        return '<div class="chart-tooltip__date">' + p.date + '</div>' +
-            '<div class="chart-tooltip__value">' + p.close.toLocaleString() + '원</div>';
-    });
-}
-
-function attachChartHover(svg, tooltip, pts, plotLeft, plotRight, formatFn) {
-    const hoverLine = svg.querySelector("#hoverLine");
-    const hoverDot = svg.querySelector("#hoverDot");
-
-    function onMove(e) {
-        const rect = svg.getBoundingClientRect();
-        const relX = (e.clientX - rect.left) / rect.width;
-        const vbX = relX * 800; // viewBox width는 항상 800으로 고정해서 씀
-        if (vbX < plotLeft || vbX > plotRight) { onLeave(); return; }
-
-        let nearest = 0, minDist = Infinity;
-        for (let i = 0; i < pts.length; i++) {
-            const d = Math.abs(pts[i].x - vbX);
-            if (d < minDist) { minDist = d; nearest = i; }
-        }
-        const p = pts[nearest];
-
-        hoverLine.setAttribute("x1", p.x); hoverLine.setAttribute("x2", p.x);
-        hoverLine.setAttribute("visibility", "visible");
-        hoverDot.setAttribute("cx", p.x); hoverDot.setAttribute("cy", p.y);
-        hoverDot.setAttribute("visibility", "visible");
-
-        tooltip.innerHTML = formatFn(p);
-        tooltip.hidden = false;
-        const pxLeft = (p.x / 800) * rect.width;
-        tooltip.style.left = Math.min(Math.max(pxLeft, 50), rect.width - 50) + "px";
-    }
-
-    function onLeave() {
-        hoverLine.setAttribute("visibility", "hidden");
-        hoverDot.setAttribute("visibility", "hidden");
-        tooltip.hidden = true;
-    }
-
-    svg.addEventListener("mousemove", onMove);
-    svg.addEventListener("mouseleave", onLeave);
-}
 
 function renderHistoryChart(history) {
     const svg = document.getElementById("historyChart");

@@ -26,7 +26,7 @@ public class RiseProbabilityService {
 
     public static final List<String> FEATURE_NAMES = List.of(
             "priceVsMa5", "ma5VsMa20", "ma20VsMa60", "rsiNorm",
-            "macdHistNorm", "bbPercentB", "logVolumeRatio"
+            "macdHistNorm", "bbPercentB", "logVolumeRatio", "momentum90"
     );
 
     private final PythonEnvironment pythonEnvironment;
