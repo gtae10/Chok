@@ -42,6 +42,7 @@ out/
 
 # 민감 정보
 application-local.properties
+src/main/resources/application.properties
 
 # Python venv
 python-collector/.venv/
