@@ -50,8 +50,24 @@ MODEL_OUTPUT_PATH = os.path.join("model", "rise_model.json")
 
 FEATURE_NAMES = [
     "priceVsMa5", "ma5VsMa20", "ma20VsMa60", "rsiNorm",
-    "macdHistNorm", "bbPercentB", "logVolumeRatio",
+    "macdHistNorm", "bbPercentB", "logVolumeRatio", "momentum90",
 ]
+
+MOMENTUM_PERIOD = 90  # Java TechnicalAnalysisService.MOMENTUM_PERIOD 와 반드시 동일해야 함
+
+# 시장 전체(종목과 무관하게 그날 공통으로 적용되는) 거시 지표 후보 - ablation으로 검증 후
+# 실제로 AUC가 개선될 때만 FEATURE_NAMES에 합류시킨다 (아래 ADOPT_MACRO_FEATURES 참고).
+MACRO_FEATURE_NAMES = ["kospiMomentum20", "kosdaqMomentum20", "usdKrwChange20"]
+MACRO_MOMENTUM_PERIOD = 20  # 거래일 기준 (MA_MID=20과 동일한 스케일 - 약 1개월)
+
+# ablation 검증 결과 실제로 유의미하게 개선될 때만 True로 바꿔서 배포 모델에 포함시킨다.
+# (직접 수동으로 뒤집는 스위치 - 자동으로 "더 높으면 채택"하지 않는 이유는, 다중비교와
+#  같은 이치로 우연한 개선을 "검증됨"으로 착각하지 않기 위해 사람이 walk_forward_detail.json의
+#  macroAucMean vs fullAucMean을 직접 보고 판단하게 하려는 것)
+ADOPT_MACRO_FEATURES = False
+
+if ADOPT_MACRO_FEATURES:
+    FEATURE_NAMES = FEATURE_NAMES + MACRO_FEATURE_NAMES
 
 MIN_FOLD_TRAIN = 100
 MIN_FOLD_TEST = 20
@@ -69,6 +85,27 @@ def load_price_history() -> pd.DataFrame:
     df["close_price"] = df["close_price"].astype(float)
     df["volume"] = df["volume"].astype(float)
     return df
+
+
+def load_market_indicators() -> pd.DataFrame:
+    """종목과 무관하게 그날 하루에 공통으로 적용되는 시장 전체 지표 (하루 1행)."""
+    with db.get_conn() as conn:
+        query = "SELECT trade_date, kospi_close, kosdaq_close, usd_krw_close FROM market_indicators ORDER BY trade_date ASC"
+        df = pd.read_sql(query, conn)
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    return df
+
+
+def compute_macro_features(market_df: pd.DataFrame) -> pd.DataFrame:
+    """시장 전체 모멘텀 특징을 하루 1행짜리 시계열로 계산한다 (종목별 momentum90과 동일한
+    "N일 전 대비 누적변화율" 공식, 종목이 아니라 지수/환율에 적용). trade_date로 종목별
+    데이터셋에 조인한다."""
+    p = MACRO_MOMENTUM_PERIOD
+    out = pd.DataFrame({"trade_date": market_df["trade_date"]})
+    out["kospiMomentum20"] = market_df["kospi_close"] / market_df["kospi_close"].shift(p) - 1
+    out["kosdaqMomentum20"] = market_df["kosdaq_close"] / market_df["kosdaq_close"].shift(p) - 1
+    out["usdKrwChange20"] = market_df["usd_krw_close"] / market_df["usd_krw_close"].shift(p) - 1
+    return out
 
 
 def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
@@ -113,6 +150,7 @@ def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
         "macdHistNorm": macd_hist / close,
         "bbPercentB": bb_percent_b,
         "logVolumeRatio": np.log(volume_ratio.clip(lower=0.01)),
+        "momentum90": close / close.shift(MOMENTUM_PERIOD) - 1,
     })
 
     # 기간별 미래수익률 + 그 라벨이 실제로 참조하는 미래 날짜(target_date)
@@ -125,7 +163,7 @@ def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
     return out
 
 
-def build_dataset(price_df: pd.DataFrame, horizons) -> pd.DataFrame:
+def build_dataset(price_df: pd.DataFrame, horizons, macro_df: pd.DataFrame = None) -> pd.DataFrame:
     frames = []
     for ticker, g in price_df.groupby("ticker"):
         g = g.sort_values("trade_date").reset_index(drop=True)
@@ -137,6 +175,15 @@ def build_dataset(price_df: pd.DataFrame, horizons) -> pd.DataFrame:
         return pd.DataFrame()
 
     dataset = pd.concat(frames, ignore_index=True)
+
+    # 거시 지표는 종목이 아니라 날짜 하나에 공통으로 적용되는 값이라 trade_date로 조인한다.
+    # FEATURE_NAMES 기준 dropna보다 먼저 merge해야 한다 - ADOPT_MACRO_FEATURES=True일 때는
+    # FEATURE_NAMES 자체에 macro 컬럼이 포함되므로, 그 전에 컬럼이 존재해야 아래 dropna가 동작한다.
+    # (ADOPT_MACRO_FEATURES=False일 때는 macro 컬럼이 FEATURE_NAMES에 없으니 이 merge로 인해
+    # baseline/기존 특징 학습 표본이 줄어들지 않는다 - ablation 비교 시에만 따로 dropna한다.)
+    if macro_df is not None and not macro_df.empty:
+        dataset = dataset.merge(macro_df, on="trade_date", how="left")
+
     # 특징 컬럼에 inf/NaN 있는 행만 제거 (기간별 수익률 컬럼은 기간마다 결측 범위가 달라서 따로 처리)
     dataset[FEATURE_NAMES] = dataset[FEATURE_NAMES].replace([np.inf, -np.inf], np.nan)
     dataset = dataset.dropna(subset=FEATURE_NAMES)
@@ -215,6 +262,9 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
     """여러 시점으로 나눠 반복 검증해서, 단일 split의 우연성을 줄인 평균 성능을 낸다."""
     dataset_h = dataset_h.sort_values("trade_date")
     no_volume_features = [f for f in FEATURE_NAMES if f != "logVolumeRatio"]
+    # 이미 채택되어 FEATURE_NAMES에 macro가 포함된 상태면 full==macro라 비교가 무의미하므로 건너뜀
+    has_macro = (not ADOPT_MACRO_FEATURES) and all(c in dataset_h.columns for c in MACRO_FEATURE_NAMES)
+    macro_features = FEATURE_NAMES + MACRO_FEATURE_NAMES
 
     folds = make_time_folds(dataset_h, N_FOLDS)
     if not folds:
@@ -246,12 +296,23 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
         _, _, full_acc, full_auc = _fit_eval(train_df, test_df, FEATURE_NAMES)
         _, _, nv_acc, nv_auc = _fit_eval(train_df, test_df, no_volume_features)
 
+        # 거시 지표 ablation: 기존 특징 + 거시 특징으로 학습했을 때 AUC가 실제로 개선되는지 비교.
+        # macro 컬럼만 dropna하므로(baseline/full 표본 수는 그대로), 초반 수집 기간처럼
+        # 거시 지표가 아직 없는 구간의 샘플은 이 비교에서만 자연스럽게 제외된다.
+        macro_acc, macro_auc = None, None
+        if has_macro:
+            train_macro = train_df.dropna(subset=MACRO_FEATURE_NAMES)
+            test_macro = test_df.dropna(subset=MACRO_FEATURE_NAMES)
+            if len(train_macro) >= MIN_FOLD_TRAIN and len(test_macro) >= MIN_FOLD_TEST:
+                _, _, macro_acc, macro_auc = _fit_eval(train_macro, test_macro, macro_features)
+
         if verbose:
             log.info(
-                "  [폴드 %d] train=%d(purge %d) test=%d | 베이스라인=%.3f | 거래량제외 acc=%.3f auc=%s | 거래량포함 acc=%.3f auc=%s",
+                "  [폴드 %d] train=%d(purge %d) test=%d | 베이스라인=%.3f | 거래량제외 acc=%.3f auc=%s | 거래량포함 acc=%.3f auc=%s | 거시포함 acc=%s auc=%s",
                 i, len(train_df), purged, len(test_df), baseline_acc,
                 nv_acc if nv_acc else -1, round(nv_auc, 3) if nv_auc else None,
                 full_acc if full_acc else -1, round(full_auc, 3) if full_auc else None,
+                round(macro_acc, 3) if macro_acc else None, round(macro_auc, 3) if macro_auc else None,
             )
 
         fold_results.append({
@@ -259,6 +320,7 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
             "baselineAccuracy": baseline_acc,
             "noVolumeAccuracy": nv_acc, "noVolumeAuc": nv_auc,
             "fullAccuracy": full_acc, "fullAuc": full_auc,
+            "macroAccuracy": macro_acc, "macroAuc": macro_auc,
         })
 
     def agg(key):
@@ -272,6 +334,8 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
     nv_auc_mean, nv_auc_std = agg("noVolumeAuc")
     full_acc_mean, full_acc_std = agg("fullAccuracy")
     full_auc_mean, full_auc_std = agg("fullAuc")
+    macro_acc_mean, macro_acc_std = agg("macroAccuracy")
+    macro_auc_mean, macro_auc_std = agg("macroAuc")
 
     return {
         "nFolds": len(fold_results),
@@ -279,6 +343,8 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
         "baselineAccuracyMean": baseline_mean, "baselineAccuracyStd": baseline_std,
         "noVolumeAccuracyMean": nv_acc_mean, "noVolumeAccuracyStd": nv_acc_std,
         "noVolumeAucMean": nv_auc_mean, "noVolumeAucStd": nv_auc_std,
+        "macroAccuracyMean": macro_acc_mean, "macroAccuracyStd": macro_acc_std,
+        "macroAucMean": macro_auc_mean, "macroAucStd": macro_auc_std,
         "fullAccuracyMean": full_acc_mean, "fullAccuracyStd": full_acc_std,
         "fullAucMean": full_auc_mean, "fullAucStd": full_auc_std,
     }
@@ -307,21 +373,24 @@ def sweep_horizons(dataset: pd.DataFrame, horizons, label_mode: str) -> dict:
             "baselineAcc": summary["baselineAccuracyMean"],
             "noVolumeAuc": summary["noVolumeAucMean"],
             "fullAuc": summary["fullAucMean"],
+            "macroAuc": summary.get("macroAucMean"),
         })
         log.info(
-            "[%d일] 베이스라인=%.3f | 거래량제외 AUC=%s | 거래량포함 AUC=%s",
+            "[%d일] 베이스라인=%.3f | 거래량제외 AUC=%s | 거래량포함 AUC=%s | 거시포함 AUC=%s",
             h, summary["baselineAccuracyMean"] or 0,
             round(summary["noVolumeAucMean"], 3) if summary["noVolumeAucMean"] else None,
             round(summary["fullAucMean"], 3) if summary["fullAucMean"] else None,
+            round(summary["macroAucMean"], 3) if summary.get("macroAucMean") else None,
         )
 
     log.info("=" * 70)
     log.info("스윕 결과 요약 (AUC가 0.5보다 뚜렷이 높을수록 신호가 있다는 뜻)")
     for r in rows:
         log.info(
-            "  %2d일 | 샘플 %6d | 거래량포함 AUC=%s",
+            "  %2d일 | 샘플 %6d | 거래량포함 AUC=%s | 거시포함 AUC=%s",
             r["horizon"], r["samples"],
-            round(r["fullAuc"], 3) if r["fullAuc"] else None
+            round(r["fullAuc"], 3) if r["fullAuc"] else None,
+            round(r["macroAuc"], 3) if r.get("macroAuc") else None,
         )
     best = max(rows, key=lambda r: r["fullAuc"] or 0) if rows else None
     if best:
@@ -367,13 +436,48 @@ def train_final_model(dataset_h: pd.DataFrame, walk_forward_summary: dict, horiz
     }
 
 
+def horizon_model_path(horizon: int) -> str:
+    """FORWARD_DAYS는 기존 호환을 위해 MODEL_OUTPUT_PATH(rise_model.json)를 그대로 쓰고,
+    그 외 스윕 기간들은 기간을 파일명에 넣어 따로 저장한다 (rise_model_30d.json 식)."""
+    model_dir = os.path.dirname(MODEL_OUTPUT_PATH) or "."
+    return os.path.join(model_dir, f"rise_model_{horizon}d.json")
+
+
+def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str, output_path: str):
+    """한 예측기간에 대해 walk-forward 검증 + 최종 모델 학습 + 저장까지 수행한다.
+    샘플 부족이거나 유효 폴드가 하나도 없으면 저장을 건너뛰고 (None, None)을 반환한다."""
+    sub = dataset_for_horizon(dataset, horizon, label_mode)
+    if len(sub) < MIN_SAMPLES:
+        log.info("[%d일] 샘플 부족(%d개)으로 배포 모델 학습 스킵", horizon, len(sub))
+        return None, None
+
+    wf_summary = walk_forward_evaluate(sub, verbose=True)
+    if wf_summary.get("nFolds", 0) == 0:
+        log.info("[%d일] 유효 폴드 없음으로 배포 모델 학습 스킵", horizon)
+        return None, None
+
+    result = train_final_model(sub, wf_summary, horizon, label_mode)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    log.info(
+        "[%d일] 배포 모델 저장 완료: %s (샘플=%d, holdoutAuc=%s)",
+        horizon, output_path, result["sampleCount"], result.get("holdoutAuc"),
+    )
+    return result, wf_summary
+
+
 def main():
     log.info("=== 상승확률 모델 학습 시작 (라벨 모드: %s) ===", LABEL_MODE)
     price_df = load_price_history()
     log.info("가격 데이터 로드 완료: %d행", len(price_df))
 
+    market_df = load_market_indicators()
+    macro_df = compute_macro_features(market_df) if not market_df.empty else None
+    log.info("거시 지표 로드 완료: %d행 (특징: %s)", len(market_df), MACRO_FEATURE_NAMES)
+
     horizons = sorted(set(SWEEP_HORIZONS + [FORWARD_DAYS]))
-    dataset = build_dataset(price_df, horizons)
+    dataset = build_dataset(price_df, horizons, macro_df)
     log.info("특징 계산 완료: %d행 (지표 계산 가능한 구간만)", len(dataset))
 
     if len(dataset) < MIN_SAMPLES:
@@ -386,32 +490,45 @@ def main():
 
     sweep_result = sweep_horizons(dataset, horizons, LABEL_MODE)
 
-    log.info("=== 배포 모델용 최종 검증 (기간=%d일, 라벨=%s) ===", FORWARD_DAYS, LABEL_MODE)
-    deploy_dataset = dataset_for_horizon(dataset, FORWARD_DAYS, LABEL_MODE)
-    if len(deploy_dataset) < MIN_SAMPLES:
-        log.warning("배포 대상 기간(%d일)의 샘플이 부족해 모델 저장을 건너뜁니다.", FORWARD_DAYS)
-        sys.exit(0)
+    log.info("=== 기간별 배포 모델 학습 시작 (기간 %d개: %s) ===", len(horizons), horizons)
+    deploy_wf_summary = None
+    saved_count, skipped_count = 0, 0
+    for h in horizons:
+        output_path = MODEL_OUTPUT_PATH if h == FORWARD_DAYS else horizon_model_path(h)
+        result, wf_summary = train_and_save_horizon(dataset, h, LABEL_MODE, output_path)
+        if result is None:
+            skipped_count += 1
+        else:
+            saved_count += 1
+            if h == FORWARD_DAYS:
+                deploy_wf_summary = wf_summary
 
-    wf_summary = walk_forward_evaluate(deploy_dataset, verbose=True)
-    if wf_summary.get("nFolds", 0) == 0:
-        log.warning("유효한 폴드가 하나도 없어 검증을 완료하지 못했습니다.")
-        sys.exit(0)
-
-    log.info("=== 최종 배포 모델 학습 (전체 데이터 사용) ===")
-    result = train_final_model(deploy_dataset, wf_summary, FORWARD_DAYS, LABEL_MODE)
     log.info(
-        "학습 완료: 샘플=%d, walk-forward 평균 정확도=%s, 평균 AUC=%s",
-        result["sampleCount"], result["holdoutAccuracy"], result["holdoutAuc"]
+        "=== 기간별 모델 학습 완료: %d개 저장, %d개 스킵 (전체 %d개 기간) ===",
+        saved_count, skipped_count, len(horizons)
     )
-
-    os.makedirs(os.path.dirname(MODEL_OUTPUT_PATH) or ".", exist_ok=True)
-    with open(MODEL_OUTPUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-    log.info("모델 저장 완료: %s", MODEL_OUTPUT_PATH)
+    if deploy_wf_summary is None:
+        log.warning("기본 배포 기간(%d일) 모델은 저장되지 않았습니다 - 기존 rise_model.json은 그대로 둡니다.", FORWARD_DAYS)
+    elif not ADOPT_MACRO_FEATURES:
+        full_auc = deploy_wf_summary.get("fullAucMean")
+        macro_auc = deploy_wf_summary.get("macroAucMean")
+        log.info("=" * 70)
+        log.info(
+            "거시 지표 ablation 결과 (배포 기간 %d일 기준): 기존특징 AUC=%s, 거시포함 AUC=%s",
+            FORWARD_DAYS, round(full_auc, 4) if full_auc else None, round(macro_auc, 4) if macro_auc else None,
+        )
+        if full_auc is not None and macro_auc is not None:
+            delta = macro_auc - full_auc
+            log.info(
+                "-> 거시 지표 추가 효과: %+.4f (%s). ADOPT_MACRO_FEATURES=%s 이므로 현재 배포 모델에는 %s.",
+                delta, "개선" if delta > 0 else "악화/무변화", ADOPT_MACRO_FEATURES,
+                "미포함" if not ADOPT_MACRO_FEATURES else "포함",
+            )
+        log.info("=" * 70)
 
     detail_path = os.path.join(os.path.dirname(MODEL_OUTPUT_PATH) or ".", "walk_forward_detail.json")
     with open(detail_path, "w", encoding="utf-8") as f:
-        json.dump({"deployHorizon": wf_summary, "sweep": sweep_result}, f, ensure_ascii=False, indent=2)
+        json.dump({"deployHorizon": deploy_wf_summary, "sweep": sweep_result}, f, ensure_ascii=False, indent=2)
     log.info("검증 상세 결과 저장: %s", detail_path)
 
 

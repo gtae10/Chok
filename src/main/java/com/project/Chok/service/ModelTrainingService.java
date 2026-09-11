@@ -4,10 +4,12 @@ import com.project.Chok.config.AppProperties;
 import com.project.Chok.config.PythonEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -22,10 +24,16 @@ public class ModelTrainingService {
 
     private final AppProperties appProperties;
     private final PythonEnvironment pythonEnvironment;
+    private final String dbUsername;
+    private final String dbPassword;
 
-    public ModelTrainingService(AppProperties appProperties, PythonEnvironment pythonEnvironment) {
+    public ModelTrainingService(AppProperties appProperties, PythonEnvironment pythonEnvironment,
+                                 @Value("${spring.datasource.username}") String dbUsername,
+                                 @Value("${spring.datasource.password}") String dbPassword) {
         this.appProperties = appProperties;
         this.pythonEnvironment = pythonEnvironment;
+        this.dbUsername = dbUsername;
+        this.dbPassword = dbPassword;
     }
 
     public String retrain() {
@@ -38,6 +46,14 @@ public class ModelTrainingService {
             );
             pb.directory(pythonEnvironment.workingDirectory());
             pb.redirectErrorStream(true);
+
+            // train_model.py(db.py)는 DB_USER/DB_PASSWORD를 os.environ에서 직접 읽는다.
+            // 이 프로세스(Java)의 환경변수에 그 값이 없으면(로컬에서 흔함 - Docker에서는
+            // docker-compose.yml이 컨테이너 환경변수로 이미 넣어줌) 인증에 실패하므로,
+            // Spring이 이미 갖고 있는 spring.datasource.* 값을 자식 프로세스 환경변수로 명시적으로 넘긴다.
+            Map<String, String> env = pb.environment();
+            env.put("DB_USER", dbUsername);
+            env.put("DB_PASSWORD", dbPassword);
 
             Process process = pb.start();
 

@@ -45,6 +45,21 @@ def upsert_stock(ticker, name, market, market_cap, base_date):
         )
         cur.close()
 
+def upsert_market_indicator_rows(rows):
+    if not rows:
+        return
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.executemany(
+            """INSERT INTO market_indicators (trade_date, kospi_close, kosdaq_close, usd_krw_close)
+               VALUES (%(date)s, %(kospi_close)s, %(kosdaq_close)s, %(usd_krw_close)s)
+               ON DUPLICATE KEY UPDATE
+                 kospi_close=VALUES(kospi_close), kosdaq_close=VALUES(kosdaq_close),
+                 usd_krw_close=VALUES(usd_krw_close)""",
+            rows
+        )
+        cur.close()
+
 def insert_price_rows(rows):
     if not rows:
         return

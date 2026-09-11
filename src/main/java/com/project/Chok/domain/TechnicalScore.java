@@ -56,6 +56,15 @@ public class TechnicalScore {
     @Column(name = "probability_horizon_days")
     private Integer probabilityHorizonDays;
 
+    @Column(name = "notable_horizon_days")
+    private Integer notableHorizonDays;
+
+    @Column(name = "notable_horizon_probability")
+    private Double notableHorizonProbability;
+
+    @Column(name = "notable_horizon_approx_date")
+    private LocalDate notableHorizonApproxDate;
+
     @Column(name = "technical_reason", columnDefinition = "TEXT")
     private String technicalReason;
 
@@ -115,6 +124,15 @@ public class TechnicalScore {
 
     public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
     public void setProbabilityHorizonDays(Integer probabilityHorizonDays) { this.probabilityHorizonDays = probabilityHorizonDays; }
+
+    public Integer getNotableHorizonDays() { return notableHorizonDays; }
+    public void setNotableHorizonDays(Integer notableHorizonDays) { this.notableHorizonDays = notableHorizonDays; }
+
+    public Double getNotableHorizonProbability() { return notableHorizonProbability; }
+    public void setNotableHorizonProbability(Double notableHorizonProbability) { this.notableHorizonProbability = notableHorizonProbability; }
+
+    public LocalDate getNotableHorizonApproxDate() { return notableHorizonApproxDate; }
+    public void setNotableHorizonApproxDate(LocalDate notableHorizonApproxDate) { this.notableHorizonApproxDate = notableHorizonApproxDate; }
 
     public String getTechnicalReason() { return technicalReason; }
     public void setTechnicalReason(String technicalReason) { this.technicalReason = technicalReason; }

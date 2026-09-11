@@ -86,7 +86,14 @@ function renderProbability(item) {
     const tagLabel = isModel ? "학습" : "추정";
     const horizon = (isModel && item.probabilityHorizonDays)
         ? '<span class="prob-horizon">(' + item.probabilityHorizonDays + '영업일 기준)</span>' : "";
-    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>' + horizon;
+    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>' + horizon + renderNotableHorizon(item);
+}
+
+// 참고용 - 통계 검증된 예측이 아님. AUC 안전장치를 통과한 후보가 없으면 서버가 애초에 null을 내려줌.
+function renderNotableHorizon(item) {
+    if (item.notableHorizonDays == null) return "";
+    return '<span class="prob-horizon">유력 구간: 약 ' + item.notableHorizonApproxDate + ' 전후 (' +
+        fmt(item.notableHorizonProbability) + '%)</span>';
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

@@ -208,6 +208,9 @@ public class AppProperties {
         private String retrainCron = "0 0 20 * * SUN";
         private int timeoutSeconds = 300;
         private int minSamples = 500;
+        // 종목별 "유력 구간" 후보로 삼을 최소 holdout AUC. 이 기준 미달인 기간은
+        // 다중비교 문제(여러 기간 중 우연히 높게 나온 것)를 "발견"처럼 보여주지 않기 위해 후보에서 제외.
+        private double minAucForHighlight = 0.55;
 
         public boolean isRetrainEnabled() { return retrainEnabled; }
         public void setRetrainEnabled(boolean retrainEnabled) { this.retrainEnabled = retrainEnabled; }
@@ -220,6 +223,9 @@ public class AppProperties {
 
         public int getMinSamples() { return minSamples; }
         public void setMinSamples(int minSamples) { this.minSamples = minSamples; }
+
+        public double getMinAucForHighlight() { return minAucForHighlight; }
+        public void setMinAucForHighlight(double minAucForHighlight) { this.minAucForHighlight = minAucForHighlight; }
     }
 
     // ─────────────────────────────────────────

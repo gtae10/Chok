@@ -36,6 +36,20 @@ async function loadStockDetail() {
     try {
         await loadNewsPage();
     } catch(e) { console.error(e); }
+
+    loadAiReport(ticker); // LLM 호출이라 응답이 늦을 수 있어 다른 로딩과 분리, 완료 대기 안 함
+}
+
+async function loadAiReport(ticker) {
+    const el = document.getElementById("aiReportText");
+    try {
+        const res = await fetch("/api/stocks/" + ticker + "/report");
+        const data = await res.json();
+        el.textContent = data.reportText;
+    } catch (e) {
+        console.error(e);
+        el.textContent = "리포트를 불러오지 못했습니다.";
+    }
 }
 
 let allNews = [];
@@ -176,6 +190,11 @@ function renderHeader(item) {
         probTagEl.textContent = (isModel ? "학습 기반" : "추정치") + horizon;
         probTagEl.className = "prob-tag " + (isModel ? "prob-tag--model" : "prob-tag--heuristic");
     }
+
+    const notableEl = document.getElementById("notableHorizonNote");
+    notableEl.textContent = (item.notableHorizonDays != null)
+        ? "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)"
+        : "";
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

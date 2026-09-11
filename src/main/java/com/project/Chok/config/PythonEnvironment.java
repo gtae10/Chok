@@ -47,4 +47,15 @@ public class PythonEnvironment {
     public String modelOutputPath() {
         return new File(baseDir, "model" + File.separator + "rise_model.json").getAbsolutePath();
     }
+
+    /** 기간별 배포 모델(rise_model_30d.json 식)이 저장되는 디렉터리. */
+    public File modelDir() {
+        return new File(baseDir, "model");
+    }
+
+    /** 기본 배포 모델(rise_model.json)을 제외한, 기간별로 따로 저장된 모델 파일들. */
+    public File[] horizonModelFiles() {
+        File[] files = modelDir().listFiles((dir, name) -> name.matches("rise_model_\\d+d\\.json"));
+        return files == null ? new File[0] : files;
+    }
 }

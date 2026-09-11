@@ -18,6 +18,11 @@ public class TechnicalIndicatorResult {
     private Double riseProbability;
     private String probabilitySource; // "MODEL" | "HEURISTIC"
     private Integer probabilityHorizonDays; // MODEL일 때만 값 있음 (학습된 예측기간, 영업일)
+    // "유력 구간" - 여러 기간별 모델 중 holdoutAuc 기준을 통과한 기간 중 확률이 가장 높은 것.
+    // 후보가 없으면(모든 기간이 기준 미달) 셋 다 null - 억지로 아무 기간이나 보여주지 않기 위함.
+    private Integer notableHorizonDays;
+    private Double notableHorizonProbability;
+    private String notableHorizonApproxDate; // ISO 날짜 문자열, 대략적인 근사치
     private String technicalReason;
 
     public TechnicalIndicatorResult(Double ma5, Double ma20, Double ma60,
@@ -26,6 +31,8 @@ public class TechnicalIndicatorResult {
                                     Double bbPercentB, Double volumeRatio, String obvTrend,
                                     Double technicalScore, Double riseProbability,
                                     String probabilitySource, Integer probabilityHorizonDays,
+                                    Integer notableHorizonDays, Double notableHorizonProbability,
+                                    String notableHorizonApproxDate,
                                     String technicalReason) {
         this.ma5 = ma5;
         this.ma20 = ma20;
@@ -43,6 +50,9 @@ public class TechnicalIndicatorResult {
         this.riseProbability = riseProbability;
         this.probabilitySource = probabilitySource;
         this.probabilityHorizonDays = probabilityHorizonDays;
+        this.notableHorizonDays = notableHorizonDays;
+        this.notableHorizonProbability = notableHorizonProbability;
+        this.notableHorizonApproxDate = notableHorizonApproxDate;
         this.technicalReason = technicalReason;
     }
 
@@ -52,6 +62,7 @@ public class TechnicalIndicatorResult {
                 null, null, null, null, null, null,
                 null, null, null, null, null, null,
                 50.0, 50.0, "HEURISTIC", null,
+                null, null, null,
                 "가격 데이터 부족으로 중립 처리"
         );
     }
@@ -72,5 +83,8 @@ public class TechnicalIndicatorResult {
     public Double getRiseProbability() { return riseProbability; }
     public String getProbabilitySource() { return probabilitySource; }
     public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
+    public Integer getNotableHorizonDays() { return notableHorizonDays; }
+    public Double getNotableHorizonProbability() { return notableHorizonProbability; }
+    public String getNotableHorizonApproxDate() { return notableHorizonApproxDate; }
     public String getTechnicalReason() { return technicalReason; }
 }

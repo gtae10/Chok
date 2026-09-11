@@ -110,6 +110,13 @@ public class TechnicalAnalysisService {
             probabilityHorizonDays = null; // 휴리스틱은 특정 예측기간을 주장하지 않음
         }
 
+        // "유력 구간" - 여러 기간별 모델 중 AUC 기준을 통과한 후보가 있으면 그중 확률이 가장 높은 기간.
+        // 기존 단일 배포 확률/기간 표시는 그대로 두고, 이건 추가 정보로만 얹는다.
+        RiseProbabilityService.NotableHorizon notable = riseProbabilityService.findNotableHorizon(features);
+        Integer notableHorizonDays = notable == null ? null : notable.horizonDays();
+        Double notableHorizonProbability = notable == null ? null : round2(notable.probability());
+        String notableHorizonApproxDate = notable == null ? null : notable.approxDate().toString();
+
         return new TechnicalIndicatorResult(
                 round2(ma5), round2(ma20), round2(ma60),
                 round2(rsi),
@@ -117,6 +124,7 @@ public class TechnicalAnalysisService {
                 round2(bbUpper), round2(bbLower), round2(bbPercentB),
                 round2(volumeRatio), obvTrend,
                 round2(finalScore), round2(riseProbability), probabilitySource, probabilityHorizonDays,
+                notableHorizonDays, notableHorizonProbability, notableHorizonApproxDate,
                 reason.toString().trim()
         );
     }

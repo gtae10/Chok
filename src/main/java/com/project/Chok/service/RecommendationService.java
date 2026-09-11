@@ -147,6 +147,8 @@ public class RecommendationService {
         saveRecommendation(stock, today, techResult.getTechnicalScore(),
                 avgSentiment, finalScore, techResult.getRiseProbability(),
                 techResult.getProbabilitySource(), techResult.getProbabilityHorizonDays(),
+                techResult.getNotableHorizonDays(), techResult.getNotableHorizonProbability(),
+                techResult.getNotableHorizonApproxDate(),
                 recommendation, nuance, reason);
     }
 
@@ -173,6 +175,9 @@ public class RecommendationService {
         entity.setRiseProbability(r.getRiseProbability());
         entity.setProbabilitySource(r.getProbabilitySource());
         entity.setProbabilityHorizonDays(r.getProbabilityHorizonDays());
+        entity.setNotableHorizonDays(r.getNotableHorizonDays());
+        entity.setNotableHorizonProbability(r.getNotableHorizonProbability());
+        entity.setNotableHorizonApproxDate(r.getNotableHorizonApproxDate() == null ? null : LocalDate.parse(r.getNotableHorizonApproxDate()));
         entity.setTechnicalReason(r.getTechnicalReason());
 
         technicalScoreRepository.save(entity);
@@ -273,6 +278,8 @@ public class RecommendationService {
                                     double sentimentScore, double finalScore,
                                     double riseProbability, String probabilitySource,
                                     Integer probabilityHorizonDays,
+                                    Integer notableHorizonDays, Double notableHorizonProbability,
+                                    String notableHorizonApproxDate,
                                     String recommendation, String recommendationNuance, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
@@ -291,6 +298,9 @@ public class RecommendationService {
         entity.setRiseProbability(round2(riseProbability));
         entity.setProbabilitySource(probabilitySource);
         entity.setProbabilityHorizonDays(probabilityHorizonDays);
+        entity.setNotableHorizonDays(notableHorizonDays);
+        entity.setNotableHorizonProbability(notableHorizonProbability);
+        entity.setNotableHorizonApproxDate(notableHorizonApproxDate == null ? null : LocalDate.parse(notableHorizonApproxDate));
         entity.setRecommendation(recommendation);
         entity.setRecommendationNuance(recommendationNuance);
         entity.setReason(reason);

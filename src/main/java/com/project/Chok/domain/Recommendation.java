@@ -42,6 +42,15 @@ public class Recommendation {
     @Column(name = "probability_horizon_days")
     private Integer probabilityHorizonDays;
 
+    @Column(name = "notable_horizon_days")
+    private Integer notableHorizonDays;
+
+    @Column(name = "notable_horizon_probability")
+    private Double notableHorizonProbability;
+
+    @Column(name = "notable_horizon_approx_date")
+    private LocalDate notableHorizonApproxDate;
+
     @Column(length = 20)
     private String recommendation;
 
@@ -88,6 +97,15 @@ public class Recommendation {
 
     public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
     public void setProbabilityHorizonDays(Integer probabilityHorizonDays) { this.probabilityHorizonDays = probabilityHorizonDays; }
+
+    public Integer getNotableHorizonDays() { return notableHorizonDays; }
+    public void setNotableHorizonDays(Integer notableHorizonDays) { this.notableHorizonDays = notableHorizonDays; }
+
+    public Double getNotableHorizonProbability() { return notableHorizonProbability; }
+    public void setNotableHorizonProbability(Double notableHorizonProbability) { this.notableHorizonProbability = notableHorizonProbability; }
+
+    public LocalDate getNotableHorizonApproxDate() { return notableHorizonApproxDate; }
+    public void setNotableHorizonApproxDate(LocalDate notableHorizonApproxDate) { this.notableHorizonApproxDate = notableHorizonApproxDate; }
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }

@@ -13,6 +13,9 @@ public class RecommendationResponse {
     private Double riseProbability;
     private String probabilitySource;
     private Integer probabilityHorizonDays;
+    private Integer notableHorizonDays;
+    private Double notableHorizonProbability;
+    private String notableHorizonApproxDate;
     private String recommendation;
     private String recommendationNuance;
     private String reason;
@@ -28,6 +31,9 @@ public class RecommendationResponse {
         this.riseProbability = r.getRiseProbability();
         this.probabilitySource = r.getProbabilitySource();
         this.probabilityHorizonDays = r.getProbabilityHorizonDays();
+        this.notableHorizonDays = r.getNotableHorizonDays();
+        this.notableHorizonProbability = r.getNotableHorizonProbability();
+        this.notableHorizonApproxDate = r.getNotableHorizonApproxDate() == null ? null : r.getNotableHorizonApproxDate().toString();
         this.recommendation = r.getRecommendation();
         this.recommendationNuance = r.getRecommendationNuance();
         this.reason = r.getReason();
@@ -43,6 +49,9 @@ public class RecommendationResponse {
     public Double getRiseProbability() { return riseProbability; }
     public String getProbabilitySource() { return probabilitySource; }
     public Integer getProbabilityHorizonDays() { return probabilityHorizonDays; }
+    public Integer getNotableHorizonDays() { return notableHorizonDays; }
+    public Double getNotableHorizonProbability() { return notableHorizonProbability; }
+    public String getNotableHorizonApproxDate() { return notableHorizonApproxDate; }
     public String getRecommendation() { return recommendation; }
     public String getRecommendationNuance() { return recommendationNuance; }
     public String getReason() { return reason; }

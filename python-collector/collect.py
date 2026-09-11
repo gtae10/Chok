@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import FinanceDataReader as fdr
 import pandas as pd
 import config
-from db import upsert_stock, insert_price_rows
+from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -85,6 +85,47 @@ def fetch_price_history(stock):
     return ticker, True
 
 
+# 종목별이 아닌, 그날 전체 시장에 공통으로 적용되는 거시 지표.
+# FDR로 안정적으로 얻을 수 있는 것만 채택 (PER/PBR/배당수익률은 FDR 미제공, pykrx는
+# KRX_ID/KRX_PW 로그인 필요, 네이버 시세 페이지는 Next.js 리뉴얼로 정적 스크래핑 불가해 제외).
+MARKET_INDEX_SYMBOLS = {
+    "kospi_close": "KS11",
+    "kosdaq_close": "KQ11",
+    "usd_krw_close": "USD/KRW",
+}
+
+
+def fetch_market_indicators():
+    """KOSPI/KOSDAQ 지수, 원/달러 환율의 일별 종가를 수집해 market_indicators에 저장한다."""
+    days = config.PRICE_HISTORY_DAYS
+    end_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d")
+
+    series = {}
+    for column, symbol in MARKET_INDEX_SYMBOLS.items():
+        try:
+            df = fdr.DataReader(symbol, start_date, end_date)
+            series[column] = df["Close"]
+        except Exception as e:
+            logger.error(f"거시 지표 조회 실패 ({symbol}): {e}")
+
+    if not series:
+        logger.warning("거시 지표를 하나도 가져오지 못해 저장을 건너뜁니다.")
+        return 0
+
+    merged = pd.DataFrame(series)
+    rows = [
+        {"date": date.strftime("%Y-%m-%d"), **{
+            col: (float(row[col]) if pd.notna(row.get(col)) else None) for col in series
+        }}
+        for date, row in merged.iterrows()
+    ]
+
+    upsert_market_indicator_rows(rows)
+    logger.info(f"거시 지표 저장 완료: {len(rows)}일치 ({', '.join(series.keys())})")
+    return len(rows)
+
+
 def run():
     logger.info("=== 시세 수집 시작 ===")
     start = datetime.datetime.now()
@@ -102,6 +143,11 @@ def run():
                 if success:
                     processed += 1
                 logger.info(f"[{i}/{total}] {ticker} 완료")
+
+        try:
+            fetch_market_indicators()
+        except Exception as e:
+            logger.error(f"거시 지표 수집 실패 (종목 시세는 정상 수집됨): {e}")
 
         elapsed = (datetime.datetime.now() - start).seconds
         logger.info(f"=== 시세 수집 완료: {processed}/{total} 종목 ({elapsed}초) ===")

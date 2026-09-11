@@ -30,9 +30,21 @@ chok.anthropic.base-url=https://api.anthropic.com/v1/messages
 
 # chok.news.* - 같은 사건을 다루는 헤드라인(언론사만 다름) 중복 제거
 # dedup-similarity-threshold: 문자 2-gram Jaccard 유사도가 이 값 이상이면 같은 사건으로 보고
-# LLM 호출 전 단계에서 건너뜀. 실제 뉴스로 보정한 값 - 서로 다른 사건은 보통 0.1 근처,
-# 같은 사건은 리드 문구가 달라도 대개 0.25~0.7 사이로 나와서 0.3으로 설정 (필요시 조정 가능)
-chok.news.dedup-similarity-threshold=0.3
+# LLM 호출 전 단계에서 건너뜀.
+# 2026-09-06 실제 저장된 헤드라인 4,172건(113종목)을 전수 비교해 재검토한 값:
+#   - 완전 무관한 사건: 0.0~0.05 (예: "코오롱티슈진 하한가" vs "모더나 잭팟" 계열, 0.0)
+#   - 진짜 오탐(다른 사건인데 유사): ~0.19부터 산발적으로 발생
+#       (예: "삼성바이오로직스 폴리펩타이드 인수" vs "삼성바이오로직스 2분기 영업익", 0.1951)
+#   - 실제 중복(같은 사건, 다른 표현): 0.20~1.0에 넓게 분포, 0.24~0.30 구간에 특히 밀집
+#       (예: 인텔리빅스 상장예심 승인 기사 2건 = 0.2632, 기존 0.3 임계값으로는 미탐지였음;
+#        "美 금리인상 경계 후퇴…코스피 1.6%" 계열 동일사건 다수가 0.2973~0.2444에서 누락 확인)
+#   → 0.24~0.30 구간은 표본상 오탐 없이 실제 중복만 관찰되어 0.25로 하향.
+#     단, 반복되는 정형 포맷 헤드라인([서울데이터랩] 코스피 시총 상위주 등 매일 갱신되는
+#     시황 요약)은 실제로는 다른 날짜의 다른 사건인데도 0.30~0.32대에서 이미 오탐이 있었음
+#     (임계값 조정으로 해결되지 않는 구조적 한계 - 문자 n-gram만으로는 "같은 템플릿"과
+#     "같은 사건"을 구분 못함. 후속 개선 필요시 정형 시황 헤드라인 별도 처리 또는 숫자/
+#     고유명사 추출 기반 보조 판정 고려)
+chok.news.dedup-similarity-threshold=0.25
 
 # chok.analysis.* - final score weights (technical 65% + sentiment 35%)
 chok.analysis.weight-technical=0.65
@@ -54,7 +66,13 @@ chok.scheduler.enabled=true
 chok.scheduler.cron=0 30 18 * * MON-FRI
 
 # chok.model.* - rise-probability logistic regression model
-chok.model.retrain-enabled=false
+chok.model.retrain-enabled=true
 chok.model.retrain-cron=0 0 20 * * SUN
+# timeout-seconds: 2026-09-11 기준, 기간 12개 전체(walk-forward 검증 + 최종모델 학습 포함)
+# 실측 소요시간 약 8초 - 데이터가 앞으로 더 쌓여도 여유 있도록 300초(약 36배 여유) 유지
 chok.model.timeout-seconds=300
 chok.model.min-samples=500
+# min-auc-for-highlight: 종목별 "유력 구간"(여러 예측기간 중 확률이 도드라진 기간)을 판단할 때,
+# 그 기간 모델의 walk-forward holdoutAuc가 이 값 이상이어야 후보로 삼는다. 다중비교 문제 방지용
+# 안전장치 - 미달이면 후보에서 빠지고, 후보가 하나도 없으면 "유력 구간 없음"으로 처리한다.
+chok.model.min-auc-for-highlight=0.55

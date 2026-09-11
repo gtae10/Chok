@@ -1,0 +1,50 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: chok-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-chokDockerTest123}
+      MYSQL_DATABASE: chok
+    ports:
+      # 호스트 3306은 로컬에 이미 떠 있는 네이티브 MySQL이 점유 중 (충돌 확인됨) → 3307로 매핑.
+      # 컨테이너 간 통신(app -> mysql:3306)은 도커 내부 네트워크를 쓰므로 이 매핑과 무관하게 정상 동작.
+      - "3307:3306"
+    volumes:
+      - chok-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-chokDockerTest123}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chok-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring Boot (application.properties의 spring.datasource.* 를 오버라이드)
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/chok?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-chokDockerTest123}
+      CHOK_OPENAI_API_KEY: ${CHOK_OPENAI_API_KEY:-CHANGE_ME}
+      CHOK_ANTHROPIC_API_KEY: ${CHOK_ANTHROPIC_API_KEY:-CHANGE_ME}
+      CHOK_SENTIMENT_PROVIDER: ${CHOK_SENTIMENT_PROVIDER:-openai}
+      CHOK_SCHEDULER_ENABLED: "false"
+      # python-collector (db.py가 os.environ에서 직접 읽음, ProcessBuilder가
+      # 부모 프로세스인 이 컨테이너의 환경변수를 그대로 상속함)
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: chok
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-chokDockerTest123}
+
+volumes:
+  chok-mysql-data:

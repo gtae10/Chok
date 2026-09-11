@@ -3,6 +3,7 @@ package com.project.Chok.controller;
 import com.project.Chok.config.AppProperties;
 import com.project.Chok.dto.PriceHistoryResponse;
 import com.project.Chok.dto.RecommendationResponse;
+import com.project.Chok.dto.StockReportResponse;
 import com.project.Chok.domain.NewsSentiment;
 import com.project.Chok.domain.PriceHistory;
 import com.project.Chok.domain.Recommendation;
@@ -12,6 +13,7 @@ import com.project.Chok.repository.RecommendationRepository;
 import com.project.Chok.service.AnalysisStatus;
 import com.project.Chok.service.DataCollectionService;
 import com.project.Chok.service.RecommendationService;
+import com.project.Chok.service.StockReportService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +35,7 @@ public class RecommendationController {
     private final RecommendationService recommendationService;
     private final AnalysisStatus analysisStatus;
     private final AppProperties appProperties;
+    private final StockReportService stockReportService;
 
     public RecommendationController(RecommendationRepository recommendationRepository,
                                     PriceHistoryRepository priceHistoryRepository,
@@ -40,7 +43,8 @@ public class RecommendationController {
                                     DataCollectionService dataCollectionService,
                                     RecommendationService recommendationService,
                                     AnalysisStatus analysisStatus,
-                                    AppProperties appProperties) {
+                                    AppProperties appProperties,
+                                    StockReportService stockReportService) {
         this.recommendationRepository = recommendationRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.newsSentimentRepository = newsSentimentRepository;
@@ -48,6 +52,7 @@ public class RecommendationController {
         this.recommendationService = recommendationService;
         this.analysisStatus = analysisStatus;
         this.appProperties = appProperties;
+        this.stockReportService = stockReportService;
     }
 
     @PostMapping("/collection/run")
@@ -157,5 +162,18 @@ public class RecommendationController {
                 .stream().map(RecommendationResponse::new).collect(Collectors.toList());
         long total = recommendationRepository.countByTicker(ticker);
         return ResponseEntity.ok().header("X-Total-Count", String.valueOf(total)).body(history);
+    }
+
+    /**
+     * AI 종합 리포트 - 종목 상세페이지를 열 때 지연 생성된다(lazy). 직전 생성 시점 대비
+     * 점수가 유의미하게 안 바뀌었으면 캐시를 그대로 반환한다 (StockReportService 참고).
+     */
+    @GetMapping("/stocks/{ticker}/report")
+    public ResponseEntity<StockReportResponse> getReport(@PathVariable String ticker) {
+        StockReportService.ReportResult result = stockReportService.getOrGenerateReport(ticker);
+        return ResponseEntity.ok(new StockReportResponse(
+                result.reportText(), result.cached(),
+                result.generatedAt() == null ? null : result.generatedAt().toString()
+        ));
     }
 }
