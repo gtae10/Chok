@@ -5,6 +5,7 @@ import com.project.Chok.domain.PriceHistory;
 import com.project.Chok.domain.Recommendation;
 import com.project.Chok.dto.PerformanceItemResponse;
 import com.project.Chok.dto.PerformanceSummaryResponse;
+import com.project.Chok.dto.RecommendationResponse;
 import com.project.Chok.repository.PerformanceSnapshotRepository;
 import com.project.Chok.repository.PriceHistoryRepository;
 import com.project.Chok.repository.RecommendationRepository;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -107,6 +109,21 @@ public class PerformanceTrackingService {
                 : round2(returns.stream().mapToDouble(Double::doubleValue).average().orElse(0.0) * 100.0);
 
         return new PerformanceSummaryResponse(items.size(), winRate, avgReturnRate, items);
+    }
+
+    /**
+     * 스냅샷 선정일부터 오늘까지, 그 종목의 Recommendation 이력을 시간순으로 반환한다.
+     * 종목 상세페이지 "추천 점수 추이" 차트와 같은 조회 패턴(ticker + recDate 범위)을 재사용.
+     */
+    public List<RecommendationResponse> getTrend(Long snapshotId) {
+        PerformanceSnapshot snapshot = performanceSnapshotRepository.findById(snapshotId)
+                .orElseThrow(() -> new NoSuchElementException("스냅샷을 찾을 수 없습니다: " + snapshotId));
+
+        return recommendationRepository
+                .findByTickerAndRecDateFromOrderByRecDateAsc(snapshot.getTicker(), snapshot.getSnapshotDate())
+                .stream()
+                .map(RecommendationResponse::new)
+                .toList();
     }
 
     private static double round2(double v) {

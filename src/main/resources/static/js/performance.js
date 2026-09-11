@@ -28,14 +28,18 @@ function renderSummary(data) {
     }
 }
 
+const trendCache = {};
+let expandedId = null;
+
 function renderTable(items) {
     const tbody = document.getElementById("performanceTableBody");
     const emptyState = document.getElementById("emptyState");
     if (items.length === 0) { tbody.innerHTML = ""; emptyState.hidden = false; return; }
     emptyState.hidden = true;
+    expandedId = null;
 
     tbody.innerHTML = items.map(function(item) {
-        return '<tr data-ticker="' + item.ticker + '">' +
+        return '<tr data-id="' + item.id + '" data-ticker="' + item.ticker + '">' +
             '<td>' + item.snapshotDate + '</td>' +
             '<td>' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></td>' +
             '<td>' + item.rank + '</td>' +
@@ -50,9 +54,65 @@ function renderTable(items) {
             '</tr>';
     }).join("");
 
-    tbody.querySelectorAll("tr[data-ticker]").forEach(function(row) {
-        row.addEventListener("click", function() { window.location.href = "/stocks/" + row.dataset.ticker; });
+    tbody.querySelectorAll("tr[data-id]").forEach(function(row) {
+        row.addEventListener("click", function() { toggleTrendRow(row); });
     });
+}
+
+// 행 클릭 시 선정일~오늘 지표 추이를 그 아래에 펼쳐 보여준다 (한 번에 하나만 펼침).
+function toggleTrendRow(row) {
+    const id = row.dataset.id;
+    const wasExpanded = expandedId === id;
+
+    const existingTrendRow = document.querySelector('tr.trend-row');
+    if (existingTrendRow) existingTrendRow.remove();
+    document.querySelectorAll('tr[data-id].is-expanded').forEach(function(r) { r.classList.remove('is-expanded'); });
+
+    if (wasExpanded) {
+        expandedId = null;
+        return;
+    }
+
+    expandedId = id;
+    row.classList.add('is-expanded');
+
+    const colCount = row.children.length;
+    const trendRow = document.createElement('tr');
+    trendRow.className = 'trend-row';
+    trendRow.innerHTML =
+        '<td colspan="' + colCount + '">' +
+            '<div class="chart-section trend-detail">' +
+                '<div class="chart-legend">' +
+                    '<span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>' +
+                    '<span class="chart-legend__item"><i class="chart-legend__dot" style="background:#3E7BFA"></i>상승확률</span>' +
+                '</div>' +
+                '<div class="chart-wrap">' +
+                    '<svg class="trend-chart" viewBox="0 0 800 260" preserveAspectRatio="none"></svg>' +
+                '</div>' +
+            '</div>' +
+        '</td>';
+    row.after(trendRow);
+
+    loadTrend(id, trendRow.querySelector('.trend-chart'));
+}
+
+async function loadTrend(id, svg) {
+    if (trendCache[id]) {
+        renderScoreTrendChart(svg, trendCache[id]);
+        return;
+    }
+    svg.innerHTML = '<text x="400" y="130" fill="#5C6786" font-size="14" text-anchor="middle">불러오는 중...</text>';
+    try {
+        const res = await fetch('/api/performance/' + id + '/trend');
+        if (!res.ok) throw new Error('trend fetch failed: ' + res.status);
+        const trend = await res.json();
+        trendCache[id] = trend;
+        // 펼쳐놓은 채로 다른 행을 클릭했다 돌아왔을 수 있으니, 여전히 이 행이 펼쳐진 상태일 때만 그린다.
+        if (String(expandedId) === String(id)) renderScoreTrendChart(svg, trend);
+    } catch (err) {
+        console.error(err);
+        svg.innerHTML = '<text x="400" y="130" fill="#5C6786" font-size="14" text-anchor="middle">추이를 불러오지 못했습니다</text>';
+    }
 }
 
 function renderReturnRate(rate) {

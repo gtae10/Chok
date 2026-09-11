@@ -6,6 +6,7 @@ import java.time.temporal.ChronoUnit;
 
 public class PerformanceItemResponse {
 
+    private Long id;
     private String ticker;
     private String name;
     private String snapshotDate;
@@ -20,6 +21,7 @@ public class PerformanceItemResponse {
     private long holdingDays;
 
     public PerformanceItemResponse(PerformanceSnapshot s, Integer currentPrice, LocalDate today) {
+        this.id = s.getId();
         this.ticker = s.getTicker();
         this.name = s.getName();
         this.snapshotDate = s.getSnapshotDate().toString();
@@ -40,6 +42,7 @@ public class PerformanceItemResponse {
         return Math.round(v * 10000.0) / 10000.0;
     }
 
+    public Long getId() { return id; }
     public String getTicker() { return ticker; }
     public String getName() { return name; }
     public String getSnapshotDate() { return snapshotDate; }

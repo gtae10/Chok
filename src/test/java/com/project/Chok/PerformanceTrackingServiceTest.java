@@ -4,6 +4,7 @@ import com.project.Chok.domain.PerformanceSnapshot;
 import com.project.Chok.domain.PriceHistory;
 import com.project.Chok.domain.Recommendation;
 import com.project.Chok.dto.PerformanceSummaryResponse;
+import com.project.Chok.dto.RecommendationResponse;
 import com.project.Chok.repository.PerformanceSnapshotRepository;
 import com.project.Chok.repository.PriceHistoryRepository;
 import com.project.Chok.repository.RecommendationRepository;
@@ -18,9 +19,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -226,5 +229,47 @@ class PerformanceTrackingServiceTest {
         assertThat(summary.getWinRate()).isNull();
         assertThat(summary.getAvgReturnRate()).isNull();
         assertThat(summary.getItems()).isEmpty();
+    }
+
+    private Recommendation recAt(String ticker, String name, LocalDate recDate, double finalScore) {
+        Recommendation r = rec(ticker, name, finalScore);
+        r.setRecDate(recDate);
+        return r;
+    }
+
+    @Test
+    @DisplayName("스냅샷 선정일부터 오늘까지의 추천 이력을 시간순으로 반환한다")
+    void getTrend_returns_history_from_snapshot_date_ordered_ascending() {
+        PerformanceSnapshot snapshot = new PerformanceSnapshot();
+        snapshot.setId(1L);
+        snapshot.setTicker("005930");
+        snapshot.setSnapshotDate(LocalDate.of(2026, 9, 1));
+        when(performanceSnapshotRepository.findById(1L)).thenReturn(Optional.of(snapshot));
+
+        List<Recommendation> history = List.of(
+                recAt("005930", "삼성전자", LocalDate.of(2026, 9, 1), 70.0),
+                recAt("005930", "삼성전자", LocalDate.of(2026, 9, 2), 75.0),
+                recAt("005930", "삼성전자", LocalDate.of(2026, 9, 3), 80.0));
+        when(recommendationRepository.findByTickerAndRecDateFromOrderByRecDateAsc(
+                "005930", LocalDate.of(2026, 9, 1))).thenReturn(history);
+
+        List<RecommendationResponse> trend = service.getTrend(1L);
+
+        assertThat(trend).hasSize(3);
+        assertThat(trend).extracting(RecommendationResponse::getDate)
+                .containsExactly("2026-09-01", "2026-09-02", "2026-09-03");
+        assertThat(trend).extracting(RecommendationResponse::getFinalScore)
+                .containsExactly(70.0, 75.0, 80.0);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 스냅샷 id로 추이를 조회하면 예외가 발생한다")
+    void getTrend_throws_when_snapshot_not_found() {
+        when(performanceSnapshotRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getTrend(999L))
+                .isInstanceOf(NoSuchElementException.class);
+
+        verifyNoInteractions(recommendationRepository);
     }
 }
