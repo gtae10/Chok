@@ -8,4 +8,4 @@ DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 
 TOP_N_STOCKS = int(os.environ.get("TOP_N_STOCKS", "100"))
 MARKETS = ["KOSPI", "KOSDAQ"]
-PRICE_HISTORY_DAYS = 365
+PRICE_HISTORY_DAYS = 1825  # 5년치 - 여러 시장 국면(상승/하락/횡보)을 포함해 백테스트 신뢰도를 높이기 위함

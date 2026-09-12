@@ -1,149 +1,241 @@
 {
   "deployHorizon": {
-    "nFolds": 3,
+    "nFolds": 10,
     "folds": [
       {
+        "fold": 1,
+        "trainSize": 4428,
+        "testSize": 9310,
+        "baselineAccuracy": 0.5053705692803437,
+        "noVolumeAccuracy": 0.5290010741138561,
+        "noVolumeAuc": 0.5440160339509912,
+        "fullAccuracy": 0.525671321160043,
+        "fullAuc": 0.5405802268707142,
+        "macroAccuracy": 0.5534626038781163,
+        "macroAuc": 0.5659819653888952
+      },
+      {
+        "fold": 2,
+        "trainSize": 13692,
+        "testSize": 9400,
+        "baselineAccuracy": 0.505,
+        "noVolumeAccuracy": 0.47585106382978726,
+        "noVolumeAuc": 0.4734859180802643,
+        "fullAccuracy": 0.4801063829787234,
+        "fullAuc": 0.47528301947442364,
+        "macroAccuracy": 0.47945839601897927,
+        "macroAuc": 0.4804383410337346
+      },
+      {
         "fold": 3,
-        "trainSize": 2729,
-        "testSize": 2801,
-        "baselineAccuracy": 0.50017850767583,
-        "noVolumeAccuracy": 0.5355230274901821,
-        "noVolumeAuc": 0.5237345773427143,
-        "fullAccuracy": 0.5365940735451624,
-        "fullAuc": 0.5238176812480881,
-        "macroAccuracy": 0.5291117722056948,
-        "macroAuc": 0.5233218606049047
+        "trainSize": 23097,
+        "testSize": 9310,
+        "baselineAccuracy": 0.5052631578947369,
+        "noVolumeAccuracy": 0.48603651987110635,
+        "noVolumeAuc": 0.4875384831527052,
+        "fullAccuracy": 0.4866809881847476,
+        "fullAuc": 0.48822866912722535,
+        "macroAccuracy": 0.4885750962772786,
+        "macroAuc": 0.48152352534163645
       },
       {
         "fold": 4,
-        "trainSize": 5485,
-        "testSize": 2689,
-        "baselineAccuracy": 0.5039047973224247,
-        "noVolumeAccuracy": 0.46597248047601336,
-        "noVolumeAuc": 0.44789855994511973,
-        "fullAccuracy": 0.4652287095574563,
-        "fullAuc": 0.4440193187539072,
-        "macroAccuracy": 0.45687952600395,
-        "macroAuc": 0.45132264674981537
+        "trainSize": 32402,
+        "testSize": 9310,
+        "baselineAccuracy": 0.5052631578947369,
+        "noVolumeAccuracy": 0.5036519871106337,
+        "noVolumeAuc": 0.5110974833919673,
+        "fullAccuracy": 0.5052631578947369,
+        "fullAuc": 0.5115752227942849,
+        "macroAccuracy": 0.5108658743633276,
+        "macroAuc": 0.5206953039091962
       },
       {
         "fold": 5,
-        "trainSize": 8285,
-        "testSize": 2600,
-        "baselineAccuracy": 0.5,
-        "noVolumeAccuracy": 0.3384615384615385,
-        "noVolumeAuc": 0.3103621301775148,
-        "fullAccuracy": 0.33884615384615385,
-        "fullAuc": 0.31054319526627217,
-        "macroAccuracy": 0.33125,
-        "macroAuc": 0.2892375
+        "trainSize": 41712,
+        "testSize": 9405,
+        "baselineAccuracy": 0.5052631578947369,
+        "noVolumeAccuracy": 0.49016480595427964,
+        "noVolumeAuc": 0.4669606010676287,
+        "fullAccuracy": 0.4884635832004253,
+        "fullAuc": 0.4658294022682589,
+        "macroAccuracy": 0.49617224880382776,
+        "macroAuc": 0.4789485970276589
+      },
+      {
+        "fold": 6,
+        "trainSize": 51117,
+        "testSize": 9433,
+        "baselineAccuracy": 0.5027032757341249,
+        "noVolumeAccuracy": 0.4873317078341991,
+        "noVolumeAuc": 0.496835204323974,
+        "fullAccuracy": 0.4864836213293756,
+        "fullAuc": 0.49711724875680624,
+        "macroAccuracy": 0.4820325659741718,
+        "macroAuc": 0.483478252645119
+      },
+      {
+        "fold": 7,
+        "trainSize": 60462,
+        "testSize": 9586,
+        "baselineAccuracy": 0.500938869184227,
+        "noVolumeAccuracy": 0.505424577508867,
+        "noVolumeAuc": 0.5052942248840018,
+        "fullAccuracy": 0.5070936782808262,
+        "fullAuc": 0.5068340480346121,
+        "macroAccuracy": 0.5147025040202159,
+        "macroAuc": 0.5141010563080173
+      },
+      {
+        "fold": 8,
+        "trainSize": 69986,
+        "testSize": 9758,
+        "baselineAccuracy": 0.5028694404591105,
+        "noVolumeAccuracy": 0.519163763066202,
+        "noVolumeAuc": 0.5098659431536662,
+        "fullAccuracy": 0.5121951219512195,
+        "fullAuc": 0.5090871617990311,
+        "macroAccuracy": 0.508695652173913,
+        "macroAuc": 0.49826431190014087
+      },
+      {
+        "fold": 9,
+        "trainSize": 79694,
+        "testSize": 10438,
+        "baselineAccuracy": 0.5041195631347002,
+        "noVolumeAccuracy": 0.5131251197547423,
+        "noVolumeAuc": 0.5175873487375878,
+        "fullAccuracy": 0.5114964552596283,
+        "fullAuc": 0.5192835893757524,
+        "macroAccuracy": 0.5315583186917151,
+        "macroAuc": 0.5424185429321549
+      },
+      {
+        "fold": 10,
+        "trainSize": 89468,
+        "testSize": 10700,
+        "baselineAccuracy": 0.5033644859813085,
+        "noVolumeAccuracy": 0.4794392523364486,
+        "noVolumeAuc": 0.4729098398516009,
+        "fullAccuracy": 0.48149532710280374,
+        "fullAuc": 0.47232558770064315,
+        "macroAccuracy": 0.4925888617067204,
+        "macroAuc": 0.4875207905365967
       }
     ],
-    "baselineAccuracyMean": 0.5013611016660849,
-    "baselineAccuracyStd": 0.0018001401689209022,
-    "noVolumeAccuracyMean": 0.4466523488092447,
-    "noVolumeAccuracyStd": 0.08160170843907015,
-    "noVolumeAucMean": 0.4273317558217829,
-    "noVolumeAucStd": 0.08831457175424014,
-    "macroAccuracyMean": 0.4390804327365483,
-    "macroAccuracyStd": 0.08175135479387408,
-    "macroAucMean": 0.4212940024515734,
-    "macroAucStd": 0.0978950512155561,
-    "fullAccuracyMean": 0.4468896456495908,
-    "fullAccuracyStd": 0.08176511434217719,
-    "fullAucMean": 0.4261267317560892,
-    "fullAucStd": 0.0879833699998957
+    "baselineAccuracyMean": 0.5040155677458026,
+    "baselineAccuracyStd": 0.0014286740071076287,
+    "noVolumeAccuracyMean": 0.49891898713801225,
+    "noVolumeAccuracyStd": 0.016940392422791332,
+    "noVolumeAucMean": 0.49855910805943876,
+    "noVolumeAucStd": 0.02273381777473482,
+    "macroAccuracyMean": 0.5058112121908266,
+    "macroAccuracyStd": 0.022070822577246237,
+    "macroAucMean": 0.5053370687023151,
+    "macroAucStd": 0.028450231128620922,
+    "fullAccuracyMean": 0.49849496373425295,
+    "fullAccuracyStd": 0.014921904610022104,
+    "fullAucMean": 0.4986144176201752,
+    "fullAucStd": 0.022257551996175132
   },
   "sweep": {
     "labelMode": "relative",
     "results": [
       {
         "horizon": 3,
-        "samples": 21686,
-        "baselineAcc": 0.5019269348496611,
-        "noVolumeAuc": 0.4700364554023901,
-        "fullAuc": 0.469329066008049,
-        "macroAuc": 0.4792683165721523
+        "samples": 111140,
+        "baselineAcc": 0.5040621868025786,
+        "noVolumeAuc": 0.4994306256741689,
+        "fullAuc": 0.4993517135012782,
+        "macroAuc": 0.5024223728816757
       },
       {
         "horizon": 5,
-        "samples": 21460,
-        "baselineAcc": 0.5018812280921177,
-        "noVolumeAuc": 0.46295487352158043,
-        "fullAuc": 0.46326762712532404,
-        "macroAuc": 0.477415270851679
+        "samples": 110912,
+        "baselineAcc": 0.5040430184747812,
+        "noVolumeAuc": 0.4961978889955619,
+        "fullAuc": 0.4963087881083671,
+        "macroAuc": 0.5006955567558016
       },
       {
         "horizon": 10,
-        "samples": 20895,
-        "baselineAcc": 0.5017384777311659,
-        "noVolumeAuc": 0.4816102946480371,
-        "fullAuc": 0.48300110787449724,
-        "macroAuc": 0.4932316307898262
+        "samples": 110342,
+        "baselineAcc": 0.503969668537626,
+        "noVolumeAuc": 0.49922537446924037,
+        "fullAuc": 0.49867053613444173,
+        "macroAuc": 0.5042555262097419
       },
       {
         "horizon": 20,
-        "samples": 19765,
-        "baselineAcc": 0.5016183629837273,
-        "noVolumeAuc": 0.43885511615094136,
-        "fullAuc": 0.43835355476590665,
-        "macroAuc": 0.4389924913393554
+        "samples": 109202,
+        "baselineAcc": 0.5039009241943846,
+        "noVolumeAuc": 0.49380562034068076,
+        "fullAuc": 0.4929935887054615,
+        "macroAuc": 0.5038100076536958
       },
       {
         "horizon": 30,
-        "samples": 18635,
-        "baselineAcc": 0.5016561844863732,
-        "noVolumeAuc": 0.4482421544234503,
-        "fullAuc": 0.44802174624253643,
-        "macroAuc": 0.45403605434960215
+        "samples": 108062,
+        "baselineAcc": 0.5039315594517273,
+        "noVolumeAuc": 0.49784691990267926,
+        "fullAuc": 0.49670333325288174,
+        "macroAuc": 0.503299931371752
       },
       {
         "horizon": 40,
-        "samples": 17505,
-        "baselineAcc": 0.5013544054673644,
-        "noVolumeAuc": 0.44202764281258217,
-        "fullAuc": 0.44367314411878056,
-        "macroAuc": 0.45213009754221456
+        "samples": 106922,
+        "baselineAcc": 0.5039857772579777,
+        "noVolumeAuc": 0.4928331199387358,
+        "fullAuc": 0.4923407609033754,
+        "macroAuc": 0.4997583024827884
       },
       {
         "horizon": 50,
-        "samples": 16375,
-        "baselineAcc": 0.5013611016660849,
-        "noVolumeAuc": 0.4273317558217829,
-        "fullAuc": 0.4261267317560892,
-        "macroAuc": 0.4212940024515734
+        "samples": 105782,
+        "baselineAcc": 0.5040155677458026,
+        "noVolumeAuc": 0.49855910805943876,
+        "fullAuc": 0.4986144176201752,
+        "macroAuc": 0.5053370687023151
       },
       {
         "horizon": 60,
-        "samples": 15245,
-        "baselineAcc": 0.500915563107934,
-        "noVolumeAuc": 0.42947856424667163,
-        "fullAuc": 0.42856063501638214,
-        "macroAuc": 0.41972129534301006
+        "samples": 104642,
+        "baselineAcc": 0.5040809709581285,
+        "noVolumeAuc": 0.5025597777330674,
+        "fullAuc": 0.5015891108801138,
+        "macroAuc": 0.5085749077014334
       },
       {
         "horizon": 70,
-        "samples": 14115,
-        "baselineAcc": 0.5002179598953793,
-        "noVolumeAuc": 0.4319170223630632,
-        "fullAuc": 0.43144545664108247,
-        "macroAuc": 0.4350966602703294
+        "samples": 103502,
+        "baselineAcc": 0.5041030191819658,
+        "noVolumeAuc": 0.5080058916519353,
+        "fullAuc": 0.5078657493090588,
+        "macroAuc": 0.5123600541108694
       },
       {
         "horizon": 80,
-        "samples": 12985,
-        "baselineAcc": 0.5,
-        "noVolumeAuc": 0.44581678004535147,
-        "fullAuc": 0.44719637188208616,
-        "macroAuc": 0.431112426035503
+        "samples": 102362,
+        "baselineAcc": 0.5041156544533222,
+        "noVolumeAuc": 0.5130216218659192,
+        "fullAuc": 0.5128815473410966,
+        "macroAuc": 0.517621888190216
       },
       {
         "horizon": 90,
-        "samples": 11855,
-        "baselineAcc": 0.5018489170628632,
-        "noVolumeAuc": 0.4832047775855333,
-        "fullAuc": 0.4802935759334709,
-        "macroAuc": 0.4820143369175628
+        "samples": 101222,
+        "baselineAcc": 0.5040086578080066,
+        "noVolumeAuc": 0.5050522877124088,
+        "fullAuc": 0.5043794460942743,
+        "macroAuc": 0.5146395941578913
+      },
+      {
+        "horizon": 100,
+        "samples": 100082,
+        "baselineAcc": 0.5038370056343116,
+        "noVolumeAuc": 0.5059852928828614,
+        "fullAuc": 0.5050985626284048,
+        "macroAuc": 0.5196280405804351
       }
     ]
   }

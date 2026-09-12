@@ -234,6 +234,35 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("가격 데이터가 2일 이상 오래되면 AnalysisStatus에 경고가 남는다")
+    void stale_price_data_sets_warning() {
+        when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(List.of());
+        when(priceHistoryRepository.findLatestTradeDateAcrossAll())
+                .thenReturn(LocalDate.now().minusDays(10));
+
+        AnalysisStatus status = new AnalysisStatus();
+        status.tryStart("manual");
+        service.runFullAnalysis(status);
+
+        assertThat(status.getPriceDataWarning()).isNotNull();
+        assertThat(status.getPriceDataWarning()).contains("시세 수집");
+    }
+
+    @Test
+    @DisplayName("가격 데이터가 최신이면 경고가 없다")
+    void fresh_price_data_sets_no_warning() {
+        when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(List.of());
+        when(priceHistoryRepository.findLatestTradeDateAcrossAll())
+                .thenReturn(LocalDate.now());
+
+        AnalysisStatus status = new AnalysisStatus();
+        status.tryStart("manual");
+        service.runFullAnalysis(status);
+
+        assertThat(status.getPriceDataWarning()).isNull();
+    }
+
+    @Test
     @DisplayName("UNCERTAIN 경계 바로 밖(52.1)은 SLIGHTLY_POSITIVE로 넘어간다")
     void hold_nuance_just_outside_uncertain_band() {
         assertThat(analyzeWithScore(52.1).getRecommendationNuance()).isEqualTo("SLIGHTLY_POSITIVE");

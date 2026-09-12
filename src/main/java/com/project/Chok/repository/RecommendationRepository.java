@@ -31,4 +31,7 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
 
     @Query("SELECT COUNT(r) FROM Recommendation r WHERE r.ticker = :ticker")
     long countByTicker(@Param("ticker") String ticker);
+
+    @Query("SELECT COUNT(r) FROM Recommendation r WHERE r.recDate = :recDate")
+    long countByRecDate(@Param("recDate") LocalDate recDate);
 }

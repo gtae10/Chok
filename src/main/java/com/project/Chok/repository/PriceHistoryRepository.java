@@ -23,4 +23,10 @@ public interface PriceHistoryRepository extends JpaRepository<PriceHistory, Long
     @Query("SELECT p FROM PriceHistory p WHERE p.ticker = :ticker AND p.tradeDate = " +
            "(SELECT MAX(p2.tradeDate) FROM PriceHistory p2 WHERE p2.ticker = :ticker)")
     Optional<PriceHistory> findLatestByTicker(@Param("ticker") String ticker);
+
+    @Query("SELECT COUNT(DISTINCT p.ticker) FROM PriceHistory p WHERE p.tradeDate = :tradeDate")
+    long countDistinctTickersByTradeDate(@Param("tradeDate") LocalDate tradeDate);
+
+    @Query("SELECT MAX(p.tradeDate) FROM PriceHistory p")
+    LocalDate findLatestTradeDateAcrossAll();
 }

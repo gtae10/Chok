@@ -64,6 +64,8 @@ chok.collector.timeout-seconds=120
 # chok.scheduler.* - automatic daily collection + analysis
 chok.scheduler.enabled=true
 chok.scheduler.cron=0 30 18 * * MON-FRI
+# 앱이 상시 구동되지 않는 환경 대비: 시작 시 평일인데 오늘자 데이터가 없으면 자동으로 따라잡기
+chok.scheduler.catch-up-on-startup=true
 
 # chok.model.* - rise-probability logistic regression model
 chok.model.retrain-enabled=true

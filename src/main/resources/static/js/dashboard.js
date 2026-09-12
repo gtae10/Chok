@@ -190,7 +190,11 @@ function pollAnalysisStatus(btn) {
             btn.disabled = false;
 
             if (s.phase === "DONE") {
-                showStatus("분석 완료! " + s.processedCount + "개 종목 처리됨");
+                if (s.priceDataWarning) {
+                    showStatus("분석 완료! " + s.processedCount + "개 종목 처리됨 - ⚠ " + s.priceDataWarning, true);
+                } else {
+                    showStatus("분석 완료! " + s.processedCount + "개 종목 처리됨");
+                }
                 loadRecommendations(currentFilter);
             } else if (s.phase === "FAILED") {
                 showStatus("분석 실패: " + (s.errorMessage || "알 수 없는 오류"), true);

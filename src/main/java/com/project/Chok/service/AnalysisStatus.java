@@ -24,6 +24,7 @@ public class AnalysisStatus {
     private volatile LocalDateTime startedAt = null;
     private volatile LocalDateTime finishedAt = null;
     private volatile String triggeredBy = null; // "manual" | "scheduler"
+    private volatile String priceDataWarning = null;
 
     public boolean tryStart(String triggeredBy) {
         if (running.compareAndSet(false, true)) {
@@ -34,6 +35,7 @@ public class AnalysisStatus {
             this.startedAt = LocalDateTime.now();
             this.finishedAt = null;
             this.triggeredBy = triggeredBy;
+            this.priceDataWarning = null;
             return true;
         }
         return false;
@@ -66,4 +68,7 @@ public class AnalysisStatus {
     public LocalDateTime getStartedAt() { return startedAt; }
     public LocalDateTime getFinishedAt() { return finishedAt; }
     public String getTriggeredBy() { return triggeredBy; }
+
+    public String getPriceDataWarning() { return priceDataWarning; }
+    public void setPriceDataWarning(String priceDataWarning) { this.priceDataWarning = priceDataWarning; }
 }

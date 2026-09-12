@@ -35,7 +35,7 @@ def load_price_data() -> Dict[str, pd.DataFrame]:
     """전체 종목의 가격+거래량 데이터를 딕셔너리로 로드"""
     conn = get_connection()
     query = """
-        SELECT p.ticker, s.name, p.trade_date, p.close_price, p.volume
+        SELECT p.ticker, s.name, s.market, p.trade_date, p.close_price, p.volume
         FROM price_history p
         JOIN stocks s ON p.ticker = s.ticker
         ORDER BY p.ticker, p.trade_date
@@ -50,6 +50,70 @@ def load_price_data() -> Dict[str, pd.DataFrame]:
     return result
 
 
+def split_by_market(price_data: Dict[str, pd.DataFrame]) -> Dict[str, Dict[str, pd.DataFrame]]:
+    """종목별 market 컬럼 기준으로 price_data를 KOSPI/KOSDAQ으로 분리"""
+    by_market: Dict[str, Dict[str, pd.DataFrame]] = {}
+    for ticker, df in price_data.items():
+        market = df["market"].iloc[0]
+        by_market.setdefault(market, {})[ticker] = df
+    return by_market
+
+
+# 공통 지표 계산 (Java TechnicalAnalysisService와 동일 로직).
+# MACD 시그널선 = MACD선(ema12-ema26) 자체의 9일 EMA (종가의 EMA가 아님),
+# 볼린저밴드 표준편차 = 모표준편차(ddof=0, Java Math.sqrt(variance/period)와 동일) -
+# 예전엔 이 둘이 어긋나 있었음 (시그널선을 종가 EMA로, std를 pandas 기본 표본표준편차(ddof=1)로
+# 계산) - v1/v2 비교가 "거래량 지표 유무" 외의 차이까지 섞이지 않도록 둘 다 동일하게 고쳤다.
+
+def _ma_score(price: float, ma5: float, ma20: float, ma60: float) -> float:
+    if ma5 > ma20 > ma60:
+        score = 80
+    elif ma5 < ma20 < ma60:
+        score = 20
+    elif ma5 > ma20:
+        score = 60
+    else:
+        score = 40
+    score += 10 if price > ma5 else -10
+    return max(0, min(100, score))
+
+
+def _rsi_score(closes: pd.Series) -> float:
+    delta = closes.diff().iloc[-14:]
+    gain = delta.clip(lower=0).mean()
+    loss = (-delta.clip(upper=0)).mean()
+    rsi = 100 - (100 / (1 + gain / loss)) if loss != 0 else 100
+    if rsi <= 30:
+        return 75
+    elif rsi >= 70:
+        return 30
+    elif rsi >= 50:
+        return 60
+    else:
+        return 45
+
+
+def _macd_score(closes: pd.Series) -> float:
+    ema12 = closes.ewm(span=12, adjust=False).mean()
+    ema26 = closes.ewm(span=26, adjust=False).mean()
+    macd_line = ema12 - ema26
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    return 75 if macd_line.iloc[-1] > signal_line.iloc[-1] else 30
+
+
+def _bb_score(closes: pd.Series, price: float) -> float:
+    sma20 = closes.iloc[-20:].mean()
+    std20 = closes.iloc[-20:].std(ddof=0)
+    bb_upper, bb_lower = sma20 + 2 * std20, sma20 - 2 * std20
+    pct_b = (price - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) != 0 else 0.5
+    if pct_b <= 0.2:
+        return 70
+    elif pct_b >= 0.8:
+        return 35
+    else:
+        return 50
+
+
 # v1: 거래량 지표 도입 이전 공식
 
 def calc_score_v1(closes: pd.Series, volumes: pd.Series = None) -> float:
@@ -59,46 +123,10 @@ def calc_score_v1(closes: pd.Series, volumes: pd.Series = None) -> float:
     price = closes.iloc[-1]
     ma5, ma20, ma60 = closes.iloc[-5:].mean(), closes.iloc[-20:].mean(), closes.iloc[-60:].mean()
 
-    if ma5 > ma20 > ma60:
-        ma_score = 80
-    elif ma5 < ma20 < ma60:
-        ma_score = 20
-    elif ma5 > ma20:
-        ma_score = 60
-    else:
-        ma_score = 40
-    ma_score += 10 if price > ma5 else -10
-    ma_score = max(0, min(100, ma_score))
-
-    delta = closes.diff().iloc[-14:]
-    gain = delta.clip(lower=0).mean()
-    loss = (-delta.clip(upper=0)).mean()
-    rsi = 100 - (100 / (1 + gain / loss)) if loss != 0 else 100
-    if rsi <= 30:
-        rsi_score = 75
-    elif rsi >= 70:
-        rsi_score = 30
-    elif rsi >= 50:
-        rsi_score = 60
-    else:
-        rsi_score = 45
-
-    ema12 = closes.ewm(span=12, adjust=False).mean().iloc[-1]
-    ema26 = closes.ewm(span=26, adjust=False).mean().iloc[-1]
-    macd = ema12 - ema26
-    signal = closes.ewm(span=9, adjust=False).mean().iloc[-1]
-    macd_score = 75 if macd > signal else 30
-
-    sma20 = closes.iloc[-20:].mean()
-    std20 = closes.iloc[-20:].std()
-    bb_upper, bb_lower = sma20 + 2 * std20, sma20 - 2 * std20
-    pct_b = (price - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) != 0 else 0.5
-    if pct_b <= 0.2:
-        bb_score = 70
-    elif pct_b >= 0.8:
-        bb_score = 35
-    else:
-        bb_score = 50
+    ma_score = _ma_score(price, ma5, ma20, ma60)
+    rsi_score = _rsi_score(closes)
+    macd_score = _macd_score(closes)
+    bb_score = _bb_score(closes, price)
 
     return (ma_score * 0.35) + (rsi_score * 0.25) + (macd_score * 0.25) + (bb_score * 0.15)
 
@@ -147,47 +175,10 @@ def calc_score_v2(closes: pd.Series, volumes: pd.Series) -> float:
     price = closes.iloc[-1]
     ma5, ma20, ma60 = closes.iloc[-5:].mean(), closes.iloc[-20:].mean(), closes.iloc[-60:].mean()
 
-    if ma5 > ma20 > ma60:
-        ma_score = 80
-    elif ma5 < ma20 < ma60:
-        ma_score = 20
-    elif ma5 > ma20:
-        ma_score = 60
-    else:
-        ma_score = 40
-    ma_score += 10 if price > ma5 else -10
-    ma_score = max(0, min(100, ma_score))
-
-    delta = closes.diff().iloc[-14:]
-    gain = delta.clip(lower=0).mean()
-    loss = (-delta.clip(upper=0)).mean()
-    rsi = 100 - (100 / (1 + gain / loss)) if loss != 0 else 100
-    if rsi <= 30:
-        rsi_score = 75
-    elif rsi >= 70:
-        rsi_score = 30
-    elif rsi >= 50:
-        rsi_score = 60
-    else:
-        rsi_score = 45
-
-    ema12 = closes.ewm(span=12, adjust=False).mean().iloc[-1]
-    ema26 = closes.ewm(span=26, adjust=False).mean().iloc[-1]
-    macd = ema12 - ema26
-    signal = closes.ewm(span=9, adjust=False).mean().iloc[-1]
-    macd_score = 75 if macd > signal else 30
-
-    sma20 = closes.iloc[-20:].mean()
-    std20 = closes.iloc[-20:].std()
-    bb_upper, bb_lower = sma20 + 2 * std20, sma20 - 2 * std20
-    pct_b = (price - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) != 0 else 0.5
-    if pct_b <= 0.2:
-        bb_score = 70
-    elif pct_b >= 0.8:
-        bb_score = 35
-    else:
-        bb_score = 50
-
+    ma_score = _ma_score(price, ma5, ma20, ma60)
+    rsi_score = _rsi_score(closes)
+    macd_score = _macd_score(closes)
+    bb_score = _bb_score(closes, price)
     volume_score = _score_volume(closes, volumes)
 
     return (ma_score * 0.30) + (rsi_score * 0.20) + (macd_score * 0.20) \
@@ -388,6 +379,75 @@ def main():
     print("=" * 64)
     print("\n상세 결과: backtest_result_v1.csv, backtest_result_v2.csv")
     print("비교 요약: backtest_comparison.csv")
+
+    run_market_split_backtest(price_data)
+
+
+def run_market_split_backtest(price_data: Dict[str, pd.DataFrame], n_random_trials: int = 50) -> None:
+    """KOSPI/KOSDAQ을 분리해서 각각 v2(기술점수) vs 무작위 베이스라인을 비교.
+    감성분석은 news_sentiment 데이터가 6주 넘게 비어있는 구간이 있어(NewsCollectorService가
+    과거 날짜 뉴스를 재수집할 수 없는 구조) 유효 리밸런싱 시점이 1개뿐이라 통계적으로
+    의미가 없으므로 이 백테스트에서는 제외했다."""
+    by_market = split_by_market(price_data)
+
+    print("\n" + "=" * 64)
+    print("시장별(KOSPI/KOSDAQ) v2(기술점수) vs random(무작위) 백테스트 비교")
+    print("=" * 64)
+
+    market_summaries = {}
+    for market in ("KOSPI", "KOSDAQ"):
+        market_price_data = by_market.get(market, {})
+        logger.info("[%s] 종목 수: %d개", market, len(market_price_data))
+
+        df_v2 = run_backtest(market_price_data, calc_score_v2)
+        random_trials = run_random_baseline(market_price_data, n_trials=n_random_trials)
+
+        summary_v2 = summarize(df_v2, f"{market}_v2")
+        if not random_trials.empty:
+            summary_random = {
+                "label": f"{market}_random",
+                "trades": f"{len(random_trials)}회 반복 평균",
+                "win_rate(%)": round(random_trials["win_rate"].mean(), 1),
+                "avg_return(%)": round(random_trials["avg_return"].mean(), 2),
+                "median_return(%)": round(random_trials["median_return"].mean(), 2),
+                "std_return(%)": round(random_trials["avg_return"].std(), 2),
+                "min_return(%)": round(random_trials["avg_return"].min(), 2),
+                "max_return(%)": round(random_trials["avg_return"].max(), 2),
+            }
+        else:
+            summary_random = {"label": f"{market}_random", "trades": 0}
+
+        market_summaries[market] = {"v2": summary_v2, "random": summary_random}
+        df_v2.to_csv(f"backtest_result_v2_{market.lower()}.csv", index=False, encoding="utf-8-sig")
+
+    comparison = pd.DataFrame(
+        [market_summaries[m][k] for m in ("KOSPI", "KOSDAQ") for k in ("v2", "random")]
+    ).set_index("label")
+    print(comparison.to_string())
+    comparison.to_csv("backtest_comparison_by_market.csv", encoding="utf-8-sig")
+
+    print("\n시장 간 일치 여부 판단:")
+    verdicts = {}
+    for market in ("KOSPI", "KOSDAQ"):
+        v2 = market_summaries[market]["v2"]
+        rnd = market_summaries[market]["random"]
+        if v2.get("trades", 0) == 0 or rnd.get("trades") == 0:
+            verdicts[market] = None
+            print(f"- {market}: 거래 없음, 판단 불가")
+            continue
+        beats_random = v2["avg_return(%)"] > rnd["avg_return(%)"]
+        verdicts[market] = beats_random
+        print(f"- {market}: v2 평균수익률 {v2['avg_return(%)']}% vs random 평균수익률 {rnd['avg_return(%)']}% "
+              f"→ 기술점수가 무작위보다 {'낫다' if beats_random else '못하다'}")
+
+    if None not in verdicts.values():
+        if verdicts["KOSPI"] == verdicts["KOSDAQ"]:
+            print(f"→ 두 시장 방향 일치: 기술점수가 무작위보다 {'낫다' if verdicts['KOSPI'] else '못하다'}는 결론이 KOSPI/KOSDAQ 모두 동일.")
+        else:
+            print("→ 두 시장 방향 불일치: KOSPI와 KOSDAQ에서 결론이 다름 (한쪽 시장에서만 통하는 신호일 가능성).")
+    print(f"\n참고: KOSDAQ 유니버스는 {len(by_market.get('KOSDAQ', {}))}종목뿐이라 TOP_N={TOP_N} 선택이 "
+          f"전체의 상당 비중을 차지함 - 표본 해석에 주의.")
+    print("=" * 64)
 
 
 if __name__ == "__main__":

@@ -105,6 +105,7 @@ public class RecommendationController {
         body.put("totalCount", analysisStatus.getTotalCount());
         body.put("errorMessage", analysisStatus.getErrorMessage());
         body.put("triggeredBy", analysisStatus.getTriggeredBy());
+        body.put("priceDataWarning", analysisStatus.getPriceDataWarning());
         return ResponseEntity.ok(body);
     }
 

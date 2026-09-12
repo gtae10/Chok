@@ -10,7 +10,7 @@ def get_pool():
     if _pool is None:
         _pool = pooling.MySQLConnectionPool(
             pool_name="chok_pool",
-            pool_size=5,
+            pool_size=10,  # collect.py의 ThreadPoolExecutor(max_workers=10)와 맞춤 - 낮으면 동시 insert 시 pool exhausted
             host=config.DB_HOST,
             port=config.DB_PORT,
             database=config.DB_NAME,

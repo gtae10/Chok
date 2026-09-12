@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -74,9 +75,13 @@ public class RecommendationService {
      * (동시성 상한은 chok.analysis.parallelism 로 조절 — LLM API로 나가는 동시 요청 수 자체는
      * chok.sentiment.max-concurrent-calls로 별도 제한됨)
      */
+    // 이 정도 오래되면(달력일 기준) "며칠 전 가격으로 분석 중"이라는 경고를 띄운다.
+    private static final int STALE_PRICE_WARNING_DAYS = 2;
+
     public int runFullAnalysis(AnalysisStatus status) {
         List<Stock> stocks = stockRepository.findAllOrderByMarketCapDesc();
         LocalDate today = LocalDate.now();
+        checkStalePriceData(today, status);
         int total = stocks.size();
         AtomicInteger processed = new AtomicInteger(0);
         AtomicInteger completed = new AtomicInteger(0);
@@ -123,6 +128,30 @@ public class RecommendationService {
         }
 
         return processed.get();
+    }
+
+    /** 오래된 가격 데이터로 분석 중이면 AnalysisStatus에 경고를 남긴다 (분석 자체는 막지 않음). */
+    private void checkStalePriceData(LocalDate today, AnalysisStatus status) {
+        LocalDate latestPriceDate = priceHistoryRepository.findLatestTradeDateAcrossAll();
+        if (latestPriceDate == null) return;
+
+        LocalDate lastTradingDay = lastTradingDayOnOrBefore(today);
+        long staleDays = ChronoUnit.DAYS.between(latestPriceDate, lastTradingDay);
+        if (staleDays < STALE_PRICE_WARNING_DAYS) return;
+
+        String warning = String.format(
+                "가격 데이터가 %d일 전(%s) 것입니다. 먼저 시세 수집을 하는 것을 권장합니다.",
+                staleDays, latestPriceDate);
+        log.warn(warning);
+        if (status != null) status.setPriceDataWarning(warning);
+    }
+
+    private LocalDate lastTradingDayOnOrBefore(LocalDate date) {
+        return switch (date.getDayOfWeek()) {
+            case SATURDAY -> date.minusDays(1);
+            case SUNDAY -> date.minusDays(2);
+            default -> date;
+        };
     }
 
     @Transactional

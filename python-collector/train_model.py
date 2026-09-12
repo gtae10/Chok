@@ -43,7 +43,7 @@ log = logging.getLogger(__name__)
 LABEL_MODE = "relative"          # "relative"(시장대비 상대수익률) 또는 "absolute"(그냥 상승여부)
 FORWARD_DAYS = 50                # 실제 배포 모델이 쓸 예측 기간(영업일)
 SWEEP_HORIZONS = [3, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]  # 스윕(비교)해볼 기간 후보들
-N_FOLDS = 5                      # walk-forward 폴드 개수
+N_FOLDS = 10                     # walk-forward 폴드 개수 (5년치로 데이터가 늘어나 5->10으로 확대)
 MIN_SAMPLES = 500                # 학습을 시도할 최소 샘플 수
 MODEL_OUTPUT_PATH = os.path.join("model", "rise_model.json")
 # ─────────────────────────────────────────────────────────────
