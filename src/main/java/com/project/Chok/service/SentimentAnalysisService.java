@@ -9,11 +9,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 뉴스 헤드라인 감성분석. 실제 LLM 호출/응답 파싱은 {@link LlmProvider} 구현체(프로바이더별)에
@@ -150,9 +153,45 @@ public class SentimentAnalysisService {
             Thread.currentThread().interrupt();
             throw new ProviderCallException("중단됨");
         } catch (Exception e) {
-            log.error("{} API 호출 실패 ({}): {}", providerName, logContext, e.getMessage());
-            throw new ProviderCallException("API 호출 오류");
+            String classification = classifyFailure(e);
+            log.error("{} API 호출 실패 [{}] ({}): {}", providerName, classification, logContext, e.getMessage());
+            throw new ProviderCallException("API 호출 오류: " + classification);
         }
+    }
+
+    /**
+     * 2026-06-27~07-23 사이 감성분석 API 호출이 전부 실패해 3,365건이 구분 불가능한
+     * "API 호출 오류"로 뭉개져 저장된 사고 이후 추가됨 - 원인(레이트리밋/인증실패/크레딧
+     * 소진/타임아웃 등)을 남겨야 같은 상황이 재발했을 때 바로 원인을 알 수 있다.
+     */
+    String classifyFailure(Exception e) {
+        if (e instanceof WebClientResponseException wcre) {
+            int status = wcre.getStatusCode().value();
+            String body = wcre.getResponseBodyAsString();
+            if (status == 401 || status == 403) {
+                return "인증실패(HTTP " + status + ") - API 키 확인 필요";
+            }
+            if (status == 429) {
+                boolean quotaExhausted = body != null
+                        && (body.contains("insufficient_quota") || body.contains("credit"));
+                return quotaExhausted
+                        ? "크레딧 소진 추정(HTTP 429)"
+                        : "레이트리밋(HTTP 429)";
+            }
+            if (status >= 500) {
+                return "프로바이더 서버 오류(HTTP " + status + ")";
+            }
+            return "요청 오류(HTTP " + status + ")";
+        }
+        if (e instanceof WebClientRequestException) {
+            Throwable cause = e.getCause();
+            boolean timeout = cause instanceof TimeoutException
+                    || (cause != null && cause.getClass().getSimpleName().contains("Timeout"));
+            return timeout
+                    ? "타임아웃"
+                    : "네트워크 오류(" + (cause != null ? cause.getClass().getSimpleName() : "원인불명") + ")";
+        }
+        return "알수없음(" + e.getClass().getSimpleName() + ")";
     }
 
     /**

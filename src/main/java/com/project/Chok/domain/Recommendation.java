@@ -30,6 +30,12 @@ public class Recommendation {
     @Column(name = "sentiment_score")
     private Double sentimentScore;
 
+    // "OK" | "FALLBACK". FALLBACK이면 이 종목의 뉴스 중 하나 이상이 LLM 호출 실패로 중립(0.0)
+    // 대체값을 썼다는 뜻 - sentimentScore/finalScore가 실제 감성 판단을 반영하지 않을 수 있다.
+    // (2026-06-27~07-23 API 장애로 638건이 이렇게 오염된 채 저장됐던 사고 이후 추가)
+    @Column(name = "sentiment_data_quality", length = 20)
+    private String sentimentDataQuality;
+
     @Column(name = "final_score")
     private Double finalScore;
 
@@ -85,6 +91,9 @@ public class Recommendation {
 
     public Double getSentimentScore() { return sentimentScore; }
     public void setSentimentScore(Double sentimentScore) { this.sentimentScore = sentimentScore; }
+
+    public String getSentimentDataQuality() { return sentimentDataQuality; }
+    public void setSentimentDataQuality(String sentimentDataQuality) { this.sentimentDataQuality = sentimentDataQuality; }
 
     public Double getFinalScore() { return finalScore; }
     public void setFinalScore(Double finalScore) { this.finalScore = finalScore; }

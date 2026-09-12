@@ -90,12 +90,15 @@ public class RecommendationService {
         log.info("전체 분석 시작: {}개 종목, 병렬도={}", total, poolSize);
         if (status != null) status.updateProgress(0, total);
 
+        AtomicInteger sentimentAnalyzed = new AtomicInteger(0);
+        AtomicInteger sentimentFallback = new AtomicInteger(0);
+
         ExecutorService executor = Executors.newFixedThreadPool(poolSize);
         try {
             List<CompletableFuture<Void>> futures = stocks.stream()
                     .map(stock -> CompletableFuture.runAsync(() -> {
                         try {
-                            analyzeStock(stock, today);
+                            analyzeStock(stock, today, sentimentAnalyzed, sentimentFallback);
                             processed.incrementAndGet();
                         } catch (Exception e) {
                             log.error("종목 분석 실패 (ticker={}): {}", stock.getTicker(), e.getMessage());
@@ -120,6 +123,7 @@ public class RecommendationService {
         }
 
         log.info("전체 분석 완료: {}/{} 종목", processed.get(), total);
+        warnIfSentimentFailureRateAbnormal(sentimentAnalyzed.get(), sentimentFallback.get());
 
         try {
             performanceTrackingService.saveSnapshot(today);
@@ -156,13 +160,20 @@ public class RecommendationService {
 
     @Transactional
     public void analyzeStock(Stock stock, LocalDate today) {
+        analyzeStock(stock, today, new AtomicInteger(), new AtomicInteger());
+    }
+
+    @Transactional
+    public void analyzeStock(Stock stock, LocalDate today,
+                              AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback) {
         String ticker = stock.getTicker();
 
         List<PriceHistory> prices = priceHistoryRepository.findByTickerOrderByTradeDateAsc(ticker);
         TechnicalIndicatorResult techResult = technicalAnalysisService.analyze(prices);
         saveTechnicalScore(ticker, today, techResult);
 
-        double avgSentiment = analyzeNewsSentiment(stock, today);
+        SentimentOutcome sentimentOutcome = analyzeNewsSentiment(stock, today, sentimentAnalyzed, sentimentFallback);
+        double avgSentiment = sentimentOutcome.avgScore();
 
         AppProperties.Analysis analysis = appProperties.getAnalysis();
         double finalScore = (techResult.getTechnicalScore() * analysis.getWeightTechnical())
@@ -174,7 +185,7 @@ public class RecommendationService {
         String reason = buildReason(techResult, avgSentiment);
 
         saveRecommendation(stock, today, techResult.getTechnicalScore(),
-                avgSentiment, finalScore, techResult.getRiseProbability(),
+                avgSentiment, sentimentOutcome.fallbackUsed(), finalScore, techResult.getRiseProbability(),
                 techResult.getProbabilitySource(), techResult.getProbabilityHorizonDays(),
                 techResult.getNotableHorizonDays(), techResult.getNotableHorizonProbability(),
                 techResult.getNotableHorizonApproxDate(),
@@ -212,11 +223,19 @@ public class RecommendationService {
         technicalScoreRepository.save(entity);
     }
 
-    private double analyzeNewsSentiment(Stock stock, LocalDate today) {
+    /** analyzeNewsSentiment의 결과 - 평균 점수와, 그 중 하나 이상이 오류 폴백이었는지 여부. */
+    private record SentimentOutcome(double avgScore, boolean fallbackUsed) {
+        static SentimentOutcome of(double avgScore) {
+            return new SentimentOutcome(avgScore, false);
+        }
+    }
+
+    private SentimentOutcome analyzeNewsSentiment(Stock stock, LocalDate today,
+                                                   AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback) {
         int maxNews = appProperties.getAnalysis().getNewsPerStock();
         List<NewsArticle> articles = newsCollectorService.fetchRecentNews(stock.getTicker(), maxNews);
 
-        if (articles.isEmpty()) return 0.0;
+        if (articles.isEmpty()) return SentimentOutcome.of(0.0);
 
         List<NewsArticle> toAnalyze = articles.stream()
                 .filter(article -> !newsSentimentRepository.existsByTickerAndHeadlineAndDate(
@@ -229,6 +248,7 @@ public class RecommendationService {
 
         double sum = 0;
         int count = 0;
+        boolean fallbackUsed = false;
 
         if (!toAnalyze.isEmpty()) {
             List<SentimentResult> sentiments = sentimentAnalysisService.analyzeBatch(
@@ -251,18 +271,41 @@ public class RecommendationService {
 
                 sum += sentiment.getScore();
                 count++;
+                fallbackUsed = fallbackUsed || sentiment.isFallback();
+
+                sentimentAnalyzed.incrementAndGet();
+                if (sentiment.isFallback()) sentimentFallback.incrementAndGet();
             }
         }
 
         if (count == 0) {
+            // ponytail: 이 경로(오늘 새 뉴스 없음 -> 최근 lookback 평균 재사용)는 과거에 저장된
+            // NewsSentiment가 그 자체로 오류 폴백이었는지는 구분하지 않는다. news_sentiment에도
+            // fallback 플래그를 추가해 여기서 걸러내는 게 이상적이지만, 지금 문제가 된 경로(위의
+            // 신규 분석 실패)보다 영향이 작아 우선순위를 낮췄다 - 필요해지면 추가.
             int lookback = appProperties.getAnalysis().getNewsLookbackDays();
             List<NewsSentiment> recent = newsSentimentRepository
                     .findByTickerSince(stock.getTicker(), today.minusDays(lookback));
-            if (recent.isEmpty()) return 0.0;
-            return recent.stream().mapToDouble(NewsSentiment::getSentimentScore).average().orElse(0.0);
+            if (recent.isEmpty()) return SentimentOutcome.of(0.0);
+            return SentimentOutcome.of(recent.stream().mapToDouble(NewsSentiment::getSentimentScore).average().orElse(0.0));
         }
 
-        return sum / count;
+        return new SentimentOutcome(sum / count, fallbackUsed);
+    }
+
+    /** 감성분석 실패율이 비정상적으로 높으면(대규모 API 장애 가능성) 눈에 띄게 경고한다.
+     * 2026-06-27~07-23 API 장애로 638건이 조용히 오류 폴백값으로 저장됐던 사고 이후 추가. */
+    private static final double ABNORMAL_FALLBACK_RATE = 0.5;
+    private static final int MIN_SAMPLES_FOR_RATE_CHECK = 10;
+
+    private void warnIfSentimentFailureRateAbnormal(int analyzed, int fallback) {
+        if (analyzed < MIN_SAMPLES_FOR_RATE_CHECK) return;
+        double rate = (double) fallback / analyzed;
+        if (rate < ABNORMAL_FALLBACK_RATE) return;
+        log.warn("!!! 감성분석 실패율 비정상 - {}건 중 {}건({}%)이 오류 폴백값입니다. "
+                        + "LLM API 키/크레딧/레이트리밋을 확인하세요. 이 상태로 쌓인 recommendations는 "
+                        + "sentimentDataQuality=FALLBACK으로 표시됩니다.",
+                analyzed, fallback, Math.round(rate * 100));
     }
 
     private double sentimentToScale100(double sentiment) {
@@ -304,7 +347,7 @@ public class RecommendationService {
     }
 
     private void saveRecommendation(Stock stock, LocalDate today, double techScore,
-                                    double sentimentScore, double finalScore,
+                                    double sentimentScore, boolean sentimentFallbackUsed, double finalScore,
                                     double riseProbability, String probabilitySource,
                                     Integer probabilityHorizonDays,
                                     Integer notableHorizonDays, Double notableHorizonProbability,
@@ -323,6 +366,7 @@ public class RecommendationService {
         entity.setMarket(stock.getMarket());
         entity.setTechnicalScore(round2(techScore));
         entity.setSentimentScore(round2(sentimentScore));
+        entity.setSentimentDataQuality(sentimentFallbackUsed ? "FALLBACK" : "OK");
         entity.setFinalScore(round2(finalScore));
         entity.setRiseProbability(round2(riseProbability));
         entity.setProbabilitySource(probabilitySource);

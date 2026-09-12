@@ -50,3 +50,6 @@ python-collector/.venv/
 # Python 캐시
 python-collector/__pycache__/
 *.pyc
+
+# 애플리케이션 로그 (logging.file.name)
+logs/

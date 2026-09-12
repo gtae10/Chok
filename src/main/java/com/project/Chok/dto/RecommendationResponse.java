@@ -9,6 +9,7 @@ public class RecommendationResponse {
     private String market;
     private Double technicalScore;
     private Double sentimentScore;
+    private String sentimentDataQuality;
     private Double finalScore;
     private Double riseProbability;
     private String probabilitySource;
@@ -27,6 +28,7 @@ public class RecommendationResponse {
         this.market = r.getMarket();
         this.technicalScore = r.getTechnicalScore();
         this.sentimentScore = r.getSentimentScore();
+        this.sentimentDataQuality = r.getSentimentDataQuality();
         this.finalScore = r.getFinalScore();
         this.riseProbability = r.getRiseProbability();
         this.probabilitySource = r.getProbabilitySource();
@@ -45,6 +47,7 @@ public class RecommendationResponse {
     public String getMarket() { return market; }
     public Double getTechnicalScore() { return technicalScore; }
     public Double getSentimentScore() { return sentimentScore; }
+    public String getSentimentDataQuality() { return sentimentDataQuality; }
     public Double getFinalScore() { return finalScore; }
     public Double getRiseProbability() { return riseProbability; }
     public String getProbabilitySource() { return probabilitySource; }
