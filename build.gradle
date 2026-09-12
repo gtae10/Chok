@@ -31,5 +31,18 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'llm-live'
+	}
+}
+
+// 실제 LLM API를 호출하는 회귀 테스트 전용 태스크 (비용 발생 + API 키 필요 -> 기본 build/test에서는 제외).
+// 프롬프트를 바꿨을 때 수동으로: ./gradlew llmTest
+tasks.register('llmTest', Test) {
+	useJUnitPlatform {
+		includeTags 'llm-live'
+	}
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	testLogging.showStandardStreams = true
 }
