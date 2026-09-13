@@ -77,13 +77,20 @@ REL_STRENGTH_FEATURE = "relativeStrength20"
 ADOPT_REL_STRENGTH = False
 
 # 감성점수 특징(작업 2) - 아직 "배관 + 유효표본 확인" 단계라 항상 검증 게이트를 거친다.
-# 데이터가 MIN_SENTIMENT_SAMPLES 이상 쌓여야 walk-forward 대상 후보에 들어간다(아래 main()의
-# sentiment_enabled 계산 참고) - 사람이 뒤집는 스위치가 아니라 애초에 검증 자체가
-# 불가능한 상태를 자동으로 감지해서 스킵하는 게이트.
+# 사람이 뒤집는 스위치가 아니라 애초에 검증 자체가 불가능한 상태를 자동으로 감지해서
+# 스킵하는 게이트. 검증 로직은 evaluate_sentiment_feature() 참고.
 SENTIMENT_LOOKBACK_DAYS = 7  # 예측 시점 이전(당일 미포함) 최근 며칠 평균을 쓸지
 SENTIMENT_FEATURE = "sentimentAvg7d"
 ADOPT_SENTIMENT = False  # 검증 통과해도 사람이 walk_forward_detail.json 보고 판단 후 수동 전환
-MIN_SENTIMENT_SAMPLES = 500  # 다른 특징과 같은 MIN_SAMPLES 기준 재사용
+
+# 감성점수는 기존 특징들과 달리 아직 데이터가 희박해서, 5년치 전체 기간을 기준으로 폴드를
+# 나누는 make_time_folds()를 그대로 쓰면 안 된다 - 폴드 하나의 폭이 "누적된 전체
+# 히스토리 / (N_FOLDS+1)"로 정해져 데이터가 쌓일수록 계속 넓어지는데(지금 약 4.5개월),
+# 감성분석은 최근에야 도입돼 그 폭 하나조차 못 채운다(실측: 0/10 폴드). 그래서 감성
+# 데이터가 실제로 존재하는 기간만으로 폴드를 다시 나누는 전용 로직
+# (make_time_folds_for_sentiment / evaluate_sentiment_feature)을 따로 둔다.
+SENTIMENT_TARGET_FOLD_DAYS = 14  # 폴드 하나의 목표 폭 (달력일 기준, "몇 주" 단위)
+MIN_SENTIMENT_FOLDS = 3  # 이 정도는 있어야 "여러 시점 반복검증"이라고 부를 수 있음
 
 if ADOPT_MACRO_FEATURES:
     FEATURE_NAMES = FEATURE_NAMES + MACRO_FEATURE_NAMES
@@ -178,37 +185,36 @@ def compute_sentiment_feature(dataset: pd.DataFrame, sentiment_df: pd.DataFrame)
     return dataset
 
 
-def report_sentiment_availability(dataset: pd.DataFrame, sentiment_raw: pd.DataFrame):
-    """감성점수 특징이 실제로 몇 건이나 유효한지 확인하고, 부족하면 현재 축적 페이스로
-    대략 언제쯤 재시도할 만한지까지 보고한다 (sentiment_predictive_check.py와 같은 취지)."""
+def report_sentiment_availability(dataset: pd.DataFrame, sentiment_raw: pd.DataFrame) -> dict:
+    """감성점수 특징이 실제로 검증 가능한 상태인지 확인한다. evaluate_sentiment_feature()로
+    감성 데이터 범위에 맞춘 전용 폴드(make_time_folds_for_sentiment)의 커버리지를 재고,
+    부족하면 simulate_sentiment_fold_growth()로 앞으로 몇 개월 뒤에 몇 개 폴드가 가능할지
+    구조적으로 추정한다. 반환: {"verifiable": bool, "evaluation": {...}, "simulation": [...]}"""
     valid_count = int(dataset[SENTIMENT_FEATURE].notna().sum())
-    log.info("감성점수 특징(%s) 유효 표본: %d건 (검증 기준: %d건 이상)",
-              SENTIMENT_FEATURE, valid_count, MIN_SENTIMENT_SAMPLES)
+    log.info("감성점수 특징(%s) 유효 표본: %d건", SENTIMENT_FEATURE, valid_count)
 
-    if valid_count >= MIN_SENTIMENT_SAMPLES:
-        log.info("-> 검증 가능 - 아래 스윕/ablation 결과의 'sentiment' 항목 참고")
-        return
-
-    log.info("-> 데이터 부족으로 이번 회차는 검증 보류 (ablation에서 'sentiment' 항목은 자동 스킵되고,"
-              " 나머지 특징 검증/배포 모델 학습은 그대로 진행됨)")
-
-    if sentiment_raw.empty or valid_count == 0:
-        log.info("   'OK' 품질 감성분석 데이터가 사실상 없어 증가 추세를 추정할 수 없음.")
-        return
-
-    span_days = max((sentiment_raw["rec_date"].max() - sentiment_raw["rec_date"].min()).days, 1)
-    rate_per_day = valid_count / span_days
-    if rate_per_day <= 0:
-        log.info("   증가 추세를 추정할 수 없음 (표본이 늘고 있지 않음).")
-        return
-
-    days_needed = (MIN_SENTIMENT_SAMPLES - valid_count) / rate_per_day
-    eta = "하루 이내" if days_needed < 1 else f"약 {int(round(days_needed))}일 후"
+    sentiment_eval = evaluate_sentiment_feature(dataset, verbose=True)
+    usable_folds = sentiment_eval["nFolds"]
     log.info(
-        "   최근 %d일간 %d건 축적(하루 평균 %.1f건 페이스) - 이 페이스가 유지되면 "
-        "%s에 %d건에 도달해 재시도 가능할 것으로 예상.",
-        span_days, valid_count, rate_per_day, eta, MIN_SENTIMENT_SAMPLES,
+        "감성 전용 폴드(주 단위, make_time_folds_for_sentiment) 커버리지: %d/%d개 사용 가능 (기준: %d개 이상)",
+        usable_folds, sentiment_eval.get("foldsAttempted", 0), MIN_SENTIMENT_FOLDS,
     )
+
+    if usable_folds >= MIN_SENTIMENT_FOLDS:
+        log.info("-> 검증 가능 - baseAucMean=%s, sentimentAucMean=%s",
+                  sentiment_eval.get("baseAucMean"), sentiment_eval.get("sentimentAucMean"))
+        return {"verifiable": True, "evaluation": sentiment_eval, "simulation": []}
+
+    log.info("-> 데이터 부족으로 이번 회차는 검증 보류 (나머지 특징 검증/배포 모델 학습은 그대로 진행됨)")
+
+    sim = simulate_sentiment_fold_growth(sentiment_raw)
+    if sim:
+        log.info("   [시뮬레이션] 현재 축적 페이스를 그대로 연장했을 때(AUC가 아니라 '폴드가 몇 개, "
+                  "언제 만들어지는가'에 대한 구조적 추정):")
+        for row in sim:
+            log.info("     폴드 %d개 확보 예상 시점: %s (지금부터 약 %d일 후, 필요 감성기간 폭 약 %d일)",
+                      row["targetFolds"], row["etaDate"], row["etaCalendarDaysFromNow"], row["neededSpanDays"])
+    return {"verifiable": False, "evaluation": sentiment_eval, "simulation": sim}
 
 
 def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
@@ -352,6 +358,139 @@ def make_time_folds(dataset: pd.DataFrame, n_folds: int):
     for k in range(n_folds):
         folds.append((edges[k + 1], edges[k + 2]))
     return folds
+
+
+def make_time_folds_for_sentiment(dataset_h: pd.DataFrame, feature_col: str = None,
+                                   min_folds: int = 2, max_folds: int = None,
+                                   target_fold_days: int = None) -> list:
+    """감성점수처럼 아직 데이터가 희박한 특징 전용 폴드 분할.
+
+    make_time_folds()는 5년치 전체 가격 데이터 기간을 기준으로 폴드를 나눠, 폴드
+    하나의 폭이 "누적된 전체 히스토리 / (N_FOLDS+1)"로 정해진다 - 데이터가 쌓일수록
+    이 폭 자체가 계속 넓어지므로(지금 약 4.5개월), 최근에야 도입된 감성분석처럼 며칠
+    ~몇 주치밖에 없는 특징은 폴드 하나조차 못 채운다(실측: 0/10).
+
+    이 함수는 feature_col이 유효한 값을 가진 행들의 "날짜 범위만" 가지고 폴드 경계를
+    계산하고, 그 범위의 폭(target_fold_days 기준, 기본 2주)에 맞춰 폴드 개수를 스스로
+    정한다 - 데이터가 짧으면 최소 min_folds개로 시작하고, 쌓일수록 max_folds개까지
+    자동으로 늘어난다. 폴드 폭이 5년 전체가 아니라 감성 데이터 자체의 폭에 비례하므로,
+    데이터가 쌓이는 속도만큼 폴드 개수도 비례해서 늘어난다(기존 방식의 "폴드 폭이
+    계속 넓어지는" 문제가 없음).
+    """
+    feature_col = feature_col or SENTIMENT_FEATURE
+    max_folds = max_folds or N_FOLDS
+    target_fold_days = target_fold_days or SENTIMENT_TARGET_FOLD_DAYS
+
+    valid_dates = np.sort(dataset_h.loc[dataset_h[feature_col].notna(), "trade_date"].unique())
+    if len(valid_dates) == 0:
+        return []
+
+    span_days = (valid_dates[-1] - valid_dates[0]) / np.timedelta64(1, "D")
+    n_folds = int(span_days // target_fold_days)
+    n_folds = max(min_folds, min(n_folds, max_folds))
+
+    n = len(valid_dates)
+    if n < (n_folds + 1) * 2:  # 폴드 경계마다 최소 2개 날짜는 있어야 구간이 의미 있음
+        return []
+
+    edges = [valid_dates[min(int(n * i / (n_folds + 1)), n - 1)] for i in range(n_folds + 2)]
+    edges[-1] = valid_dates[-1] + np.timedelta64(1, "D")
+
+    return [(edges[k + 1], edges[k + 2]) for k in range(n_folds)]
+
+
+def evaluate_sentiment_feature(dataset: pd.DataFrame, verbose: bool = True) -> dict:
+    """감성점수 특징 전용 walk-forward 검증. make_time_folds_for_sentiment()로 나눈,
+    감성 데이터 범위에 맞춘 좁은 폴드를 쓴다. purge 로직(학습 샘플의 라벨이 검증구간
+    미래를 참조하면 제외)은 데이터 규모와 무관하게 기존과 동일하게 적용한다."""
+    sub = dataset_for_horizon(dataset, FORWARD_DAYS, LABEL_MODE)
+    folds = make_time_folds_for_sentiment(sub, SENTIMENT_FEATURE)
+
+    if not folds:
+        if verbose:
+            log.info("감성 전용 폴드를 만들기엔 (라벨 지연 포함) 유효 표본의 날짜 범위가 부족합니다.")
+        return {"nFolds": 0, "foldsAttempted": 0, "folds": [], "baseAucMean": None, "sentimentAucMean": None}
+
+    fold_results = []
+    for i, (train_end, test_end) in enumerate(folds, start=1):
+        train_df = sub[sub["trade_date"] < train_end]
+        test_df = sub[(sub["trade_date"] >= train_end) & (sub["trade_date"] < test_end)]
+
+        # purge - 폴드 방식이 달라도 이 원칙은 그대로 지킨다
+        train_df = train_df[train_df["target_date"] < train_end]
+
+        train_df = train_df.dropna(subset=[SENTIMENT_FEATURE])
+        test_df = test_df.dropna(subset=[SENTIMENT_FEATURE])
+
+        if len(train_df) < MIN_FOLD_TRAIN or len(test_df) < MIN_FOLD_TEST:
+            if verbose:
+                log.info("  [감성 폴드 %d] 데이터 부족으로 스킵 (train=%d, test=%d)",
+                          i, len(train_df), len(test_df))
+            continue
+
+        majority_class = train_df["label"].mode()[0]
+        baseline_acc = float((test_df["label"] == majority_class).mean())
+        _, _, base_acc, base_auc = _fit_eval(train_df, test_df, FEATURE_NAMES)
+        _, _, sent_acc, sent_auc = _fit_eval(train_df, test_df, FEATURE_NAMES + [SENTIMENT_FEATURE])
+
+        if verbose:
+            log.info(
+                "  [감성 폴드 %d] %s~%s train=%d test=%d | 베이스라인=%.3f | 기존특징AUC=%s | +감성AUC=%s",
+                i, pd.Timestamp(train_end).date(), pd.Timestamp(test_end).date(),
+                len(train_df), len(test_df), baseline_acc,
+                round(base_auc, 3) if base_auc is not None else None,
+                round(sent_auc, 3) if sent_auc is not None else None,
+            )
+
+        fold_results.append({
+            "fold": i, "trainSize": len(train_df), "testSize": len(test_df),
+            "baselineAccuracy": baseline_acc, "baseAuc": base_auc, "sentimentAuc": sent_auc,
+        })
+
+    def agg(key):
+        vals = [f[key] for f in fold_results if f.get(key) is not None]
+        return (float(np.mean(vals)), float(np.std(vals))) if vals else (None, None)
+
+    base_auc_mean, base_auc_std = agg("baseAuc")
+    sent_auc_mean, sent_auc_std = agg("sentimentAuc")
+
+    return {
+        "nFolds": len(fold_results), "foldsAttempted": len(folds), "folds": fold_results,
+        "baseAucMean": base_auc_mean, "baseAucStd": base_auc_std,
+        "sentimentAucMean": sent_auc_mean, "sentimentAucStd": sent_auc_std,
+    }
+
+
+def simulate_sentiment_fold_growth(sentiment_raw: pd.DataFrame) -> list:
+    """실제 미래 데이터 없이, (1) 지금까지 관측된 감성 데이터 축적 밀도와 (2) 라벨이
+    실제로 생기기까지 걸리는 지연(FORWARD_DAYS 영업일)을 근거로, 몇 개 폴드가 대략
+    언제쯤 가능해질지 구조적으로만 추정한다. 미래 뉴스 내용은 알 수 없으니 AUC는 추정
+    대상이 아니다 - "폴드가 몇 개, 대략 언제 만들어지는가"라는 구조적 질문에만 답한다."""
+    if sentiment_raw.empty:
+        return []
+
+    observed_span = max((sentiment_raw["rec_date"].max() - sentiment_raw["rec_date"].min()).days, 1)
+    observed_dates = sentiment_raw["rec_date"].dt.date.nunique()
+    density = observed_dates / observed_span  # 현재 페이스: 달력일당 유효 관측일 비율
+
+    # 영업일 -> 달력일 근사치. RiseProbabilityService.BUSINESS_TO_CALENDAR_DAYS와 같은 원칙(7/5).
+    label_lag_days = int(round(FORWARD_DAYS * 7 / 5))
+
+    results = []
+    for target_folds in [2, 3, 4, 5]:
+        needed_span = target_folds * SENTIMENT_TARGET_FOLD_DAYS
+        needed_valid_dates = (target_folds + 1) * 2
+        span_for_density = needed_valid_dates / density if density > 0 else needed_span
+        needed_span = max(needed_span, span_for_density)
+        eta_days = label_lag_days + needed_span
+        eta_date = (pd.Timestamp.now().normalize() + pd.Timedelta(days=eta_days)).date()
+        results.append({
+            "targetFolds": target_folds,
+            "neededSpanDays": int(round(needed_span)),
+            "etaCalendarDaysFromNow": int(round(eta_days)),
+            "etaDate": str(eta_date),
+        })
+    return results
 
 
 def _fit_eval(train_df, test_df, feature_names):
@@ -662,13 +801,15 @@ def main():
         sys.exit(0)
 
     log.info("=" * 70)
-    report_sentiment_availability(dataset, sentiment_raw)
-    sentiment_valid_count = int(dataset[SENTIMENT_FEATURE].notna().sum())
-    sentiment_enabled = (not ADOPT_SENTIMENT) and sentiment_valid_count >= MIN_SENTIMENT_SAMPLES
+    # 감성점수는 전용 로직(evaluate_sentiment_feature, make_time_folds_for_sentiment)으로만
+    # 검증한다 - 아래 일반 candidate_groups 메커니즘(make_time_folds() 기반, 5년 전체 폴드
+    # 구조)은 감성 데이터처럼 최근 극히 일부 기간에만 몰린 특징에는 구조적으로 안 맞는다.
+    sentiment_report = report_sentiment_availability(dataset, sentiment_raw)
     log.info("=" * 70)
 
     # 후보 ablation 그룹 - 이미 채택된 것(ADOPT_*=True)은 full==candidate라 비교가
-    # 무의미하므로 자동으로 건너뛴다 (거시지표 때와 동일한 원칙).
+    # 무의미하므로 자동으로 건너뛴다 (거시지표 때와 동일한 원칙). sentiment는 위 전용
+    # 로직으로 이미 검증했으므로 여기엔 포함하지 않는다.
     candidate_groups = {
         "macro": (MACRO_FEATURE_NAMES,
                   (not ADOPT_MACRO_FEATURES) and all(c in dataset.columns for c in MACRO_FEATURE_NAMES)),
@@ -680,7 +821,6 @@ def main():
             (not ADOPT_HIGH52W) and (not ADOPT_REL_STRENGTH)
             and HIGH52W_FEATURE in dataset.columns and REL_STRENGTH_FEATURE in dataset.columns,
         ),
-        "sentiment": ([SENTIMENT_FEATURE], sentiment_enabled),
     }
 
     sweep_result = sweep_horizons(dataset, horizons, LABEL_MODE, candidate_groups)
@@ -717,11 +857,21 @@ def main():
             delta = auc - full_auc if full_auc is not None else None
             log.info("  %s 추가 AUC=%.4f (%s%.4f)", name, auc,
                       "+" if (delta is not None and delta >= 0) else "", delta if delta is not None else 0.0)
+        sent_auc = sentiment_report["evaluation"].get("sentimentAucMean")
+        if sent_auc is None:
+            log.info("  sentiment: 검증 불가(전용 폴드 커버리지 부족 - 위 시뮬레이션 결과 참고)")
+        else:
+            base_auc = sentiment_report["evaluation"].get("baseAucMean")
+            delta = sent_auc - base_auc if base_auc is not None else None
+            log.info("  sentiment 추가 AUC=%.4f (%s%.4f, 전용 폴드 %d개 기준)", sent_auc,
+                      "+" if (delta is not None and delta >= 0) else "",
+                      delta if delta is not None else 0.0, sentiment_report["evaluation"]["nFolds"])
         log.info("=" * 70)
 
     detail_path = os.path.join(os.path.dirname(MODEL_OUTPUT_PATH) or ".", "walk_forward_detail.json")
     with open(detail_path, "w", encoding="utf-8") as f:
-        json.dump({"deployHorizon": deploy_wf_summary, "sweep": sweep_result}, f, ensure_ascii=False, indent=2)
+        json.dump({"deployHorizon": deploy_wf_summary, "sweep": sweep_result,
+                    "sentimentReport": sentiment_report}, f, ensure_ascii=False, indent=2)
     log.info("검증 상세 결과 저장: %s", detail_path)
 
 
