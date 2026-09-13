@@ -279,20 +279,29 @@ function renderHeader(item) {
 
     const riseProbEl = document.getElementById("riseProbVal");
     const probTagEl = document.getElementById("probSourceTag");
+    const fallProbEl = document.getElementById("fallProbVal");
     if (item.riseProbability == null) {
         riseProbEl.textContent = "--";
         probTagEl.textContent = "";
+        fallProbEl.textContent = "";
     } else {
         riseProbEl.textContent = fmt(item.riseProbability) + "%";
         const isModel = item.probabilitySource === "MODEL";
         const horizon = (isModel && item.probabilityHorizonDays) ? " · " + item.probabilityHorizonDays + "영업일 기준" : "";
         probTagEl.textContent = (isModel ? "학습 기반" : "추정치") + horizon;
         probTagEl.className = "prob-tag " + (isModel ? "prob-tag--model" : "prob-tag--heuristic");
+        // 하락확률은 별도로 계산하지 않고 100-상승확률로 표시 (같은 확률의 반대쪽 표현일 뿐)
+        fallProbEl.textContent = "하락(보합포함) 확률: " + fmt(100 - item.riseProbability) + "%";
     }
 
     const notableEl = document.getElementById("notableHorizonNote");
     notableEl.textContent = (item.notableHorizonDays != null)
         ? "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)"
+        : "";
+
+    const notableFallEl = document.getElementById("notableFallHorizonNote");
+    notableFallEl.textContent = (item.notableFallHorizonDays != null)
+        ? "유력 하락구간: 약 " + item.notableFallHorizonApproxDate + " 전후 (" + fmt(item.notableFallHorizonProbability) + "%)"
         : "";
 }
 

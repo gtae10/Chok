@@ -17,10 +17,12 @@ train_model.py
 실제 배포 모델은 그 중 FORWARD_DAYS로 지정한 기간 하나로 학습한다.
 설정값은 전부 아래 "설정" 섹션에서 직접 수정하면 됨 (환경변수 불필요).
 
-주의: 여기서 계산하는 7개 특징의 공식은
+주의: 여기서 계산하는 8개 배포 특징의 공식은
       Chok(Java)/src/main/java/com/project/Chok/service/TechnicalAnalysisService.java 의
       buildFeatureVector() 와 반드시 동일해야 한다. 한쪽만 고치면 예측이 어긋난다.
-      (특징 계산 로직 자체는 이번에도 바뀌지 않았음 - 라벨/예측기간만 바뀜)
+      아래 후보 특징(52주 신고가 근접도/상대강도/감성점수)은 ablation 검증 통과 전까지는
+      Java에 반영하지 않는다 - 검증 통과한 것만 buildFeatureVector()에 추가한다
+      (거시지표 ablation 때와 동일한 원칙).
 """
 import json
 import logging
@@ -59,15 +61,38 @@ MOMENTUM_PERIOD = 90  # Java TechnicalAnalysisService.MOMENTUM_PERIOD 와 반드
 # 실제로 AUC가 개선될 때만 FEATURE_NAMES에 합류시킨다 (아래 ADOPT_MACRO_FEATURES 참고).
 MACRO_FEATURE_NAMES = ["kospiMomentum20", "kosdaqMomentum20", "usdKrwChange20"]
 MACRO_MOMENTUM_PERIOD = 20  # 거래일 기준 (MA_MID=20과 동일한 스케일 - 약 1개월)
-
-# ablation 검증 결과 실제로 유의미하게 개선될 때만 True로 바꿔서 배포 모델에 포함시킨다.
-# (직접 수동으로 뒤집는 스위치 - 자동으로 "더 높으면 채택"하지 않는 이유는, 다중비교와
-#  같은 이치로 우연한 개선을 "검증됨"으로 착각하지 않기 위해 사람이 walk_forward_detail.json의
-#  macroAucMean vs fullAucMean을 직접 보고 판단하게 하려는 것)
 ADOPT_MACRO_FEATURES = False
+
+# 52주 신고가 근접도 - 현재가 / 최근 252거래일(약 1년) 최고가. 1에 가까울수록 신고가 근접.
+# Java TechnicalAnalysisService.HIGH_52W_PERIOD 와 반드시 동일해야 한다.
+HIGH52W_PERIOD = 252
+HIGH52W_FEATURE = "high52wRatio"
+ADOPT_HIGH52W = False
+
+# 시장대비 상대강도 - 종목의 REL_STRENGTH_PERIOD일 수익률에서 "그날 전체 종목의 평균
+# 수익률"을 뺀 값. 라벨(label_rel_*)에 쓰는 시장중앙값과 같은 날짜별 groupby 방식이지만,
+# 여기서는 라벨이 아니라 입력 특징이라 평균(mean)을 쓴다(요청 사항 그대로).
+REL_STRENGTH_PERIOD = 20  # 거래일 기준 (MA_MID=20과 동일한 스케일 - 약 1개월)
+REL_STRENGTH_FEATURE = "relativeStrength20"
+ADOPT_REL_STRENGTH = False
+
+# 감성점수 특징(작업 2) - 아직 "배관 + 유효표본 확인" 단계라 항상 검증 게이트를 거친다.
+# 데이터가 MIN_SENTIMENT_SAMPLES 이상 쌓여야 walk-forward 대상 후보에 들어간다(아래 main()의
+# sentiment_enabled 계산 참고) - 사람이 뒤집는 스위치가 아니라 애초에 검증 자체가
+# 불가능한 상태를 자동으로 감지해서 스킵하는 게이트.
+SENTIMENT_LOOKBACK_DAYS = 7  # 예측 시점 이전(당일 미포함) 최근 며칠 평균을 쓸지
+SENTIMENT_FEATURE = "sentimentAvg7d"
+ADOPT_SENTIMENT = False  # 검증 통과해도 사람이 walk_forward_detail.json 보고 판단 후 수동 전환
+MIN_SENTIMENT_SAMPLES = 500  # 다른 특징과 같은 MIN_SAMPLES 기준 재사용
 
 if ADOPT_MACRO_FEATURES:
     FEATURE_NAMES = FEATURE_NAMES + MACRO_FEATURE_NAMES
+if ADOPT_HIGH52W:
+    FEATURE_NAMES = FEATURE_NAMES + [HIGH52W_FEATURE]
+if ADOPT_REL_STRENGTH:
+    FEATURE_NAMES = FEATURE_NAMES + [REL_STRENGTH_FEATURE]
+if ADOPT_SENTIMENT:
+    FEATURE_NAMES = FEATURE_NAMES + [SENTIMENT_FEATURE]
 
 MIN_FOLD_TRAIN = 100
 MIN_FOLD_TEST = 20
@@ -108,6 +133,84 @@ def compute_macro_features(market_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def load_sentiment_scores() -> pd.DataFrame:
+    """감성점수 특징(작업 2) 원본 데이터. sentiment_data_quality='OK'인 것만 사용한다 -
+    FALLBACK(2026-06-27~07-23 API 장애로 638건이 오염됐던 사고 이후 추가된 플래그)은 물론,
+    이 컬럼이 도입되기 전의 과거 레코드(NULL)도 오염 여부를 확인할 방법이 없어 안전하게
+    함께 제외한다."""
+    with db.get_conn() as conn:
+        query = """
+            SELECT ticker, rec_date, sentiment_score
+            FROM recommendations
+            WHERE sentiment_data_quality = 'OK'
+            ORDER BY ticker, rec_date ASC
+        """
+        df = pd.read_sql(query, conn)
+    df["rec_date"] = pd.to_datetime(df["rec_date"])
+    return df
+
+
+def compute_sentiment_feature(dataset: pd.DataFrame, sentiment_df: pd.DataFrame) -> pd.DataFrame:
+    """각 (ticker, trade_date) 행에 대해 "그 날짜 이전"(당일 미포함) SENTIMENT_LOOKBACK_DAYS일간의
+    평균 감성점수를 계산해 SENTIMENT_FEATURE 컬럼으로 붙인다.
+
+    미래 정보 유출 방지: 감성분석은 그날 뉴스를 그날 계산하므로, 당일 분까지 창(window)에
+    포함하면 "장 마감 후에야 완성되는 그날 요약"을 예측 시점에 이미 아는 셈이 되어 누수다.
+    rolling 계산 후 shift(1)로 당일을 반드시 창에서 밀어내 이 문제를 막는다.
+    """
+    dataset = dataset.copy()
+    if sentiment_df.empty:
+        dataset[SENTIMENT_FEATURE] = np.nan
+        return dataset
+
+    frames = []
+    for ticker, g in sentiment_df.groupby("ticker"):
+        daily = g.groupby("rec_date")["sentiment_score"].mean()  # 같은 날 여러 분석 실행 시 평균
+        daily = daily.asfreq("D")  # 결측일을 NaN으로 채운 연속 달력 (rolling('N D')에 필요)
+        rolling = daily.rolling(window=f"{SENTIMENT_LOOKBACK_DAYS}D", min_periods=1).mean()
+        rolling = rolling.shift(1)  # 당일 제외 - "예측 시점 이전"만 남기기 위한 핵심 한 줄
+        frames.append(pd.DataFrame({
+            "ticker": ticker, "trade_date": rolling.index, SENTIMENT_FEATURE: rolling.values
+        }))
+
+    sentiment_feature_df = pd.concat(frames, ignore_index=True)
+    dataset = dataset.merge(sentiment_feature_df, on=["ticker", "trade_date"], how="left")
+    return dataset
+
+
+def report_sentiment_availability(dataset: pd.DataFrame, sentiment_raw: pd.DataFrame):
+    """감성점수 특징이 실제로 몇 건이나 유효한지 확인하고, 부족하면 현재 축적 페이스로
+    대략 언제쯤 재시도할 만한지까지 보고한다 (sentiment_predictive_check.py와 같은 취지)."""
+    valid_count = int(dataset[SENTIMENT_FEATURE].notna().sum())
+    log.info("감성점수 특징(%s) 유효 표본: %d건 (검증 기준: %d건 이상)",
+              SENTIMENT_FEATURE, valid_count, MIN_SENTIMENT_SAMPLES)
+
+    if valid_count >= MIN_SENTIMENT_SAMPLES:
+        log.info("-> 검증 가능 - 아래 스윕/ablation 결과의 'sentiment' 항목 참고")
+        return
+
+    log.info("-> 데이터 부족으로 이번 회차는 검증 보류 (ablation에서 'sentiment' 항목은 자동 스킵되고,"
+              " 나머지 특징 검증/배포 모델 학습은 그대로 진행됨)")
+
+    if sentiment_raw.empty or valid_count == 0:
+        log.info("   'OK' 품질 감성분석 데이터가 사실상 없어 증가 추세를 추정할 수 없음.")
+        return
+
+    span_days = max((sentiment_raw["rec_date"].max() - sentiment_raw["rec_date"].min()).days, 1)
+    rate_per_day = valid_count / span_days
+    if rate_per_day <= 0:
+        log.info("   증가 추세를 추정할 수 없음 (표본이 늘고 있지 않음).")
+        return
+
+    days_needed = (MIN_SENTIMENT_SAMPLES - valid_count) / rate_per_day
+    eta = "하루 이내" if days_needed < 1 else f"약 {int(round(days_needed))}일 후"
+    log.info(
+        "   최근 %d일간 %d건 축적(하루 평균 %.1f건 페이스) - 이 페이스가 유지되면 "
+        "%s에 %d건에 도달해 재시도 가능할 것으로 예상.",
+        span_days, valid_count, rate_per_day, eta, MIN_SENTIMENT_SAMPLES,
+    )
+
+
 def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
     """티커 하나의 시계열(날짜 오름차순)에 대해 지표 + 특징 + 기간별 미래수익률을 계산한다."""
     close = g["close_price"]
@@ -141,7 +244,10 @@ def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
     avg_volume20 = volume.rolling(20).mean()
     volume_ratio = volume / avg_volume20
 
+    high_252 = close.rolling(HIGH52W_PERIOD).max()
+
     out = pd.DataFrame({
+        "ticker": g["ticker"],
         "trade_date": g["trade_date"],
         "priceVsMa5": (close - ma5) / close,
         "ma5VsMa20": (ma5 - ma20) / ma20,
@@ -151,7 +257,13 @@ def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
         "bbPercentB": bb_percent_b,
         "logVolumeRatio": np.log(volume_ratio.clip(lower=0.01)),
         "momentum90": close / close.shift(MOMENTUM_PERIOD) - 1,
+        HIGH52W_FEATURE: close / high_252,
     })
+
+    # 상대강도 계산용 원재료(종목 자체의 N일 수익률) - 아직 시장평균을 빼기 전이라
+    # FEATURE_NAMES에는 넣지 않는다. 시장평균은 전 종목을 concat한 뒤에야 계산 가능
+    # (build_dataset에서 처리).
+    out["_return20"] = close / close.shift(REL_STRENGTH_PERIOD) - 1
 
     # 기간별 미래수익률 + 그 라벨이 실제로 참조하는 미래 날짜(target_date)
     # target_date는 폴드 분할 시 "학습 구간 라벨이 검증 구간 미래를 훔쳐보지 않게" purge하는 데 씀
@@ -163,7 +275,8 @@ def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
     return out
 
 
-def build_dataset(price_df: pd.DataFrame, horizons, macro_df: pd.DataFrame = None) -> pd.DataFrame:
+def build_dataset(price_df: pd.DataFrame, horizons, macro_df: pd.DataFrame = None,
+                   sentiment_df: pd.DataFrame = None) -> pd.DataFrame:
     frames = []
     for ticker, g in price_df.groupby("ticker"):
         g = g.sort_values("trade_date").reset_index(drop=True)
@@ -183,6 +296,15 @@ def build_dataset(price_df: pd.DataFrame, horizons, macro_df: pd.DataFrame = Non
     # baseline/기존 특징 학습 표본이 줄어들지 않는다 - ablation 비교 시에만 따로 dropna한다.)
     if macro_df is not None and not macro_df.empty:
         dataset = dataset.merge(macro_df, on="trade_date", how="left")
+
+    # 상대강도: 라벨(label_rel_*)의 시장중앙값과 같은 날짜별 groupby 방식이지만, 특징이라
+    # 평균(mean)을 쓴다. macro와 같은 이유로 FEATURE_NAMES dropna 전에 계산해야 한다.
+    market_mean_return = dataset.groupby("trade_date")["_return20"].transform("mean")
+    dataset[REL_STRENGTH_FEATURE] = dataset["_return20"] - market_mean_return
+    dataset = dataset.drop(columns=["_return20"])
+
+    if sentiment_df is not None:
+        dataset = compute_sentiment_feature(dataset, sentiment_df)
 
     # 특징 컬럼에 inf/NaN 있는 행만 제거 (기간별 수익률 컬럼은 기간마다 결측 범위가 달라서 따로 처리)
     dataset[FEATURE_NAMES] = dataset[FEATURE_NAMES].replace([np.inf, -np.inf], np.nan)
@@ -258,19 +380,40 @@ def _fit_eval(train_df, test_df, feature_names):
     return model, scaler, accuracy, auc
 
 
-def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
-    """여러 시점으로 나눠 반복 검증해서, 단일 split의 우연성을 줄인 평균 성능을 낸다."""
+def _fit_eval_candidate(train_df, test_df, extra_feature_names, enabled):
+    """기존 FEATURE_NAMES(이미 non-null 보장됨)에 extra_feature_names를 더해 학습/평가한다.
+    enabled=False거나 표본이 부족하면 (None, None) - 호출부가 이를 "이 후보는 이번엔
+    검증 못 함"으로 해석한다."""
+    if not enabled:
+        return None, None
+    train_c = train_df.dropna(subset=extra_feature_names)
+    test_c = test_df.dropna(subset=extra_feature_names)
+    if len(train_c) < MIN_FOLD_TRAIN or len(test_c) < MIN_FOLD_TEST:
+        return None, None
+    _, _, acc, auc = _fit_eval(train_c, test_c, FEATURE_NAMES + extra_feature_names)
+    return acc, auc
+
+
+def walk_forward_evaluate(dataset_h: pd.DataFrame, candidate_groups=None, verbose=True) -> dict:
+    """여러 시점으로 나눠 반복 검증해서, 단일 split의 우연성을 줄인 평균 성능을 낸다.
+
+    candidate_groups: {이름: (추가할 특징 컬럼 목록, 활성화 여부)} - 기존 FEATURE_NAMES에 각
+    후보를 추가했을 때 AUC가 실제로 개선되는지 나란히 비교한다 (거시지표 ablation과 동일한
+    원칙을 임의 개수의 후보로 일반화한 것 - macro/52주고가/상대강도/감성점수 전부 이 하나의
+    메커니즘을 공유한다)."""
+    candidate_groups = candidate_groups or {}
     dataset_h = dataset_h.sort_values("trade_date")
     no_volume_features = [f for f in FEATURE_NAMES if f != "logVolumeRatio"]
-    # 이미 채택되어 FEATURE_NAMES에 macro가 포함된 상태면 full==macro라 비교가 무의미하므로 건너뜀
-    has_macro = (not ADOPT_MACRO_FEATURES) and all(c in dataset_h.columns for c in MACRO_FEATURE_NAMES)
-    macro_features = FEATURE_NAMES + MACRO_FEATURE_NAMES
 
     folds = make_time_folds(dataset_h, N_FOLDS)
     if not folds:
         if verbose:
             log.warning("폴드를 만들기엔 거래일 수가 부족해 walk-forward 검증을 건너뜁니다.")
-        return {"nFolds": 0, "folds": []}
+        return {
+            "nFolds": 0, "folds": [],
+            "candidates": {name: {"aucMean": None, "aucStd": None, "accuracyMean": None, "accuracyStd": None}
+                           for name in candidate_groups},
+        }
 
     fold_results = []
     for i, (train_end, test_end) in enumerate(folds, start=1):
@@ -296,23 +439,23 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
         _, _, full_acc, full_auc = _fit_eval(train_df, test_df, FEATURE_NAMES)
         _, _, nv_acc, nv_auc = _fit_eval(train_df, test_df, no_volume_features)
 
-        # 거시 지표 ablation: 기존 특징 + 거시 특징으로 학습했을 때 AUC가 실제로 개선되는지 비교.
-        # macro 컬럼만 dropna하므로(baseline/full 표본 수는 그대로), 초반 수집 기간처럼
-        # 거시 지표가 아직 없는 구간의 샘플은 이 비교에서만 자연스럽게 제외된다.
-        macro_acc, macro_auc = None, None
-        if has_macro:
-            train_macro = train_df.dropna(subset=MACRO_FEATURE_NAMES)
-            test_macro = test_df.dropna(subset=MACRO_FEATURE_NAMES)
-            if len(train_macro) >= MIN_FOLD_TRAIN and len(test_macro) >= MIN_FOLD_TEST:
-                _, _, macro_acc, macro_auc = _fit_eval(train_macro, test_macro, macro_features)
+        candidate_fold = {}
+        for name, (extra_features, enabled) in candidate_groups.items():
+            c_acc, c_auc = _fit_eval_candidate(train_df, test_df, extra_features, enabled)
+            candidate_fold[name] = {"accuracy": c_acc, "auc": c_auc}
 
         if verbose:
+            cand_log = " | ".join(
+                f"{name}={round(v['auc'], 3) if v['auc'] is not None else None}"
+                for name, v in candidate_fold.items()
+            )
             log.info(
-                "  [폴드 %d] train=%d(purge %d) test=%d | 베이스라인=%.3f | 거래량제외 acc=%.3f auc=%s | 거래량포함 acc=%.3f auc=%s | 거시포함 acc=%s auc=%s",
+                "  [폴드 %d] train=%d(purge %d) test=%d | 베이스라인=%.3f | 거래량제외 auc=%s | "
+                "거래량포함 auc=%s%s%s",
                 i, len(train_df), purged, len(test_df), baseline_acc,
-                nv_acc if nv_acc else -1, round(nv_auc, 3) if nv_auc else None,
-                full_acc if full_acc else -1, round(full_auc, 3) if full_auc else None,
-                round(macro_acc, 3) if macro_acc else None, round(macro_auc, 3) if macro_auc else None,
+                round(nv_auc, 3) if nv_auc is not None else None,
+                round(full_auc, 3) if full_auc is not None else None,
+                " | " if cand_log else "", cand_log,
             )
 
         fold_results.append({
@@ -320,11 +463,18 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
             "baselineAccuracy": baseline_acc,
             "noVolumeAccuracy": nv_acc, "noVolumeAuc": nv_auc,
             "fullAccuracy": full_acc, "fullAuc": full_auc,
-            "macroAccuracy": macro_acc, "macroAuc": macro_auc,
+            "candidates": candidate_fold,
         })
 
     def agg(key):
         vals = [f[key] for f in fold_results if f.get(key) is not None]
+        if not vals:
+            return None, None
+        return float(np.mean(vals)), float(np.std(vals))
+
+    def agg_candidate(name, metric):
+        vals = [f["candidates"][name][metric] for f in fold_results
+                if f["candidates"].get(name, {}).get(metric) is not None]
         if not vals:
             return None, None
         return float(np.mean(vals)), float(np.std(vals))
@@ -334,8 +484,15 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
     nv_auc_mean, nv_auc_std = agg("noVolumeAuc")
     full_acc_mean, full_acc_std = agg("fullAccuracy")
     full_auc_mean, full_auc_std = agg("fullAuc")
-    macro_acc_mean, macro_acc_std = agg("macroAccuracy")
-    macro_auc_mean, macro_auc_std = agg("macroAuc")
+
+    candidates_summary = {}
+    for name in candidate_groups:
+        auc_mean, auc_std = agg_candidate(name, "auc")
+        acc_mean, acc_std = agg_candidate(name, "accuracy")
+        candidates_summary[name] = {
+            "aucMean": auc_mean, "aucStd": auc_std,
+            "accuracyMean": acc_mean, "accuracyStd": acc_std,
+        }
 
     return {
         "nFolds": len(fold_results),
@@ -343,58 +500,70 @@ def walk_forward_evaluate(dataset_h: pd.DataFrame, verbose=True) -> dict:
         "baselineAccuracyMean": baseline_mean, "baselineAccuracyStd": baseline_std,
         "noVolumeAccuracyMean": nv_acc_mean, "noVolumeAccuracyStd": nv_acc_std,
         "noVolumeAucMean": nv_auc_mean, "noVolumeAucStd": nv_auc_std,
-        "macroAccuracyMean": macro_acc_mean, "macroAccuracyStd": macro_acc_std,
-        "macroAucMean": macro_auc_mean, "macroAucStd": macro_auc_std,
         "fullAccuracyMean": full_acc_mean, "fullAccuracyStd": full_acc_std,
         "fullAucMean": full_auc_mean, "fullAucStd": full_auc_std,
+        "candidates": candidates_summary,
     }
 
 
-def sweep_horizons(dataset: pd.DataFrame, horizons, label_mode: str) -> dict:
-    """예측 기간별로 walk-forward 검증을 돌려서 어느 기간이 그나마 신호가 있는지 비교한다."""
+def sweep_horizons(dataset: pd.DataFrame, horizons, label_mode: str, candidate_groups=None) -> dict:
+    """예측 기간별로 walk-forward 검증을 돌려서 어느 기간이 그나마 신호가 있는지,
+    그리고 각 후보 특징이 여러 기간에 걸쳐 일관되게 개선되는지 비교한다."""
+    candidate_groups = candidate_groups or {}
     log.info("=" * 70)
-    log.info("예측 기간 스윕 시작 (라벨 모드: %s, 기간 후보: %s)", label_mode, horizons)
+    log.info("예측 기간 스윕 시작 (라벨 모드: %s, 기간 후보: %s, 후보 특징: %s)",
+              label_mode, horizons, list(candidate_groups.keys()))
     log.info("=" * 70)
 
     rows = []
     for h in horizons:
         sub = dataset_for_horizon(dataset, h, label_mode)
         if len(sub) < MIN_SAMPLES:
-            log.info("[%d일] 샘플 부족(%d개)으로 스킵", h, len(sub))
+            log.info("[%3d일] 샘플 부족(%d개)으로 스킵", h, len(sub))
             continue
-        log.info("[%d일] 샘플 %d개로 walk-forward 검증 중...", h, len(sub))
-        summary = walk_forward_evaluate(sub, verbose=False)
+        log.info("[%3d일] 샘플 %d개로 walk-forward 검증 중...", h, len(sub))
+        summary = walk_forward_evaluate(sub, candidate_groups=candidate_groups, verbose=False)
         if summary["nFolds"] == 0:
-            log.info("[%d일] 유효 폴드 없음, 스킵", h)
+            log.info("[%3d일] 유효 폴드 없음, 스킵", h)
             continue
-        rows.append({
+
+        row = {
             "horizon": h,
             "samples": len(sub),
             "baselineAcc": summary["baselineAccuracyMean"],
             "noVolumeAuc": summary["noVolumeAucMean"],
             "fullAuc": summary["fullAucMean"],
-            "macroAuc": summary.get("macroAucMean"),
-        })
+        }
+        for name, cand in summary["candidates"].items():
+            row[f"{name}Auc"] = cand["aucMean"]
+        rows.append(row)
+
+        cand_str = " | ".join(
+            f"{name}={round(row[name + 'Auc'], 3) if row.get(name + 'Auc') is not None else None}"
+            for name in candidate_groups
+        )
         log.info(
-            "[%d일] 베이스라인=%.3f | 거래량제외 AUC=%s | 거래량포함 AUC=%s | 거시포함 AUC=%s",
+            "[%3d일] 베이스라인=%.3f | 거래량제외 AUC=%s | 거래량포함 AUC=%s%s%s",
             h, summary["baselineAccuracyMean"] or 0,
             round(summary["noVolumeAucMean"], 3) if summary["noVolumeAucMean"] else None,
             round(summary["fullAucMean"], 3) if summary["fullAucMean"] else None,
-            round(summary["macroAucMean"], 3) if summary.get("macroAucMean") else None,
+            " | " if cand_str else "", cand_str,
         )
 
     log.info("=" * 70)
     log.info("스윕 결과 요약 (AUC가 0.5보다 뚜렷이 높을수록 신호가 있다는 뜻)")
     for r in rows:
-        log.info(
-            "  %2d일 | 샘플 %6d | 거래량포함 AUC=%s | 거시포함 AUC=%s",
-            r["horizon"], r["samples"],
-            round(r["fullAuc"], 3) if r["fullAuc"] else None,
-            round(r["macroAuc"], 3) if r.get("macroAuc") else None,
+        extras = " | ".join(
+            f"{name}={round(r[name + 'Auc'], 3) if r.get(name + 'Auc') is not None else 'N/A'}"
+            for name in candidate_groups
         )
+        log.info("  %3d일 | 샘플 %6d | 거래량포함 AUC=%s%s%s",
+                  r["horizon"], r["samples"],
+                  round(r["fullAuc"], 3) if r["fullAuc"] else None,
+                  " | " if extras else "", extras)
     best = max(rows, key=lambda r: r["fullAuc"] or 0) if rows else None
     if best:
-        log.info("가장 AUC가 높았던 기간: %d일 (AUC=%.3f)", best["horizon"], best["fullAuc"] or 0)
+        log.info("가장 AUC가 높았던 기간(기존 특징 기준): %d일 (AUC=%.3f)", best["horizon"], best["fullAuc"] or 0)
         if (best["fullAuc"] or 0) < 0.52:
             log.info("주의: 최고 AUC도 0.52 미만이면 사실상 어느 기간을 골라도 유의미한 신호는 없다고 보는 게 맞음")
     log.info("=" * 70)
@@ -443,7 +612,8 @@ def horizon_model_path(horizon: int) -> str:
     return os.path.join(model_dir, f"rise_model_{horizon}d.json")
 
 
-def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str, output_path: str):
+def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str, output_path: str,
+                            candidate_groups=None):
     """한 예측기간에 대해 walk-forward 검증 + 최종 모델 학습 + 저장까지 수행한다.
     샘플 부족이거나 유효 폴드가 하나도 없으면 저장을 건너뛰고 (None, None)을 반환한다."""
     sub = dataset_for_horizon(dataset, horizon, label_mode)
@@ -451,7 +621,7 @@ def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str,
         log.info("[%d일] 샘플 부족(%d개)으로 배포 모델 학습 스킵", horizon, len(sub))
         return None, None
 
-    wf_summary = walk_forward_evaluate(sub, verbose=True)
+    wf_summary = walk_forward_evaluate(sub, candidate_groups=candidate_groups, verbose=True)
     if wf_summary.get("nFolds", 0) == 0:
         log.info("[%d일] 유효 폴드 없음으로 배포 모델 학습 스킵", horizon)
         return None, None
@@ -474,10 +644,13 @@ def main():
 
     market_df = load_market_indicators()
     macro_df = compute_macro_features(market_df) if not market_df.empty else None
-    log.info("거시 지표 로드 완료: %d행 (특징: %s)", len(market_df), MACRO_FEATURE_NAMES)
+    log.info("거시 지표 로드 완료: %d행", len(market_df))
+
+    sentiment_raw = load_sentiment_scores()
+    log.info("감성점수(OK 품질) 로드 완료: %d행", len(sentiment_raw))
 
     horizons = sorted(set(SWEEP_HORIZONS + [FORWARD_DAYS]))
-    dataset = build_dataset(price_df, horizons, macro_df)
+    dataset = build_dataset(price_df, horizons, macro_df, sentiment_raw)
     log.info("특징 계산 완료: %d행 (지표 계산 가능한 구간만)", len(dataset))
 
     if len(dataset) < MIN_SAMPLES:
@@ -488,14 +661,36 @@ def main():
         )
         sys.exit(0)
 
-    sweep_result = sweep_horizons(dataset, horizons, LABEL_MODE)
+    log.info("=" * 70)
+    report_sentiment_availability(dataset, sentiment_raw)
+    sentiment_valid_count = int(dataset[SENTIMENT_FEATURE].notna().sum())
+    sentiment_enabled = (not ADOPT_SENTIMENT) and sentiment_valid_count >= MIN_SENTIMENT_SAMPLES
+    log.info("=" * 70)
+
+    # 후보 ablation 그룹 - 이미 채택된 것(ADOPT_*=True)은 full==candidate라 비교가
+    # 무의미하므로 자동으로 건너뛴다 (거시지표 때와 동일한 원칙).
+    candidate_groups = {
+        "macro": (MACRO_FEATURE_NAMES,
+                  (not ADOPT_MACRO_FEATURES) and all(c in dataset.columns for c in MACRO_FEATURE_NAMES)),
+        "high52w": ([HIGH52W_FEATURE], (not ADOPT_HIGH52W) and HIGH52W_FEATURE in dataset.columns),
+        "relStrength": ([REL_STRENGTH_FEATURE],
+                         (not ADOPT_REL_STRENGTH) and REL_STRENGTH_FEATURE in dataset.columns),
+        "high52w+relStrength": (
+            [HIGH52W_FEATURE, REL_STRENGTH_FEATURE],
+            (not ADOPT_HIGH52W) and (not ADOPT_REL_STRENGTH)
+            and HIGH52W_FEATURE in dataset.columns and REL_STRENGTH_FEATURE in dataset.columns,
+        ),
+        "sentiment": ([SENTIMENT_FEATURE], sentiment_enabled),
+    }
+
+    sweep_result = sweep_horizons(dataset, horizons, LABEL_MODE, candidate_groups)
 
     log.info("=== 기간별 배포 모델 학습 시작 (기간 %d개: %s) ===", len(horizons), horizons)
     deploy_wf_summary = None
     saved_count, skipped_count = 0, 0
     for h in horizons:
         output_path = MODEL_OUTPUT_PATH if h == FORWARD_DAYS else horizon_model_path(h)
-        result, wf_summary = train_and_save_horizon(dataset, h, LABEL_MODE, output_path)
+        result, wf_summary = train_and_save_horizon(dataset, h, LABEL_MODE, output_path, candidate_groups)
         if result is None:
             skipped_count += 1
         else:
@@ -509,21 +704,19 @@ def main():
     )
     if deploy_wf_summary is None:
         log.warning("기본 배포 기간(%d일) 모델은 저장되지 않았습니다 - 기존 rise_model.json은 그대로 둡니다.", FORWARD_DAYS)
-    elif not ADOPT_MACRO_FEATURES:
+    else:
         full_auc = deploy_wf_summary.get("fullAucMean")
-        macro_auc = deploy_wf_summary.get("macroAucMean")
         log.info("=" * 70)
-        log.info(
-            "거시 지표 ablation 결과 (배포 기간 %d일 기준): 기존특징 AUC=%s, 거시포함 AUC=%s",
-            FORWARD_DAYS, round(full_auc, 4) if full_auc else None, round(macro_auc, 4) if macro_auc else None,
-        )
-        if full_auc is not None and macro_auc is not None:
-            delta = macro_auc - full_auc
-            log.info(
-                "-> 거시 지표 추가 효과: %+.4f (%s). ADOPT_MACRO_FEATURES=%s 이므로 현재 배포 모델에는 %s.",
-                delta, "개선" if delta > 0 else "악화/무변화", ADOPT_MACRO_FEATURES,
-                "미포함" if not ADOPT_MACRO_FEATURES else "포함",
-            )
+        log.info("배포 기간(%d일) 기준 ablation 결과: 기존특징 AUC=%s",
+                  FORWARD_DAYS, round(full_auc, 4) if full_auc is not None else None)
+        for name, cand in deploy_wf_summary.get("candidates", {}).items():
+            auc = cand.get("aucMean")
+            if auc is None:
+                log.info("  %s: 검증 불가(비활성 또는 표본 부족)", name)
+                continue
+            delta = auc - full_auc if full_auc is not None else None
+            log.info("  %s 추가 AUC=%.4f (%s%.4f)", name, auc,
+                      "+" if (delta is not None and delta >= 0) else "", delta if delta is not None else 0.0)
         log.info("=" * 70)
 
     detail_path = os.path.join(os.path.dirname(MODEL_OUTPUT_PATH) or ".", "walk_forward_detail.json")

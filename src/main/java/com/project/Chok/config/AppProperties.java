@@ -16,6 +16,7 @@ public class AppProperties {
     private Scheduler scheduler = new Scheduler();
     private Model model = new Model();
     private PythonCollector pythonCollector = new PythonCollector();
+    private Chat chat = new Chat();
 
     public PythonCollector getPythonCollector() {
         return pythonCollector;
@@ -87,6 +88,14 @@ public class AppProperties {
 
     public void setModel(Model model) {
         this.model = model;
+    }
+
+    public Chat getChat() {
+        return chat;
+    }
+
+    public void setChat(Chat chat) {
+        this.chat = chat;
     }
 
     // ─────────────────────────────────────────
@@ -230,6 +239,32 @@ public class AppProperties {
 
         public double getMinAucForHighlight() { return minAucForHighlight; }
         public void setMinAucForHighlight(double minAucForHighlight) { this.minAucForHighlight = minAucForHighlight; }
+    }
+
+    // ─────────────────────────────────────────
+    // chok.chat.* - AI 피드백 챗봇 (로그인 없어 사용자별 제한 불가 - IP+요청 단위로만 상한)
+    // ─────────────────────────────────────────
+    public static class Chat {
+        private int maxTokens = 500;
+        private int maxMessageLength = 1000;
+        private int maxHistoryMessages = 20;
+        private int maxRequestsPerWindow = 20;
+        private int windowMinutes = 10;
+
+        public int getMaxTokens() { return maxTokens; }
+        public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
+
+        public int getMaxMessageLength() { return maxMessageLength; }
+        public void setMaxMessageLength(int maxMessageLength) { this.maxMessageLength = maxMessageLength; }
+
+        public int getMaxHistoryMessages() { return maxHistoryMessages; }
+        public void setMaxHistoryMessages(int maxHistoryMessages) { this.maxHistoryMessages = maxHistoryMessages; }
+
+        public int getMaxRequestsPerWindow() { return maxRequestsPerWindow; }
+        public void setMaxRequestsPerWindow(int maxRequestsPerWindow) { this.maxRequestsPerWindow = maxRequestsPerWindow; }
+
+        public int getWindowMinutes() { return windowMinutes; }
+        public void setWindowMinutes(int windowMinutes) { this.windowMinutes = windowMinutes; }
     }
 
     // ─────────────────────────────────────────

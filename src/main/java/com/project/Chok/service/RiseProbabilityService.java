@@ -81,6 +81,19 @@ public class RiseProbabilityService {
      * (다중비교 문제 방지 - AUC 기준 미달 기간을 억지로 보여주지 않음).
      */
     public NotableHorizon findNotableHorizon(double[] features) {
+        return findExtremeHorizon(features, true);
+    }
+
+    /**
+     * findNotableHorizon()의 대칭 버전 - 같은 AUC 기준을 통과한 후보들 중 이번엔 확률이
+     * 가장 낮은(하락 쪽으로 가장 확신 있는) 기간을 고른다. 별도 모델을 새로 학습하지 않고
+     * 같은 기간별 모델들을 재사용한다 - 상승확률이 낮다는 것 자체가 곧 하락 쪽 신호이므로.
+     */
+    public NotableHorizon findNotableFallHorizon(double[] features) {
+        return findExtremeHorizon(features, false);
+    }
+
+    private NotableHorizon findExtremeHorizon(double[] features, boolean highest) {
         double minAuc = appProperties.getModel().getMinAucForHighlight();
 
         NotableHorizon best = null;
@@ -90,7 +103,8 @@ public class RiseProbabilityService {
             Double probability = computeProbability(model, features);
             if (probability == null) continue;
 
-            if (best == null || probability > best.probability()) {
+            boolean better = best == null || (highest ? probability > best.probability() : probability < best.probability());
+            if (better) {
                 long calendarDays = Math.round(model.forwardDays * BUSINESS_TO_CALENDAR_DAYS);
                 LocalDate approxDate = LocalDate.now().plusDays(calendarDays);
                 best = new NotableHorizon(model.forwardDays, probability, approxDate);

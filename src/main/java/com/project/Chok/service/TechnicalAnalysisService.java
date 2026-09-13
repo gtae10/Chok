@@ -117,6 +117,12 @@ public class TechnicalAnalysisService {
         Double notableHorizonProbability = notable == null ? null : round2(notable.probability());
         String notableHorizonApproxDate = notable == null ? null : notable.approxDate().toString();
 
+        // "유력 하락구간" - 위 유력 구간(상승)의 대칭 버전. 같은 AUC 기준 미달이면 마찬가지로 null.
+        RiseProbabilityService.NotableHorizon notableFall = riseProbabilityService.findNotableFallHorizon(features);
+        Integer notableFallHorizonDays = notableFall == null ? null : notableFall.horizonDays();
+        Double notableFallHorizonProbability = notableFall == null ? null : round2(notableFall.probability());
+        String notableFallHorizonApproxDate = notableFall == null ? null : notableFall.approxDate().toString();
+
         return new TechnicalIndicatorResult(
                 round2(ma5), round2(ma20), round2(ma60),
                 round2(rsi),
@@ -125,6 +131,7 @@ public class TechnicalAnalysisService {
                 round2(volumeRatio), obvTrend,
                 round2(finalScore), round2(riseProbability), probabilitySource, probabilityHorizonDays,
                 notableHorizonDays, notableHorizonProbability, notableHorizonApproxDate,
+                notableFallHorizonDays, notableFallHorizonProbability, notableFallHorizonApproxDate,
                 reason.toString().trim()
         );
     }

@@ -86,7 +86,10 @@ function renderProbability(item) {
     const tagLabel = isModel ? "학습" : "추정";
     const horizon = (isModel && item.probabilityHorizonDays)
         ? '<span class="prob-horizon">(' + item.probabilityHorizonDays + '영업일 기준)</span>' : "";
-    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>' + horizon + renderNotableHorizon(item);
+    // 하락확률은 별도 계산 없이 100-상승확률로 표시 (같은 확률의 반대쪽 표현)
+    const fallPct = '<span class="prob-horizon">하락(보합포함) ' + fmt(100 - item.riseProbability) + '%</span>';
+    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>' + horizon +
+        fallPct + renderNotableHorizon(item) + renderNotableFallHorizon(item);
 }
 
 // 참고용 - 통계 검증된 예측이 아님. AUC 안전장치를 통과한 후보가 없으면 서버가 애초에 null을 내려줌.
@@ -96,6 +99,13 @@ function renderNotableHorizon(item) {
     if (item.notableHorizonDays == null) return "";
     const text = "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)";
     return '<span class="prob-horizon prob-horizon--notable" title="' + esc(text) + '">' + esc(text) + '</span>';
+}
+
+// findNotableHorizon()의 대칭 버전 - 매도 계열(파랑) 색상으로 구분.
+function renderNotableFallHorizon(item) {
+    if (item.notableFallHorizonDays == null) return "";
+    const text = "유력 하락구간: 약 " + item.notableFallHorizonApproxDate + " 전후 (" + fmt(item.notableFallHorizonProbability) + "%)";
+    return '<span class="prob-horizon prob-horizon--notable prob-horizon--fall" title="' + esc(text) + '">' + esc(text) + '</span>';
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

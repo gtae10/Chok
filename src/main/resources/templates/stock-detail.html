@@ -49,12 +49,14 @@
             <span class="score-card__label">상승 확률</span>
             <span id="riseProbVal" class="score-card__value">--</span>
             <span id="probSourceTag" class="prob-tag"></span>
+            <span id="fallProbVal" class="prob-horizon"></span>
         </div>
     </div>
 
     <p class="prob-caveat">
-        상승확률은 실제 통계 검증된 예측이 아닌 참고용 지표입니다.
+        상승확률/하락확률은 실제 통계 검증된 예측이 아닌 참고용 지표입니다.
         <span id="notableHorizonNote"></span>
+        <span id="notableFallHorizonNote" class="prob-horizon--fall"></span>
     </p>
 
     <div class="chart-section">
@@ -111,5 +113,6 @@
 
 <script th:src="@{/js/score-trend-chart.js}"></script>
 <script th:src="@{/js/stock-detail.js}"></script>
+<script th:src="@{/js/feedback-widget.js}"></script>
 </body>
 </html>

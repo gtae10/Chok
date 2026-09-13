@@ -189,6 +189,8 @@ public class RecommendationService {
                 techResult.getProbabilitySource(), techResult.getProbabilityHorizonDays(),
                 techResult.getNotableHorizonDays(), techResult.getNotableHorizonProbability(),
                 techResult.getNotableHorizonApproxDate(),
+                techResult.getNotableFallHorizonDays(), techResult.getNotableFallHorizonProbability(),
+                techResult.getNotableFallHorizonApproxDate(),
                 recommendation, nuance, reason);
     }
 
@@ -352,6 +354,8 @@ public class RecommendationService {
                                     Integer probabilityHorizonDays,
                                     Integer notableHorizonDays, Double notableHorizonProbability,
                                     String notableHorizonApproxDate,
+                                    Integer notableFallHorizonDays, Double notableFallHorizonProbability,
+                                    String notableFallHorizonApproxDate,
                                     String recommendation, String recommendationNuance, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
@@ -374,6 +378,9 @@ public class RecommendationService {
         entity.setNotableHorizonDays(notableHorizonDays);
         entity.setNotableHorizonProbability(notableHorizonProbability);
         entity.setNotableHorizonApproxDate(notableHorizonApproxDate == null ? null : LocalDate.parse(notableHorizonApproxDate));
+        entity.setNotableFallHorizonDays(notableFallHorizonDays);
+        entity.setNotableFallHorizonProbability(notableFallHorizonProbability);
+        entity.setNotableFallHorizonApproxDate(notableFallHorizonApproxDate == null ? null : LocalDate.parse(notableFallHorizonApproxDate));
         entity.setRecommendation(recommendation);
         entity.setRecommendationNuance(recommendationNuance);
         entity.setReason(reason);

@@ -11,8 +11,28 @@
         "noVolumeAuc": 0.5440160339509912,
         "fullAccuracy": 0.525671321160043,
         "fullAuc": 0.5405802268707142,
-        "macroAccuracy": 0.5534626038781163,
-        "macroAuc": 0.5659819653888952
+        "candidates": {
+          "macro": {
+            "accuracy": 0.5534626038781163,
+            "auc": 0.5659819653888952
+          },
+          "high52w": {
+            "accuracy": null,
+            "auc": null
+          },
+          "relStrength": {
+            "accuracy": 0.5373791621911923,
+            "auc": 0.5404550568215254
+          },
+          "high52w+relStrength": {
+            "accuracy": null,
+            "auc": null
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 2,
@@ -23,8 +43,28 @@
         "noVolumeAuc": 0.4734859180802643,
         "fullAccuracy": 0.4801063829787234,
         "fullAuc": 0.47528301947442364,
-        "macroAccuracy": 0.47945839601897927,
-        "macroAuc": 0.4804383410337346
+        "candidates": {
+          "macro": {
+            "accuracy": 0.47945839601897927,
+            "auc": 0.4804383410337346
+          },
+          "high52w": {
+            "accuracy": null,
+            "auc": null
+          },
+          "relStrength": {
+            "accuracy": 0.475,
+            "auc": 0.4708190601767285
+          },
+          "high52w+relStrength": {
+            "accuracy": null,
+            "auc": null
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 3,
@@ -35,8 +75,28 @@
         "noVolumeAuc": 0.4875384831527052,
         "fullAccuracy": 0.4866809881847476,
         "fullAuc": 0.48822866912722535,
-        "macroAccuracy": 0.4885750962772786,
-        "macroAuc": 0.48152352534163645
+        "candidates": {
+          "macro": {
+            "accuracy": 0.4885750962772786,
+            "auc": 0.48152352534163645
+          },
+          "high52w": {
+            "accuracy": 0.4908700322234157,
+            "auc": 0.4888236856835657
+          },
+          "relStrength": {
+            "accuracy": 0.48958109559613316,
+            "auc": 0.48600381859213515
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.49097744360902257,
+            "auc": 0.48483727783340863
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 4,
@@ -47,8 +107,28 @@
         "noVolumeAuc": 0.5110974833919673,
         "fullAccuracy": 0.5052631578947369,
         "fullAuc": 0.5115752227942849,
-        "macroAccuracy": 0.5108658743633276,
-        "macroAuc": 0.5206953039091962
+        "candidates": {
+          "macro": {
+            "accuracy": 0.5108658743633276,
+            "auc": 0.5206953039091962
+          },
+          "high52w": {
+            "accuracy": 0.46251342642320087,
+            "auc": 0.44042463652851505
+          },
+          "relStrength": {
+            "accuracy": 0.47959183673469385,
+            "auc": 0.49208381518043603
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.464124597207304,
+            "auc": 0.43728090726086355
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 5,
@@ -59,8 +139,28 @@
         "noVolumeAuc": 0.4669606010676287,
         "fullAccuracy": 0.4884635832004253,
         "fullAuc": 0.4658294022682589,
-        "macroAccuracy": 0.49617224880382776,
-        "macroAuc": 0.4789485970276589
+        "candidates": {
+          "macro": {
+            "accuracy": 0.49617224880382776,
+            "auc": 0.4789485970276589
+          },
+          "high52w": {
+            "accuracy": 0.4680489101541733,
+            "auc": 0.44634562003732436
+          },
+          "relStrength": {
+            "accuracy": 0.5006911217437533,
+            "auc": 0.4701885337362449
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.4631578947368421,
+            "auc": 0.447349959224019
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 6,
@@ -71,8 +171,28 @@
         "noVolumeAuc": 0.496835204323974,
         "fullAccuracy": 0.4864836213293756,
         "fullAuc": 0.49711724875680624,
-        "macroAccuracy": 0.4820325659741718,
-        "macroAuc": 0.483478252645119
+        "candidates": {
+          "macro": {
+            "accuracy": 0.4820325659741718,
+            "auc": 0.483478252645119
+          },
+          "high52w": {
+            "accuracy": 0.463265306122449,
+            "auc": 0.43818556157869615
+          },
+          "relStrength": {
+            "accuracy": 0.4836213293755963,
+            "auc": 0.4948163434004705
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.4673469387755102,
+            "auc": 0.4481874404096525
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 7,
@@ -83,8 +203,28 @@
         "noVolumeAuc": 0.5052942248840018,
         "fullAccuracy": 0.5070936782808262,
         "fullAuc": 0.5068340480346121,
-        "macroAccuracy": 0.5147025040202159,
-        "macroAuc": 0.5141010563080173
+        "candidates": {
+          "macro": {
+            "accuracy": 0.5147025040202159,
+            "auc": 0.5141010563080173
+          },
+          "high52w": {
+            "accuracy": 0.5174667809687098,
+            "auc": 0.5192493966305379
+          },
+          "relStrength": {
+            "accuracy": 0.5058418527018569,
+            "auc": 0.5039305233048103
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.5154307758251179,
+            "auc": 0.5171839953494252
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 8,
@@ -95,8 +235,28 @@
         "noVolumeAuc": 0.5098659431536662,
         "fullAccuracy": 0.5121951219512195,
         "fullAuc": 0.5090871617990311,
-        "macroAccuracy": 0.508695652173913,
-        "macroAuc": 0.49826431190014087
+        "candidates": {
+          "macro": {
+            "accuracy": 0.508695652173913,
+            "auc": 0.49826431190014087
+          },
+          "high52w": {
+            "accuracy": 0.4736348478532722,
+            "auc": 0.47034247648552163
+          },
+          "relStrength": {
+            "accuracy": 0.503586800573888,
+            "auc": 0.5037344578233687
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.47863693205502295,
+            "auc": 0.4699106814069517
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 9,
@@ -107,8 +267,28 @@
         "noVolumeAuc": 0.5175873487375878,
         "fullAccuracy": 0.5114964552596283,
         "fullAuc": 0.5192835893757524,
-        "macroAccuracy": 0.5315583186917151,
-        "macroAuc": 0.5424185429321549
+        "candidates": {
+          "macro": {
+            "accuracy": 0.5315583186917151,
+            "auc": 0.5424185429321549
+          },
+          "high52w": {
+            "accuracy": 0.47407330279050397,
+            "auc": 0.465734873368935
+          },
+          "relStrength": {
+            "accuracy": 0.5098677907645143,
+            "auc": 0.5182447847181713
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.4765722615576843,
+            "auc": 0.46747136304608994
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       },
       {
         "fold": 10,
@@ -119,8 +299,28 @@
         "noVolumeAuc": 0.4729098398516009,
         "fullAccuracy": 0.48149532710280374,
         "fullAuc": 0.47232558770064315,
-        "macroAccuracy": 0.4925888617067204,
-        "macroAuc": 0.4875207905365967
+        "candidates": {
+          "macro": {
+            "accuracy": 0.4925888617067204,
+            "auc": 0.4875207905365967
+          },
+          "high52w": {
+            "accuracy": 0.472840514600776,
+            "auc": 0.46254724843978756
+          },
+          "relStrength": {
+            "accuracy": 0.4818691588785047,
+            "auc": 0.4724639466599658
+          },
+          "high52w+relStrength": {
+            "accuracy": 0.47447416785787216,
+            "auc": 0.4622077331988228
+          },
+          "sentiment": {
+            "accuracy": null,
+            "auc": null
+          }
+        }
       }
     ],
     "baselineAccuracyMean": 0.5040155677458026,
@@ -129,14 +329,42 @@
     "noVolumeAccuracyStd": 0.016940392422791332,
     "noVolumeAucMean": 0.49855910805943876,
     "noVolumeAucStd": 0.02273381777473482,
-    "macroAccuracyMean": 0.5058112121908266,
-    "macroAccuracyStd": 0.022070822577246237,
-    "macroAucMean": 0.5053370687023151,
-    "macroAucStd": 0.028450231128620922,
     "fullAccuracyMean": 0.49849496373425295,
     "fullAccuracyStd": 0.014921904610022104,
     "fullAucMean": 0.4986144176201752,
-    "fullAucStd": 0.022257551996175132
+    "fullAucStd": 0.022257551996175132,
+    "candidates": {
+      "macro": {
+        "aucMean": 0.5053370687023151,
+        "aucStd": 0.028450231128620922,
+        "accuracyMean": 0.5058112121908266,
+        "accuracyStd": 0.022070822577246237
+      },
+      "high52w": {
+        "aucMean": 0.4664566873441104,
+        "aucStd": 0.02549420547805676,
+        "accuracyMean": 0.47783914014206263,
+        "accuracyStd": 0.0171030723485253
+      },
+      "relStrength": {
+        "aucMean": 0.49527403404138565,
+        "aucStd": 0.021352858856041816,
+        "accuracyMean": 0.49670301485601326,
+        "accuracyStd": 0.01783361693246394
+      },
+      "high52w+relStrength": {
+        "aucMean": 0.46680366971615417,
+        "aucStd": 0.023693919445813626,
+        "accuracyMean": 0.478840126453047,
+        "accuracyStd": 0.016221161866488254
+      },
+      "sentiment": {
+        "aucMean": null,
+        "aucStd": null,
+        "accuracyMean": null,
+        "accuracyStd": null
+      }
+    }
   },
   "sweep": {
     "labelMode": "relative",
@@ -147,7 +375,11 @@
         "baselineAcc": 0.5040621868025786,
         "noVolumeAuc": 0.4994306256741689,
         "fullAuc": 0.4993517135012782,
-        "macroAuc": 0.5024223728816757
+        "macroAuc": 0.5024223728816757,
+        "high52wAuc": 0.5025984866125479,
+        "relStrengthAuc": 0.49786856497513876,
+        "high52w+relStrengthAuc": 0.5011704005157585,
+        "sentimentAuc": null
       },
       {
         "horizon": 5,
@@ -155,7 +387,11 @@
         "baselineAcc": 0.5040430184747812,
         "noVolumeAuc": 0.4961978889955619,
         "fullAuc": 0.4963087881083671,
-        "macroAuc": 0.5006955567558016
+        "macroAuc": 0.5006955567558016,
+        "high52wAuc": 0.4985017002232991,
+        "relStrengthAuc": 0.4952522940710236,
+        "high52w+relStrengthAuc": 0.4979947716928972,
+        "sentimentAuc": null
       },
       {
         "horizon": 10,
@@ -163,7 +399,11 @@
         "baselineAcc": 0.503969668537626,
         "noVolumeAuc": 0.49922537446924037,
         "fullAuc": 0.49867053613444173,
-        "macroAuc": 0.5042555262097419
+        "macroAuc": 0.5042555262097419,
+        "high52wAuc": 0.491675537150614,
+        "relStrengthAuc": 0.49781807134180023,
+        "high52w+relStrengthAuc": 0.4914707843139575,
+        "sentimentAuc": null
       },
       {
         "horizon": 20,
@@ -171,7 +411,11 @@
         "baselineAcc": 0.5039009241943846,
         "noVolumeAuc": 0.49380562034068076,
         "fullAuc": 0.4929935887054615,
-        "macroAuc": 0.5038100076536958
+        "macroAuc": 0.5038100076536958,
+        "high52wAuc": 0.48915682417552603,
+        "relStrengthAuc": 0.49268587327442576,
+        "high52w+relStrengthAuc": 0.48850239360622916,
+        "sentimentAuc": null
       },
       {
         "horizon": 30,
@@ -179,7 +423,11 @@
         "baselineAcc": 0.5039315594517273,
         "noVolumeAuc": 0.49784691990267926,
         "fullAuc": 0.49670333325288174,
-        "macroAuc": 0.503299931371752
+        "macroAuc": 0.503299931371752,
+        "high52wAuc": 0.4873660577818673,
+        "relStrengthAuc": 0.4960553250361264,
+        "high52w+relStrengthAuc": 0.4861176939298402,
+        "sentimentAuc": null
       },
       {
         "horizon": 40,
@@ -187,7 +435,11 @@
         "baselineAcc": 0.5039857772579777,
         "noVolumeAuc": 0.4928331199387358,
         "fullAuc": 0.4923407609033754,
-        "macroAuc": 0.4997583024827884
+        "macroAuc": 0.4997583024827884,
+        "high52wAuc": 0.46437888758809154,
+        "relStrengthAuc": 0.4901137903226761,
+        "high52w+relStrengthAuc": 0.46608675854436205,
+        "sentimentAuc": null
       },
       {
         "horizon": 50,
@@ -195,7 +447,11 @@
         "baselineAcc": 0.5040155677458026,
         "noVolumeAuc": 0.49855910805943876,
         "fullAuc": 0.4986144176201752,
-        "macroAuc": 0.5053370687023151
+        "macroAuc": 0.5053370687023151,
+        "high52wAuc": 0.4664566873441104,
+        "relStrengthAuc": 0.49527403404138565,
+        "high52w+relStrengthAuc": 0.46680366971615417,
+        "sentimentAuc": null
       },
       {
         "horizon": 60,
@@ -203,7 +459,11 @@
         "baselineAcc": 0.5040809709581285,
         "noVolumeAuc": 0.5025597777330674,
         "fullAuc": 0.5015891108801138,
-        "macroAuc": 0.5085749077014334
+        "macroAuc": 0.5085749077014334,
+        "high52wAuc": 0.46680330722973196,
+        "relStrengthAuc": 0.5000301134198682,
+        "high52w+relStrengthAuc": 0.46748497338253847,
+        "sentimentAuc": null
       },
       {
         "horizon": 70,
@@ -211,7 +471,11 @@
         "baselineAcc": 0.5041030191819658,
         "noVolumeAuc": 0.5080058916519353,
         "fullAuc": 0.5078657493090588,
-        "macroAuc": 0.5123600541108694
+        "macroAuc": 0.5123600541108694,
+        "high52wAuc": 0.4747401322892239,
+        "relStrengthAuc": 0.5061446318486776,
+        "high52w+relStrengthAuc": 0.4750742840923433,
+        "sentimentAuc": null
       },
       {
         "horizon": 80,
@@ -219,7 +483,11 @@
         "baselineAcc": 0.5041156544533222,
         "noVolumeAuc": 0.5130216218659192,
         "fullAuc": 0.5128815473410966,
-        "macroAuc": 0.517621888190216
+        "macroAuc": 0.517621888190216,
+        "high52wAuc": 0.4771118600738379,
+        "relStrengthAuc": 0.5131296482901105,
+        "high52w+relStrengthAuc": 0.4794311594804964,
+        "sentimentAuc": null
       },
       {
         "horizon": 90,
@@ -227,7 +495,11 @@
         "baselineAcc": 0.5040086578080066,
         "noVolumeAuc": 0.5050522877124088,
         "fullAuc": 0.5043794460942743,
-        "macroAuc": 0.5146395941578913
+        "macroAuc": 0.5146395941578913,
+        "high52wAuc": 0.4695454248176911,
+        "relStrengthAuc": 0.5050513494632846,
+        "high52w+relStrengthAuc": 0.4715080077272074,
+        "sentimentAuc": null
       },
       {
         "horizon": 100,
@@ -235,7 +507,11 @@
         "baselineAcc": 0.5038370056343116,
         "noVolumeAuc": 0.5059852928828614,
         "fullAuc": 0.5050985626284048,
-        "macroAuc": 0.5196280405804351
+        "macroAuc": 0.5196280405804351,
+        "high52wAuc": 0.4702587982268904,
+        "relStrengthAuc": 0.5064180207175182,
+        "high52w+relStrengthAuc": 0.4729939771025936,
+        "sentimentAuc": null
       }
     ]
   }

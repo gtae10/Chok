@@ -57,6 +57,16 @@ public class Recommendation {
     @Column(name = "notable_horizon_approx_date")
     private LocalDate notableHorizonApproxDate;
 
+    // "유력 하락구간" - notable_horizon_*의 대칭 버전 (RiseProbabilityService.findNotableFallHorizon)
+    @Column(name = "notable_fall_horizon_days")
+    private Integer notableFallHorizonDays;
+
+    @Column(name = "notable_fall_horizon_probability")
+    private Double notableFallHorizonProbability;
+
+    @Column(name = "notable_fall_horizon_approx_date")
+    private LocalDate notableFallHorizonApproxDate;
+
     @Column(length = 20)
     private String recommendation;
 
@@ -115,6 +125,15 @@ public class Recommendation {
 
     public LocalDate getNotableHorizonApproxDate() { return notableHorizonApproxDate; }
     public void setNotableHorizonApproxDate(LocalDate notableHorizonApproxDate) { this.notableHorizonApproxDate = notableHorizonApproxDate; }
+
+    public Integer getNotableFallHorizonDays() { return notableFallHorizonDays; }
+    public void setNotableFallHorizonDays(Integer notableFallHorizonDays) { this.notableFallHorizonDays = notableFallHorizonDays; }
+
+    public Double getNotableFallHorizonProbability() { return notableFallHorizonProbability; }
+    public void setNotableFallHorizonProbability(Double notableFallHorizonProbability) { this.notableFallHorizonProbability = notableFallHorizonProbability; }
+
+    public LocalDate getNotableFallHorizonApproxDate() { return notableFallHorizonApproxDate; }
+    public void setNotableFallHorizonApproxDate(LocalDate notableFallHorizonApproxDate) { this.notableFallHorizonApproxDate = notableFallHorizonApproxDate; }
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }

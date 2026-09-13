@@ -78,3 +78,10 @@ chok.model.min-samples=500
 # 그 기간 모델의 walk-forward holdoutAuc가 이 값 이상이어야 후보로 삼는다. 다중비교 문제 방지용
 # 안전장치 - 미달이면 후보에서 빠지고, 후보가 하나도 없으면 "유력 구간 없음"으로 처리한다.
 chok.model.min-auc-for-highlight=0.55
+
+# chok.chat.* - AI 피드백 챗봇 (로그인 없어 IP+요청 단위로만 남용 방지)
+chok.chat.max-tokens=500
+chok.chat.max-message-length=1000
+chok.chat.max-history-messages=20
+chok.chat.max-requests-per-window=20
+chok.chat.window-minutes=10

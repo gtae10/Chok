@@ -23,6 +23,11 @@ public class TechnicalIndicatorResult {
     private Integer notableHorizonDays;
     private Double notableHorizonProbability;
     private String notableHorizonApproxDate; // ISO 날짜 문자열, 대략적인 근사치
+    // "유력 하락구간" - findNotableHorizon()의 대칭 버전. 후보가 없으면(모든 기간이 기준
+    // 미달) 셋 다 null - 상승 쪽과 동일한 원칙으로 억지로 보여주지 않는다.
+    private Integer notableFallHorizonDays;
+    private Double notableFallHorizonProbability;
+    private String notableFallHorizonApproxDate;
     private String technicalReason;
 
     public TechnicalIndicatorResult(Double ma5, Double ma20, Double ma60,
@@ -33,6 +38,8 @@ public class TechnicalIndicatorResult {
                                     String probabilitySource, Integer probabilityHorizonDays,
                                     Integer notableHorizonDays, Double notableHorizonProbability,
                                     String notableHorizonApproxDate,
+                                    Integer notableFallHorizonDays, Double notableFallHorizonProbability,
+                                    String notableFallHorizonApproxDate,
                                     String technicalReason) {
         this.ma5 = ma5;
         this.ma20 = ma20;
@@ -53,6 +60,9 @@ public class TechnicalIndicatorResult {
         this.notableHorizonDays = notableHorizonDays;
         this.notableHorizonProbability = notableHorizonProbability;
         this.notableHorizonApproxDate = notableHorizonApproxDate;
+        this.notableFallHorizonDays = notableFallHorizonDays;
+        this.notableFallHorizonProbability = notableFallHorizonProbability;
+        this.notableFallHorizonApproxDate = notableFallHorizonApproxDate;
         this.technicalReason = technicalReason;
     }
 
@@ -62,6 +72,7 @@ public class TechnicalIndicatorResult {
                 null, null, null, null, null, null,
                 null, null, null, null, null, null,
                 50.0, 50.0, "HEURISTIC", null,
+                null, null, null,
                 null, null, null,
                 "가격 데이터 부족으로 중립 처리"
         );
@@ -86,5 +97,8 @@ public class TechnicalIndicatorResult {
     public Integer getNotableHorizonDays() { return notableHorizonDays; }
     public Double getNotableHorizonProbability() { return notableHorizonProbability; }
     public String getNotableHorizonApproxDate() { return notableHorizonApproxDate; }
+    public Integer getNotableFallHorizonDays() { return notableFallHorizonDays; }
+    public Double getNotableFallHorizonProbability() { return notableFallHorizonProbability; }
+    public String getNotableFallHorizonApproxDate() { return notableFallHorizonApproxDate; }
     public String getTechnicalReason() { return technicalReason; }
 }

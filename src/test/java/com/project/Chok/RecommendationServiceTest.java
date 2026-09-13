@@ -109,7 +109,7 @@ class RecommendationServiceTest {
                         null, null, null, null, null, null, null,
                         null, null, null, 1.0, "RISING",
                         80.0, 70.0, "HEURISTIC", null,
-                        null, null, null, "상승추세"
+                        null, null, null, null, null, null, "상승추세"
                 ));
         when(newsCollectorService.fetchRecentNews(anyString(), anyInt()))
                 .thenReturn(List.of(new NewsArticle("호재 뉴스", "http://test.com", LocalDate.now())));
@@ -168,7 +168,7 @@ class RecommendationServiceTest {
                 null, null, null, null, null, null, null,
                 null, null, null, 1.0, "RISING",
                 techScore, 50.0, "HEURISTIC", null,
-                null, null, null, "테스트"
+                null, null, null, null, null, null, "테스트"
         ));
         when(newsCollectorService.fetchRecentNews(anyString(), anyInt())).thenReturn(List.of());
         when(technicalScoreRepository.findByTickerAndCalcDate(anyString(), any())).thenReturn(Optional.empty());
