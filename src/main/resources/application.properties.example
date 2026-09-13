@@ -61,10 +61,10 @@ chok.python-collector.base-dir=python-collector
 # chok.collector.* - price collection settings
 chok.collector.timeout-seconds=120
 
-# chok.scheduler.* - automatic daily collection + analysis
+# chok.scheduler.* - automatic collection + analysis, every 6 hours by default (00/06/12/18시)
 chok.scheduler.enabled=true
-chok.scheduler.cron=0 30 18 * * MON-FRI
-# 앱이 상시 구동되지 않는 환경 대비: 시작 시 평일인데 오늘자 데이터가 없으면 자동으로 따라잡기
+chok.scheduler.cron=0 0 */6 * * *
+# 앱이 상시 구동되지 않는 환경 대비: 시작 시 오늘자 데이터가 없으면 자동으로 따라잡기
 chok.scheduler.catch-up-on-startup=true
 
 # chok.model.* - rise-probability logistic regression model

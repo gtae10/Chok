@@ -72,12 +72,20 @@
             <button data-range="all" class="is-active">전체</button>
         </div>
         <div class="chart-wrap">
+            <svg id="priceChart" viewBox="0 0 800 320" preserveAspectRatio="none"></svg>
+            <div id="priceTooltip" class="chart-tooltip" hidden></div>
+        </div>
+        <div class="chart-wrap" style="margin-top:12px;">
             <div id="dailyStats" class="daily-stats"></div>
         </div>
     </div>
 
     <div class="chart-section">
         <h2>추천 점수 추이</h2>
+        <p class="chart-desc">
+            이 종목의 종합점수와 상승확률이 시간에 따라 어떻게 바뀌어왔는지 보여주는 차트입니다.
+            둘 다 0~100 스케일이며, 숫자가 높을수록 더 긍정적인 신호를 뜻합니다.
+        </p>
         <div class="chart-legend">
             <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>
             <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#3E7BFA"></i>상승확률</span>

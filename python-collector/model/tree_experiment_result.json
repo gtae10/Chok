@@ -1,0 +1,125 @@
+{
+  "rfParams": {
+    "n_estimators": 200,
+    "max_depth": 3,
+    "min_samples_leaf": 200,
+    "max_features": "sqrt",
+    "n_jobs": -1,
+    "random_state": 42
+  },
+  "labelMode": "relative",
+  "nFoldsConfigured": 10,
+  "adoptionCriterion": "AUC>=0.55 in >= 3 horizons",
+  "results": [
+    {
+      "horizon": 3,
+      "samples": 111140,
+      "nFolds": 10,
+      "lrAucMean": 0.4993517135012782,
+      "lrAucStd": 0.00911056074193935,
+      "rfAucMean": 0.5013956387989176,
+      "rfAucStd": 0.010308020670622541
+    },
+    {
+      "horizon": 5,
+      "samples": 110912,
+      "nFolds": 10,
+      "lrAucMean": 0.4963087881083671,
+      "lrAucStd": 0.013661831086040918,
+      "rfAucMean": 0.4990837796258557,
+      "rfAucStd": 0.014870297851038218
+    },
+    {
+      "horizon": 10,
+      "samples": 110342,
+      "nFolds": 10,
+      "lrAucMean": 0.49867053613444173,
+      "lrAucStd": 0.01742093200090047,
+      "rfAucMean": 0.5006530412268272,
+      "rfAucStd": 0.017833291835217643
+    },
+    {
+      "horizon": 20,
+      "samples": 109202,
+      "nFolds": 10,
+      "lrAucMean": 0.4929935887054615,
+      "lrAucStd": 0.014025528348057537,
+      "rfAucMean": 0.501852060743544,
+      "rfAucStd": 0.016401974594339615
+    },
+    {
+      "horizon": 30,
+      "samples": 108062,
+      "nFolds": 10,
+      "lrAucMean": 0.49670333325288174,
+      "lrAucStd": 0.017434090092057646,
+      "rfAucMean": 0.4943321830892605,
+      "rfAucStd": 0.02405100721358524
+    },
+    {
+      "horizon": 40,
+      "samples": 106922,
+      "nFolds": 10,
+      "lrAucMean": 0.4923407609033754,
+      "lrAucStd": 0.02775078485731441,
+      "rfAucMean": 0.48344201639742357,
+      "rfAucStd": 0.028306297395527057
+    },
+    {
+      "horizon": 50,
+      "samples": 105782,
+      "nFolds": 10,
+      "lrAucMean": 0.4986144176201752,
+      "lrAucStd": 0.022257551996175132,
+      "rfAucMean": 0.48505093621316586,
+      "rfAucStd": 0.031361053852045566
+    },
+    {
+      "horizon": 60,
+      "samples": 104642,
+      "nFolds": 10,
+      "lrAucMean": 0.5015891108801138,
+      "lrAucStd": 0.029542812015955055,
+      "rfAucMean": 0.4969359406720503,
+      "rfAucStd": 0.03533532347971703
+    },
+    {
+      "horizon": 70,
+      "samples": 103502,
+      "nFolds": 10,
+      "lrAucMean": 0.5078657493090588,
+      "lrAucStd": 0.013818943805466293,
+      "rfAucMean": 0.5031066746220929,
+      "rfAucStd": 0.03640698447101138
+    },
+    {
+      "horizon": 80,
+      "samples": 102362,
+      "nFolds": 10,
+      "lrAucMean": 0.5128815473410966,
+      "lrAucStd": 0.02045002554236606,
+      "rfAucMean": 0.5066364641356799,
+      "rfAucStd": 0.03547294462129341
+    },
+    {
+      "horizon": 90,
+      "samples": 101222,
+      "nFolds": 10,
+      "lrAucMean": 0.5043794460942743,
+      "lrAucStd": 0.018629663483029038,
+      "rfAucMean": 0.4999170536916365,
+      "rfAucStd": 0.031125486283070884
+    },
+    {
+      "horizon": 100,
+      "samples": 100082,
+      "nFolds": 9,
+      "lrAucMean": 0.5050985626284048,
+      "lrAucStd": 0.037501263417236655,
+      "rfAucMean": 0.5035607253518357,
+      "rfAucStd": 0.04369646895793758
+    }
+  ],
+  "adopted": false,
+  "conclusion": "랜덤포레스트(max_depth=3, min_samples_leaf=200)가 로지스틱 회귀 대비 일관된 개선을 보이지 않음 (AUC>=0.55 기간 0/12개, 기준 3개 미달) - 배포 모델은 로지스틱 회귀 그대로 유지."
+}

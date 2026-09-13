@@ -135,6 +135,12 @@ a { color: inherit; text-decoration: none; }
 .prob-tag--model { background: rgba(201,169,106,0.18); color: #C9A96A; }
 .prob-tag--heuristic { background: rgba(137,147,176,0.16); color: #8993B0; }
 .prob-horizon { display: block; color: #5C6786; font-size: 0.68rem; margin-top: 2px; }
+/* 유력구간 문구는 길어질 수 있어 대시보드 좁은 열 안에서 셀이 늘어나지 않게 말줄임 처리 -
+   전체 텍스트는 title 속성(네이티브 툴팁)으로 확인 가능 */
+.prob-horizon--notable {
+    max-width: 170px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: help;
+}
 
 /* HOLD 등급 세부 뉘앙스 - 기존 rec-badge/prob-horizon 팔레트 재사용 (매수=옅은 빨강, 매도=옅은 파랑) */
 .rec-badge-wrap { display: inline-block; }
@@ -144,7 +150,8 @@ a { color: inherit; text-decoration: none; }
 .nuance-tag--negative { color: #8FB1FA; }
 .nuance-tag--neutral { color: #5C6786; }
 
-.prob-caveat { margin-top: 10px; color: #5C6786; font-size: 0.74rem; }
+/* 점수카드/AI리포트 바로 아래 개별 caveat - footer의 전체 고지보다 한 단계 더 눈에 덜 띄게 */
+.prob-caveat { margin-top: 10px; color: #5C6786; font-size: 0.68rem; }
 
 .loading-row td { text-align: center; color: #5C6786; padding: 48px 18px; font-size: 0.85rem; }
 
@@ -178,6 +185,7 @@ a { color: inherit; text-decoration: none; }
 
 .chart-section, .news-section { margin-bottom: 36px; }
 .chart-section h2, .news-section h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; }
+.chart-desc { color: #8993B0; font-size: 0.82rem; line-height: 1.6; margin: -8px 0 12px; }
 .chart-wrap { position: relative; background: #161F33; border: 1px solid #283454; border-radius: 10px; padding: 16px; }
 
 .chart-range { display: flex; gap: 8px; margin-bottom: 12px; }

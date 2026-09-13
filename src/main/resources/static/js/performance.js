@@ -82,6 +82,7 @@ function toggleTrendRow(row) {
     trendRow.innerHTML =
         '<td colspan="' + colCount + '">' +
             '<div class="chart-section trend-detail">' +
+                '<p class="chart-desc">선정일부터 오늘까지 이 종목의 종합점수/상승확률이 어떻게 바뀌어왔는지 보여주는 차트입니다. 둘 다 0~100 스케일이며, 숫자가 높을수록 더 긍정적인 신호를 뜻합니다.</p>' +
                 '<div class="chart-legend">' +
                     '<span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>' +
                     '<span class="chart-legend__item"><i class="chart-legend__dot" style="background:#3E7BFA"></i>상승확률</span>' +

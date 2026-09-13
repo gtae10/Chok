@@ -92,7 +92,106 @@ function applyRange(prices, range) {
 const RANGE_COMPARE_LABEL = { "7": "전주대비", "30": "전월대비", "365": "전년대비", "all": "전일대비" };
 
 function showRangeView() {
+    renderChart(applyRange(fullPrices, currentRange));
     renderPeriodStats(fullPrices, currentRange);
+}
+
+// 가격 라인차트 (호버 시 날짜/종가 툴팁). b5747a1에서 daily-stats 요약으로 대체되며
+// 한 번 유실됐던 걸 복원 - 요약 통계와 시각적 추이는 서로 대체재가 아니라 상호보완이라
+// 통계 카드(renderPeriodStats)는 그대로 두고 차트를 그 위에 다시 추가한다.
+function renderChart(prices) {
+    const svg = document.getElementById("priceChart");
+    const tooltip = document.getElementById("priceTooltip");
+    tooltip.hidden = true;
+
+    if (!prices || prices.length === 0) {
+        svg.innerHTML = '<text x="400" y="160" fill="#5C6786" font-size="14" text-anchor="middle">가격 데이터가 없습니다</text>';
+        return;
+    }
+    if (prices.length === 1) {
+        svg.innerHTML = '<text x="400" y="160" fill="#5C6786" font-size="14" text-anchor="middle">일별 시세라 1일 단위 추이는 표시할 수 없어요. 1주 이상을 선택해보세요.</text>';
+        return;
+    }
+
+    const W = 800, H = 320, PL = 60, PR = 16, PT = 20, PB = 30;
+    const closes = prices.map(function(p) { return p.close; });
+    const maxP = Math.max.apply(null, closes);
+    const minP = Math.min.apply(null, closes);
+    const range = maxP - minP || 1;
+    const pw = W - PL - PR, ph = H - PT - PB;
+    const pts = prices.map(function(p, i) {
+        return {
+            x: PL + (i / (prices.length - 1 || 1)) * pw,
+            y: PT + (1 - (p.close - minP) / range) * ph,
+            date: p.date, close: p.close
+        };
+    });
+    const isUp = closes[closes.length - 1] >= closes[0];
+    const color = isUp ? "#E0473C" : "#3E7BFA";
+    const line = pts.map(function(pt, i) { return (i === 0 ? "M" : "L") + " " + pt.x.toFixed(1) + " " + pt.y.toFixed(1); }).join(" ");
+    const area = line + " L " + pts[pts.length-1].x.toFixed(1) + " " + (H-PB) + " L " + pts[0].x.toFixed(1) + " " + (H-PB) + " Z";
+    let grid = "";
+    for (let i = 0; i <= 4; i++) {
+        const y = PT + (i / 4) * ph;
+        const p = maxP - (i / 4) * range;
+        grid += '<line x1="' + PL + '" y1="' + y + '" x2="' + (W-PR) + '" y2="' + y + '" stroke="#283454" stroke-width="1"/>';
+        grid += '<text x="' + (PL-8) + '" y="' + (y+4) + '" fill="#5C6786" font-size="11" text-anchor="end">' + Math.round(p).toLocaleString() + '</text>';
+    }
+    svg.innerHTML =
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.2"/>' +
+        '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
+        '</linearGradient></defs>' +
+        grid +
+        '<path d="' + area + '" fill="url(#g)"/>' +
+        '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round"/>' +
+        '<text x="' + PL + '" y="' + (H-8) + '" fill="#5C6786" font-size="11">' + pts[0].date + '</text>' +
+        '<text x="' + (W-PR) + '" y="' + (H-8) + '" fill="#5C6786" font-size="11" text-anchor="end">' + pts[pts.length-1].date + '</text>' +
+        '<line id="hoverLine" x1="0" y1="' + PT + '" x2="0" y2="' + (H-PB) + '" stroke="#8993B0" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>' +
+        '<circle id="hoverDot" r="4" fill="' + color + '" stroke="#0E1525" stroke-width="2" visibility="hidden"/>';
+
+    attachChartHover(svg, tooltip, pts, PL, W - PR, function(p) {
+        return '<div class="chart-tooltip__date">' + p.date + '</div>' +
+            '<div class="chart-tooltip__value">' + p.close.toLocaleString() + '원</div>';
+    });
+}
+
+function attachChartHover(svg, tooltip, pts, plotLeft, plotRight, formatFn) {
+    const hoverLine = svg.querySelector("#hoverLine");
+    const hoverDot = svg.querySelector("#hoverDot");
+
+    function onMove(e) {
+        const rect = svg.getBoundingClientRect();
+        const relX = (e.clientX - rect.left) / rect.width;
+        const vbX = relX * 800; // viewBox width는 항상 800으로 고정해서 씀
+        if (vbX < plotLeft || vbX > plotRight) { onLeave(); return; }
+
+        let nearest = 0, minDist = Infinity;
+        for (let i = 0; i < pts.length; i++) {
+            const d = Math.abs(pts[i].x - vbX);
+            if (d < minDist) { minDist = d; nearest = i; }
+        }
+        const p = pts[nearest];
+
+        hoverLine.setAttribute("x1", p.x); hoverLine.setAttribute("x2", p.x);
+        hoverLine.setAttribute("visibility", "visible");
+        hoverDot.setAttribute("cx", p.x); hoverDot.setAttribute("cy", p.y);
+        hoverDot.setAttribute("visibility", "visible");
+
+        tooltip.innerHTML = formatFn(p);
+        tooltip.hidden = false;
+        const pxLeft = (p.x / 800) * rect.width;
+        tooltip.style.left = Math.min(Math.max(pxLeft, 50), rect.width - 50) + "px";
+    }
+
+    function onLeave() {
+        hoverLine.setAttribute("visibility", "hidden");
+        hoverDot.setAttribute("visibility", "hidden");
+        tooltip.hidden = true;
+    }
+
+    svg.addEventListener("mousemove", onMove);
+    svg.addEventListener("mouseleave", onLeave);
 }
 
 function renderPeriodStats(fullPrices, range) {

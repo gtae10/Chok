@@ -90,10 +90,12 @@ function renderProbability(item) {
 }
 
 // 참고용 - 통계 검증된 예측이 아님. AUC 안전장치를 통과한 후보가 없으면 서버가 애초에 null을 내려줌.
+// 대시보드는 한 행에 다른 열도 많아 폭이 좁으므로, 길어질 수 있는 이 문구만 말줄임 처리하고
+// title 속성(네이티브 툴팁)으로 전체 텍스트를 보여준다 - 커스텀 툴팁 UI 없이 브라우저 기본 기능 재사용.
 function renderNotableHorizon(item) {
     if (item.notableHorizonDays == null) return "";
-    return '<span class="prob-horizon">유력 구간: 약 ' + item.notableHorizonApproxDate + ' 전후 (' +
-        fmt(item.notableHorizonProbability) + '%)</span>';
+    const text = "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)";
+    return '<span class="prob-horizon prob-horizon--notable" title="' + esc(text) + '">' + esc(text) + '</span>';
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

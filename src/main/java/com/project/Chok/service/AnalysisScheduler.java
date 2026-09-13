@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * chok.scheduler.enabled=true 일 때, chok.scheduler.cron 스케줄에 맞춰
- * 시세 수집 -> 전체 분석을 자동으로 실행한다.
+ * 시세 수집 -> 전체 분석을 자동으로 실행한다. 기본값은 6시간마다(00/06/12/18시).
  * 수동으로 "분석 실행" 버튼을 이미 누른 상태라면 AnalysisStatus.tryStart()가
  * false를 반환하므로 스케줄러가 겹쳐 도는 일은 없다 (한쪽이 양보).
  */
@@ -35,7 +35,7 @@ public class AnalysisScheduler {
         this.appProperties = appProperties;
     }
 
-    @Scheduled(cron = "${chok.scheduler.cron:0 30 18 * * MON-FRI}")
+    @Scheduled(cron = "${chok.scheduler.cron:0 0 */6 * * *}")
     public void runDaily() {
         if (!appProperties.getScheduler().isEnabled()) {
             return;
