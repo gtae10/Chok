@@ -105,7 +105,14 @@ public class RecommendationController {
         body.put("totalCount", analysisStatus.getTotalCount());
         body.put("errorMessage", analysisStatus.getErrorMessage());
         body.put("triggeredBy", analysisStatus.getTriggeredBy());
-        body.put("priceDataWarning", analysisStatus.getPriceDataWarning());
+
+        // 분석을 아직 한 번도 안 돌렸으면 analysisStatus의 경고는 비어있으므로,
+        // 그 경우엔 즉석에서 확인해 앱을 켜자마자(분석 실행 전에도) 배너로 보이게 한다.
+        String warning = analysisStatus.getPriceDataWarning();
+        if (warning == null) {
+            warning = recommendationService.checkPriceDataFreshness();
+        }
+        body.put("priceDataWarning", warning);
         return ResponseEntity.ok(body);
     }
 

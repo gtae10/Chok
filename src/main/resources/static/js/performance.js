@@ -7,7 +7,8 @@ async function loadPerformance() {
         const res = await fetch("/api/performance");
         const data = await res.json();
         renderSummary(data);
-        renderTable(data.items || []);
+        currentItems = data.items || [];
+        renderTable(sortedItems());
     } catch (err) {
         tbody.innerHTML = '<tr class="loading-row"><td colspan="11">데이터를 불러오지 못했습니다.</td></tr>';
     }
@@ -30,6 +31,38 @@ function renderSummary(data) {
 
 const trendCache = {};
 let expandedId = null;
+let currentItems = [];
+let currentSort = { key: null, dir: "desc" };
+
+function sortedItems() {
+    if (!currentSort.key) return currentItems;
+    const sign = currentSort.dir === "asc" ? 1 : -1;
+    return currentItems.slice().sort(function(a, b) {
+        const av = a[currentSort.key], bv = b[currentSort.key];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * sign;
+    });
+}
+
+document.querySelectorAll("th.sortable").forEach(function(th) {
+    th.addEventListener("click", function() {
+        const key = th.dataset.sort;
+        currentSort.dir = (currentSort.key === key && currentSort.dir === "desc") ? "asc" : "desc";
+        currentSort.key = key;
+        updateSortHeaderUI();
+        renderTable(sortedItems());
+    });
+});
+
+function updateSortHeaderUI() {
+    document.querySelectorAll("th.sortable").forEach(function(th) {
+        const isActive = th.dataset.sort === currentSort.key;
+        th.classList.toggle("is-sorted", isActive);
+        th.classList.toggle("sort-desc", isActive && currentSort.dir === "desc");
+    });
+}
 
 function renderTable(items) {
     const tbody = document.getElementById("performanceTableBody");

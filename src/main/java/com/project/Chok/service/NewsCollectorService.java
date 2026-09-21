@@ -1,10 +1,10 @@
 package com.project.Chok.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.Chok.dto.NewsArticle;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,47 +19,44 @@ public class NewsCollectorService {
 
     private static final Logger log = LoggerFactory.getLogger(NewsCollectorService.class);
 
+    // 2026-09-21: finance.naver.com/item/news_news.naver 가 410 Gone으로 폐지되어
+    // 네이버 신규 모바일 API로 교체
     private static final String NEWS_URL_TEMPLATE =
-            "https://finance.naver.com/item/news_news.naver?code=%s&page=1";
-    private static final DateTimeFormatter NAVER_DATE_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy.MM.dd");
+            "https://m.stock.naver.com/api/news/stock/%s?pageSize=%d&page=1";
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<NewsArticle> fetchRecentNews(String ticker, int maxCount) {
         List<NewsArticle> articles = new ArrayList<>();
-        String url = String.format(NEWS_URL_TEMPLATE, ticker);
+        String url = String.format(NEWS_URL_TEMPLATE, ticker, maxCount);
 
         try {
-            Document doc = Jsoup.connect(url)
+            Connection.Response response = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .referrer("https://finance.naver.com/")
+                    .referrer("https://m.stock.naver.com/")
+                    .ignoreContentType(true)
                     .timeout(7000)
-                    .get();
+                    .execute();
 
-            Elements rows = doc.select("table.type5 tr");
+            JsonNode groups = objectMapper.readTree(response.body());
 
-            for (Element row : rows) {
-                if (articles.size() >= maxCount) break;
+            for (JsonNode group : groups) {
+                for (JsonNode item : group.path("items")) {
+                    if (articles.size() >= maxCount) break;
 
-                Element titleEl = row.selectFirst("td.title a");
-                Element dateEl = row.selectFirst("td.date");
-                if (titleEl == null || dateEl == null) continue;
+                    String headline = item.path("title").asText("").trim();
+                    String fullUrl = item.path("mobileNewsUrl").asText("");
+                    if (headline.isEmpty() || fullUrl.isEmpty()) continue;
 
-                String headline = titleEl.text().trim();
-                String href = titleEl.attr("href");
-                String fullUrl = href.startsWith("http")
-                        ? href
-                        : "https://finance.naver.com" + href;
+                    LocalDate date;
+                    try {
+                        date = LocalDate.parse(item.path("datetime").asText().substring(0, 8),
+                                DateTimeFormatter.BASIC_ISO_DATE);
+                    } catch (Exception e) {
+                        date = LocalDate.now();
+                    }
 
-                LocalDate date;
-                try {
-                    date = LocalDate.parse(dateEl.text().trim(), NAVER_DATE_FORMAT);
-                } catch (Exception e) {
-                    date = LocalDate.now();
+                    articles.add(new NewsArticle(headline, fullUrl, date));
                 }
-
-                if (headline.isEmpty()) continue;
-
-                articles.add(new NewsArticle(headline, fullUrl, date));
             }
 
         } catch (Exception e) {

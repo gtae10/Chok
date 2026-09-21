@@ -136,18 +136,32 @@ public class RecommendationService {
 
     /** 오래된 가격 데이터로 분석 중이면 AnalysisStatus에 경고를 남긴다 (분석 자체는 막지 않음). */
     private void checkStalePriceData(LocalDate today, AnalysisStatus status) {
+        String warning = buildStaleWarning(today);
+        if (warning == null) return;
+        log.warn(warning);
+        if (status != null) status.setPriceDataWarning(warning);
+    }
+
+    /**
+     * 분석을 실행하지 않고도 현재 가격 데이터가 얼마나 밀려있는지 확인한다.
+     * 앱을 켰을 때 대시보드가 분석 실행 여부와 무관하게 즉시 배너로 보여주기 위함
+     * (기존엔 분석을 한 번 돌려야만 경고가 채워져서 사용자가 밀린 걸 놓치기 쉬웠음).
+     */
+    public String checkPriceDataFreshness() {
+        return buildStaleWarning(LocalDate.now());
+    }
+
+    private String buildStaleWarning(LocalDate today) {
         LocalDate latestPriceDate = priceHistoryRepository.findLatestTradeDateAcrossAll();
-        if (latestPriceDate == null) return;
+        if (latestPriceDate == null) return null;
 
         LocalDate lastTradingDay = lastTradingDayOnOrBefore(today);
         long staleDays = ChronoUnit.DAYS.between(latestPriceDate, lastTradingDay);
-        if (staleDays < STALE_PRICE_WARNING_DAYS) return;
+        if (staleDays < STALE_PRICE_WARNING_DAYS) return null;
 
-        String warning = String.format(
+        return String.format(
                 "가격 데이터가 %d일 전(%s) 것입니다. 먼저 시세 수집을 하는 것을 권장합니다.",
                 staleDays, latestPriceDate);
-        log.warn(warning);
-        if (status != null) status.setPriceDataWarning(warning);
     }
 
     private LocalDate lastTradingDayOnOrBefore(LocalDate date) {

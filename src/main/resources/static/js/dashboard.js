@@ -225,6 +225,13 @@ loadRecommendations();
     try {
         const res = await fetch("/api/analysis/status");
         const s = await res.json();
+
+        const banner = document.getElementById("staleDataBanner");
+        if (s.priceDataWarning) {
+            banner.textContent = "⚠ " + s.priceDataWarning;
+            banner.hidden = false;
+        }
+
         if (s.running) {
             const btn = document.getElementById("analyzeBtn");
             btn.disabled = true;
