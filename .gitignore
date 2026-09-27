@@ -53,3 +53,6 @@ python-collector/__pycache__/
 
 # 애플리케이션 로그 (logging.file.name)
 logs/
+
+# marcap 원본 데이터 (experiment_pit_universe.py, 약 140MB)
+python-collector/data/

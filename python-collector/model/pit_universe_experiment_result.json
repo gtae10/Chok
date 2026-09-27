@@ -1,0 +1,274 @@
+{
+  "topN": 100,
+  "horizons": {
+    "5": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.5008,
+        "icMean": 0.0069,
+        "icStd": 0.031,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0011
+      },
+      "+mom12_1": {
+        "nFolds": 10,
+        "aucMean": 0.5096,
+        "icMean": 0.0238,
+        "icStd": 0.0324,
+        "icPositiveFolds": 8,
+        "spreadMean": 0.003
+      },
+      "+reversal5": {
+        "nFolds": 10,
+        "aucMean": 0.5007,
+        "icMean": 0.0059,
+        "icStd": 0.0337,
+        "icPositiveFolds": 6,
+        "spreadMean": -0.0014
+      },
+      "+vol60": {
+        "nFolds": 10,
+        "aucMean": 0.514,
+        "icMean": 0.0355,
+        "icStd": 0.0365,
+        "icPositiveFolds": 9,
+        "spreadMean": 0.0001
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.518,
+        "icMean": 0.042,
+        "icStd": 0.0373,
+        "icPositiveFolds": 9,
+        "spreadMean": 0.0014
+      },
+      "only:mom12_1": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.024,
+        "icStd": 0.0343,
+        "icPositiveFolds": 6,
+        "spreadMean": 0.0076
+      },
+      "only:reversal5": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0211,
+        "icStd": 0.0319,
+        "icPositiveFolds": 3,
+        "spreadMean": -0.0013
+      },
+      "only:vol60": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0388,
+        "icStd": 0.0388,
+        "icPositiveFolds": 1,
+        "spreadMean": 0.0005
+      }
+    },
+    "10": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.5023,
+        "icMean": 0.0029,
+        "icStd": 0.0427,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0109
+      },
+      "+mom12_1": {
+        "nFolds": 10,
+        "aucMean": 0.5122,
+        "icMean": 0.0239,
+        "icStd": 0.0397,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0013
+      },
+      "+reversal5": {
+        "nFolds": 10,
+        "aucMean": 0.5022,
+        "icMean": 0.0008,
+        "icStd": 0.0443,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0105
+      },
+      "+vol60": {
+        "nFolds": 10,
+        "aucMean": 0.5232,
+        "icMean": 0.0427,
+        "icStd": 0.0475,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0076
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5277,
+        "icMean": 0.0507,
+        "icStd": 0.0457,
+        "icPositiveFolds": 9,
+        "spreadMean": -0.0034
+      },
+      "only:mom12_1": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.0317,
+        "icStd": 0.0539,
+        "icPositiveFolds": 7,
+        "spreadMean": 0.0155
+      },
+      "only:reversal5": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0192,
+        "icStd": 0.0397,
+        "icPositiveFolds": 4,
+        "spreadMean": 0.0005
+      },
+      "only:vol60": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0517,
+        "icStd": 0.0528,
+        "icPositiveFolds": 2,
+        "spreadMean": 0.0015
+      }
+    },
+    "20": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.5005,
+        "icMean": 0.0084,
+        "icStd": 0.0526,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0158
+      },
+      "+mom12_1": {
+        "nFolds": 10,
+        "aucMean": 0.5117,
+        "icMean": 0.0274,
+        "icStd": 0.0605,
+        "icPositiveFolds": 5,
+        "spreadMean": -0.0012
+      },
+      "+reversal5": {
+        "nFolds": 10,
+        "aucMean": 0.501,
+        "icMean": 0.0078,
+        "icStd": 0.0522,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0156
+      },
+      "+vol60": {
+        "nFolds": 10,
+        "aucMean": 0.5212,
+        "icMean": 0.0443,
+        "icStd": 0.0628,
+        "icPositiveFolds": 8,
+        "spreadMean": -0.0132
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5258,
+        "icMean": 0.052,
+        "icStd": 0.06,
+        "icPositiveFolds": 9,
+        "spreadMean": -0.0083
+      },
+      "only:mom12_1": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.0416,
+        "icStd": 0.0812,
+        "icPositiveFolds": 7,
+        "spreadMean": 0.03
+      },
+      "only:reversal5": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0087,
+        "icStd": 0.0267,
+        "icPositiveFolds": 3,
+        "spreadMean": 0.0097
+      },
+      "only:vol60": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0579,
+        "icStd": 0.0759,
+        "icPositiveFolds": 3,
+        "spreadMean": 0.0021
+      }
+    },
+    "50": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.4984,
+        "icMean": -0.0146,
+        "icStd": 0.0342,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0464
+      },
+      "+mom12_1": {
+        "nFolds": 10,
+        "aucMean": 0.505,
+        "icMean": 0.0097,
+        "icStd": 0.0904,
+        "icPositiveFolds": 5,
+        "spreadMean": 0.0114
+      },
+      "+reversal5": {
+        "nFolds": 10,
+        "aucMean": 0.4988,
+        "icMean": -0.0134,
+        "icStd": 0.0357,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0463
+      },
+      "+vol60": {
+        "nFolds": 10,
+        "aucMean": 0.5333,
+        "icMean": 0.0628,
+        "icStd": 0.1104,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0263
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5285,
+        "icMean": 0.0602,
+        "icStd": 0.1013,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0027
+      },
+      "only:mom12_1": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.0588,
+        "icStd": 0.1216,
+        "icPositiveFolds": 8,
+        "spreadMean": 0.0856
+      },
+      "only:reversal5": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0052,
+        "icStd": 0.0258,
+        "icPositiveFolds": 5,
+        "spreadMean": 0.0163
+      },
+      "only:vol60": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0863,
+        "icStd": 0.1365,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0068
+      }
+    }
+  },
+  "passed": [
+    "+vol60",
+    "+all3",
+    "only:mom12_1"
+  ]
+}

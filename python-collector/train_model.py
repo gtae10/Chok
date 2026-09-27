@@ -1,6 +1,7 @@
 """
 train_model.py
-- price_history 테이블에서 전 종목 시세를 읽어 특징(feature)을 계산하고,
+- marcap(KRX 일별 시총) 기준 "그날의 시총 상위 종목" 시세로 특징(feature)을 계산하고
+  (생존편향 제거 - load_pit_price_history 참고),
   로지스틱 회귀로 상승 여부를 학습한다.
 - 학습 결과(가중치/절편/정규화 통계)를 JSON으로 저장하면, Java(RiseProbabilityService)가
   그 파일을 읽어 실시간으로 sigmoid(w·((x-mean)/std) + b) 를 계산해 상승확률을 매긴다.
@@ -103,6 +104,75 @@ if ADOPT_SENTIMENT:
 
 MIN_FOLD_TRAIN = 100
 MIN_FOLD_TEST = 20
+
+
+# 생존편향 제거용 point-in-time 유니버스 (README 검증 과정 11번).
+# price_history는 "오늘 기준" 시총 상위 종목의 과거 가격이라, 과거 검증 대상이 "결국 대형주가
+# 된 종목"으로 치우친다. 학습/검증은 FinanceData/marcap(KRX 전 종목 일별 시총·등락률, 로그인
+# 불필요)으로 "각 날짜마다 그날의 KOSPI+KOSDAQ 시총 상위 TOP_N"만 쓴다. 서빙(대시보드)은 오늘의
+# 상위 종목을 보여주는 게 맞으므로 collect.py/price_history는 그대로 둔다.
+MARCAP_DIR = os.path.join("data", "marcap")
+MARCAP_URL = "https://raw.githubusercontent.com/FinanceData/marcap/master/data/marcap-{year}.parquet"
+PIT_TOP_N = config.TOP_N_STOCKS  # collect.py의 유니버스 크기와 동일
+PIT_YEARS_BACK = 5  # price_history(PRICE_HISTORY_DAYS=1825)와 같은 5년
+
+
+def ensure_marcap_files(years) -> None:
+    """올해 파일은 매일 갱신되므로 항상 새로 받고, 지난 연도는 없을 때만 받는다.
+    올해 파일 갱신에 실패해도 기존 파일이 있으면 그걸로 진행한다(며칠 늦은 데이터일 뿐)."""
+    import urllib.request
+    os.makedirs(MARCAP_DIR, exist_ok=True)
+    this_year = datetime.now().year
+    for year in years:
+        path = os.path.join(MARCAP_DIR, f"marcap-{year}.parquet")
+        if os.path.exists(path) and year != this_year:
+            continue
+        try:
+            urllib.request.urlretrieve(MARCAP_URL.format(year=year), path + ".part")
+            os.replace(path + ".part", path)
+            log.info("marcap %d 다운로드 완료", year)
+        except Exception as e:
+            if not os.path.exists(path):
+                raise RuntimeError(f"marcap {year} 다운로드 실패, 기존 파일도 없음: {e}") from e
+            log.warning("marcap %d 갱신 실패 - 기존 파일로 진행: %s", year, e)
+
+
+def load_pit_price_history():
+    """반환: (price_df, universe)
+    price_df: 기간 중 한 번이라도 상위 PIT_TOP_N에 든 종목 전체의 가격 (특징 계산용 - MA60 등
+              과거 창은 유니버스 편입 이전 구간도 필요하므로 자르지 않는다)
+    universe: 날짜별로 그날 상위 PIT_TOP_N이었던 (ticker, trade_date) - 표본은 여기로 제한
+    marcap의 Close는 액면분할 미반영이라, KRX 등락률(ChangesRatio - 분할 시 조정된 기준가
+    대비)을 누적곱해 수정주가 지수를 만든다. DB 수정주가와 20일 수익률 99.7% 일치 확인됨."""
+    this_year = datetime.now().year
+    years = range(this_year - PIT_YEARS_BACK, this_year + 1)
+    ensure_marcap_files(years)
+
+    cols = ["Date", "Code", "Market", "Marcap", "ChangesRatio", "Volume"]
+    m = pd.concat([pd.read_parquet(os.path.join(MARCAP_DIR, f"marcap-{y}.parquet"), columns=cols)
+                   for y in years], ignore_index=True)
+    m = m[m["Market"].isin(["KOSPI", "KOSDAQ"])]
+    m["Date"] = pd.to_datetime(m["Date"])
+    m["rank"] = m.groupby("Date")["Marcap"].rank(ascending=False, method="first")
+
+    m = m[m["Code"].isin(m.loc[m["rank"] <= PIT_TOP_N, "Code"].unique())].sort_values(["Code", "Date"])
+    m["close_price"] = m.groupby("Code")["ChangesRatio"].transform(lambda r: (1 + r.fillna(0) / 100).cumprod())
+
+    price_df = m.rename(columns={"Code": "ticker", "Date": "trade_date", "Volume": "volume"})
+    price_df["volume"] = price_df["volume"].astype(float)
+    universe = price_df.loc[price_df["rank"] <= PIT_TOP_N, ["ticker", "trade_date"]]
+    return price_df[["ticker", "trade_date", "close_price", "volume"]].reset_index(drop=True), universe
+
+
+def restrict_to_universe(dataset: pd.DataFrame, universe: pd.DataFrame, horizons) -> pd.DataFrame:
+    """표본을 그날의 유니버스로 제한하고, 상대라벨을 "그날 유니버스 안" 중앙값 기준으로 다시 계산한다
+    (build_dataset은 유니버스 밖 종목까지 포함한 중앙값으로 라벨을 만들기 때문)."""
+    ds = dataset.merge(universe, on=["ticker", "trade_date"], how="inner")
+    for h in horizons:
+        col = f"fwd_return_{h}"
+        median = ds.groupby("trade_date")[col].transform("median")
+        ds[f"label_rel_{h}"] = (ds[col] > median).astype(float).where(ds[col].notna())
+    return ds
 
 
 def load_price_history() -> pd.DataFrame:
@@ -778,8 +848,9 @@ def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str,
 
 def main():
     log.info("=== 상승확률 모델 학습 시작 (라벨 모드: %s) ===", LABEL_MODE)
-    price_df = load_price_history()
-    log.info("가격 데이터 로드 완료: %d행", len(price_df))
+    price_df, universe = load_pit_price_history()
+    log.info("가격 데이터 로드 완료 (point-in-time 유니버스, marcap): %d행, 종목 %d개",
+             len(price_df), price_df["ticker"].nunique())
 
     market_df = load_market_indicators()
     macro_df = compute_macro_features(market_df) if not market_df.empty else None
@@ -789,8 +860,8 @@ def main():
     log.info("감성점수(OK 품질) 로드 완료: %d행", len(sentiment_raw))
 
     horizons = sorted(set(SWEEP_HORIZONS + [FORWARD_DAYS]))
-    dataset = build_dataset(price_df, horizons, macro_df, sentiment_raw)
-    log.info("특징 계산 완료: %d행 (지표 계산 가능한 구간만)", len(dataset))
+    dataset = restrict_to_universe(build_dataset(price_df, horizons, macro_df, sentiment_raw), universe, horizons)
+    log.info("특징 계산 완료: %d행 (지표 계산 가능 + 그날 상위 %d 종목만)", len(dataset), PIT_TOP_N)
 
     if len(dataset) < MIN_SAMPLES:
         log.warning(
