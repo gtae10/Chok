@@ -263,6 +263,16 @@ class RecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("추석 연휴/주말만 지났으면 경고가 없고, 거래일이 2일 밀리면 경고")
+    void stale_warning_skips_krx_holidays() {
+        when(priceHistoryRepository.findLatestTradeDateAcrossAll()).thenReturn(LocalDate.of(2026, 9, 23));
+
+        assertThat(service.buildStaleWarning(LocalDate.of(2026, 9, 27))).isNull(); // 추석+주말
+        assertThat(service.buildStaleWarning(LocalDate.of(2026, 9, 28))).isNull(); // 1거래일 (장중)
+        assertThat(service.buildStaleWarning(LocalDate.of(2026, 9, 29))).contains("2거래일");
+    }
+
+    @Test
     @DisplayName("UNCERTAIN 경계 바로 밖(52.1)은 SLIGHTLY_POSITIVE로 넘어간다")
     void hold_nuance_just_outside_uncertain_band() {
         assertThat(analyzeWithScore(52.1).getRecommendationNuance()).isEqualTo("SLIGHTLY_POSITIVE");

@@ -13,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -75,8 +75,27 @@ public class RecommendationService {
      * (동시성 상한은 chok.analysis.parallelism 로 조절 — LLM API로 나가는 동시 요청 수 자체는
      * chok.sentiment.max-concurrent-calls로 별도 제한됨)
      */
-    // 이 정도 오래되면(달력일 기준) "며칠 전 가격으로 분석 중"이라는 경고를 띄운다.
+    // 최신 가격 이후 이만큼 거래일이 지나면 "며칠 전 가격으로 분석 중"이라는 경고를 띄운다.
+    // (주말/휴장일은 세지 않음 - 추석 연휴 같은 긴 휴장에 오경고가 뜨던 문제 방지)
     private static final int STALE_PRICE_WARNING_DAYS = 2;
+
+    // 주말 외 KRX 휴장일. 2025~2026-09는 price_history에서 실제로 비어 있는 평일로 검증함.
+    // ponytail: 수동 목록 - 매년 말 KRX 휴장일 공지 보고 다음 해 추가 (빠져도 오경고만 뜸)
+    private static final Set<LocalDate> KRX_HOLIDAYS = Set.of(
+            LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 16), LocalDate.of(2026, 2, 17),
+            LocalDate.of(2026, 2, 18), LocalDate.of(2026, 3, 2), LocalDate.of(2026, 5, 1),
+            LocalDate.of(2026, 5, 5), LocalDate.of(2026, 5, 25), LocalDate.of(2026, 6, 3),
+            LocalDate.of(2026, 7, 17), LocalDate.of(2026, 8, 17), LocalDate.of(2026, 9, 24),
+            LocalDate.of(2026, 9, 25), LocalDate.of(2026, 10, 5), LocalDate.of(2026, 10, 9),
+            LocalDate.of(2026, 12, 25), LocalDate.of(2026, 12, 31),
+            // 2027: 법정공휴일+대체공휴일(python holidays 0.105 KR 기준) + KRX 연말휴장. 임시공휴일은 지정 시 추가
+            LocalDate.of(2027, 1, 1), LocalDate.of(2027, 2, 8), LocalDate.of(2027, 2, 9),
+            LocalDate.of(2027, 3, 1), LocalDate.of(2027, 5, 3), LocalDate.of(2027, 5, 5),
+            LocalDate.of(2027, 5, 13), LocalDate.of(2027, 7, 19),
+            LocalDate.of(2027, 8, 16), LocalDate.of(2027, 9, 14), LocalDate.of(2027, 9, 15),
+            LocalDate.of(2027, 9, 16), LocalDate.of(2027, 10, 4), LocalDate.of(2027, 10, 11),
+            LocalDate.of(2027, 12, 27), LocalDate.of(2027, 12, 31)
+    );
 
     public int runFullAnalysis(AnalysisStatus status) {
         List<Stock> stocks = stockRepository.findAllOrderByMarketCapDesc();
@@ -151,24 +170,25 @@ public class RecommendationService {
         return buildStaleWarning(LocalDate.now());
     }
 
-    private String buildStaleWarning(LocalDate today) {
+    public String buildStaleWarning(LocalDate today) {
         LocalDate latestPriceDate = priceHistoryRepository.findLatestTradeDateAcrossAll();
         if (latestPriceDate == null) return null;
 
-        LocalDate lastTradingDay = lastTradingDayOnOrBefore(today);
-        long staleDays = ChronoUnit.DAYS.between(latestPriceDate, lastTradingDay);
+        long staleDays = latestPriceDate.datesUntil(today.plusDays(1))
+                .skip(1)
+                .filter(RecommendationService::isTradingDay)
+                .count();
         if (staleDays < STALE_PRICE_WARNING_DAYS) return null;
 
         return String.format(
-                "가격 데이터가 %d일 전(%s) 것입니다. 먼저 시세 수집을 하는 것을 권장합니다.",
+                "가격 데이터가 %d거래일 전(%s) 것입니다. 먼저 시세 수집을 하는 것을 권장합니다.",
                 staleDays, latestPriceDate);
     }
 
-    private LocalDate lastTradingDayOnOrBefore(LocalDate date) {
+    private static boolean isTradingDay(LocalDate date) {
         return switch (date.getDayOfWeek()) {
-            case SATURDAY -> date.minusDays(1);
-            case SUNDAY -> date.minusDays(2);
-            default -> date;
+            case SATURDAY, SUNDAY -> false;
+            default -> !KRX_HOLIDAYS.contains(date);
         };
     }
 
