@@ -26,6 +26,8 @@ public class TechnicalAnalysisService {
     private static final int VOLUME_AVG_PERIOD = 20;
     private static final int OBV_TREND_LOOKBACK = 5;
     private static final int MOMENTUM_PERIOD = 90; // 중기 모멘텀(누적수익률) 계산 기간, 영업일 기준
+    private static final int MOMENTUM_12M_LOOKBACK = 252; // 12-1개월 모멘텀: 약 12개월 전부터
+    private static final int MOMENTUM_12M_SKIP = 21;      // 최근 약 1개월은 뺀다(단기 반전 효과 제외)
 
     private final RiseProbabilityService riseProbabilityService;
 
@@ -151,6 +153,20 @@ public class TechnicalAnalysisService {
                 Math.log(Math.max(volumeRatio, 0.01)),
                 momentum90
         };
+    }
+
+    /**
+     * 12-1개월 모멘텀(%): 252영업일 전 종가 대비 21영업일 전 종가 수익률 — 최근 1개월 제외.
+     * 화면 참고 지표 전용이고 점수·모델 특징에는 들어가지 않는다(README 검증 과정 11·12번:
+     * 생존편향 제거 후에도 순위 상관이 남았지만 구간별로 흔들려 모델엔 미채택).
+     * 정의는 python-collector/experiment_new_features.py 의 mom12_1 과 같다. 이력이 253일 미만이면 null.
+     */
+    public Double momentum12m(List<PriceHistory> priceHistory) {
+        int n = priceHistory == null ? 0 : priceHistory.size();
+        if (n <= MOMENTUM_12M_LOOKBACK) return null;
+        double past = priceHistory.get(n - 1 - MOMENTUM_12M_LOOKBACK).getClosePrice().doubleValue();
+        double recent = priceHistory.get(n - 1 - MOMENTUM_12M_SKIP).getClosePrice().doubleValue();
+        return past > 0 ? round2((recent - past) / past * 100) : null;
     }
 
     /** N영업일 전 대비 현재까지의 누적수익률. 중기(수개월) 모멘텀을 나타내는 팩터. */

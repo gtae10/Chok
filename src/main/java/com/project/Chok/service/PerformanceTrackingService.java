@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -94,7 +95,7 @@ public class PerformanceTrackingService {
                     Integer currentPrice = priceHistoryRepository.findLatestByTicker(s.getTicker())
                             .map(PriceHistory::getClosePrice)
                             .orElse(null);
-                    return new PerformanceItemResponse(s, currentPrice, today);
+                    return new PerformanceItemResponse(s, currentPrice, today, findPeakAfter(s));
                 })
                 .toList();
 
@@ -124,6 +125,19 @@ public class PerformanceTrackingService {
                 .stream()
                 .map(RecommendationResponse::new)
                 .toList();
+    }
+
+    /**
+     * 선정일 다음 거래일부터 지금까지 종가가 가장 높았던 날 (같은 값이면 먼저 온 날).
+     * 수익률과 같은 기준인 종가로 본다. 선정 뒤 거래일이 아직 없으면 null.
+     */
+    private PriceHistory findPeakAfter(PerformanceSnapshot s) {
+        return priceHistoryRepository.findByTickerSince(s.getTicker(), s.getSnapshotDate().plusDays(1))
+                .stream()
+                .filter(p -> p.getClosePrice() != null)
+                .max(Comparator.comparing(PriceHistory::getClosePrice)
+                        .thenComparing(PriceHistory::getTradeDate, Comparator.reverseOrder()))
+                .orElse(null);
     }
 
     private static double round2(double v) {

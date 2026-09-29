@@ -1,7 +1,7 @@
 async function loadPerformance() {
     const tbody = document.getElementById("performanceTableBody");
     const emptyState = document.getElementById("emptyState");
-    tbody.innerHTML = '<tr class="loading-row"><td colspan="11">데이터를 불러오는 중...</td></tr>';
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="12">데이터를 불러오는 중...</td></tr>';
     emptyState.hidden = true;
     try {
         const res = await fetch("/api/performance");
@@ -10,7 +10,7 @@ async function loadPerformance() {
         currentItems = data.items || [];
         renderTable(sortedItems());
     } catch (err) {
-        tbody.innerHTML = '<tr class="loading-row"><td colspan="11">데이터를 불러오지 못했습니다.</td></tr>';
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="12">데이터를 불러오지 못했습니다.</td></tr>';
     }
 }
 
@@ -84,6 +84,7 @@ function renderTable(items) {
             '<td>' + fmtPrice(item.currentPrice) + '</td>' +
             '<td>' + renderReturnRate(item.returnRate) + '</td>' +
             '<td>' + item.holdingDays + '일</td>' +
+            '<td>' + renderPeak(item) + '</td>' +
             '</tr>';
     }).join("");
 
@@ -147,6 +148,13 @@ async function loadTrend(id, svg) {
         console.error(err);
         svg.innerHTML = '<text x="400" y="130" fill="#5C6786" font-size="14" text-anchor="middle">추이를 불러오지 못했습니다</text>';
     }
+}
+
+// 선정 뒤 종가 고점: 수익률 + "N일 뒤" (선정 뒤 거래일이 아직 없으면 "-")
+function renderPeak(item) {
+    if (item.peakDays == null) return "-";
+    return renderReturnRate(item.peakReturnRate) +
+        '<span class="ticker-sub" title="' + item.peakDate + '">' + item.peakDays + '일 뒤</span>';
 }
 
 function renderReturnRate(rate) {

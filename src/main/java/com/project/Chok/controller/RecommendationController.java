@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class RecommendationController {
 
+    private static final double MOMENTUM_TOP_SHARE = 0.2; // "모멘텀 상위 20%" 표시 기준
+
     private final RecommendationRepository recommendationRepository;
     private final PriceHistoryRepository priceHistoryRepository;
     private final NewsSentimentRepository newsSentimentRepository;
@@ -125,6 +127,8 @@ public class RecommendationController {
 
         List<Recommendation> recs = recommendationRepository
                 .findByRecDateOrderByFinalScoreDesc(latestDate);
+        Double momentumCutoff = RecommendationService.topShareCutoff(
+                recs.stream().map(Recommendation::getMomentum12m).toList(), MOMENTUM_TOP_SHARE);
 
         if (filter != null && !filter.isBlank()) {
             recs = recs.stream()
@@ -132,9 +136,12 @@ public class RecommendationController {
                     .collect(Collectors.toList());
         }
 
-        return ResponseEntity.ok(
-                recs.stream().map(RecommendationResponse::new).collect(Collectors.toList())
-        );
+        return ResponseEntity.ok(recs.stream().map(r -> {
+            RecommendationResponse resp = new RecommendationResponse(r);
+            resp.setMomentumTop20(momentumCutoff != null && r.getMomentum12m() != null
+                    && r.getMomentum12m() >= momentumCutoff);
+            return resp;
+        }).collect(Collectors.toList()));
     }
 
     @GetMapping("/stocks/{ticker}/prices")

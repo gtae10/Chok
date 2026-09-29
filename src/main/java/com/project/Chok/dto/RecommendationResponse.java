@@ -20,6 +20,8 @@ public class RecommendationResponse {
     private Integer notableFallHorizonDays;
     private Double notableFallHorizonProbability;
     private String notableFallHorizonApproxDate;
+    private Double momentum12m;
+    private boolean momentumTop20; // 같은 날 전 종목 중 12-1개월 모멘텀 상위 20% (목록 API에서만 채움)
     private String recommendation;
     private String recommendationNuance;
     private String reason;
@@ -42,6 +44,7 @@ public class RecommendationResponse {
         this.notableFallHorizonDays = r.getNotableFallHorizonDays();
         this.notableFallHorizonProbability = r.getNotableFallHorizonProbability();
         this.notableFallHorizonApproxDate = r.getNotableFallHorizonApproxDate() == null ? null : r.getNotableFallHorizonApproxDate().toString();
+        this.momentum12m = r.getMomentum12m();
         this.recommendation = r.getRecommendation();
         this.recommendationNuance = r.getRecommendationNuance();
         this.reason = r.getReason();
@@ -64,6 +67,9 @@ public class RecommendationResponse {
     public Integer getNotableFallHorizonDays() { return notableFallHorizonDays; }
     public Double getNotableFallHorizonProbability() { return notableFallHorizonProbability; }
     public String getNotableFallHorizonApproxDate() { return notableFallHorizonApproxDate; }
+    public Double getMomentum12m() { return momentum12m; }
+    public boolean isMomentumTop20() { return momentumTop20; }
+    public void setMomentumTop20(boolean momentumTop20) { this.momentumTop20 = momentumTop20; }
     public String getRecommendation() { return recommendation; }
     public String getRecommendationNuance() { return recommendationNuance; }
     public String getReason() { return reason; }

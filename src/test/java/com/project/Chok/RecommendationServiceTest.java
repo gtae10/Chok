@@ -284,4 +284,15 @@ class RecommendationServiceTest {
         assertThat(analyzeWithScore(60.0).getRecommendationNuance()).isNull();
         assertThat(analyzeWithScore(30.0).getRecommendationNuance()).isNull();
     }
+
+    @Test
+    void top_share_cutoff_counts_only_stocks_with_a_value() {
+        // 값 5개 중 상위 20% = 1개 -> 경계값 50, null은 세지 않는다
+        assertThat(RecommendationService.topShareCutoff(java.util.Arrays.asList(10.0, null, 50.0, 30.0, 20.0, 40.0), 0.2))
+                .isEqualTo(50.0);
+        // 10개 중 상위 20% = 2개 -> 경계값은 두 번째로 큰 9
+        assertThat(RecommendationService.topShareCutoff(
+                java.util.stream.IntStream.rangeClosed(1, 10).mapToObj(i -> (double) i).toList(), 0.2)).isEqualTo(9.0);
+        assertThat(RecommendationService.topShareCutoff(java.util.Arrays.asList((Double) null), 0.2)).isNull();
+    }
 }

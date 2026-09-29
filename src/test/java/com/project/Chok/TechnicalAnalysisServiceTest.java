@@ -113,4 +113,15 @@ class TechnicalAnalysisServiceTest {
                 .isGreaterThanOrEqualTo(0.0)
                 .isLessThanOrEqualTo(100.0);
     }
+
+    @Test
+    @DisplayName("12-1개월 모멘텀: 252영업일 전 대비 21영업일 전 수익률(%), 이력 1년 미만이면 null")
+    void momentum12m_skips_recent_month() {
+        // 300일 상승 추세: 252일 전 = index 47(14,700원), 21일 전 = index 278(37,800원)
+        List<PriceHistory> data = createPriceHistory(300, 10000, true);
+        assertThat(service.momentum12m(data)).isEqualTo(157.14); // 37800/14700 - 1
+
+        assertThat(service.momentum12m(createPriceHistory(252, 10000, true))).isNull();
+        assertThat(service.momentum12m(createPriceHistory(253, 10000, true))).isNotNull();
+    }
 }

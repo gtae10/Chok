@@ -17,7 +17,7 @@ async function loadRecommendations(filter) {
     filter = filter || "";
     const tbody = document.getElementById("stockTableBody");
     const emptyState = document.getElementById("emptyState");
-    tbody.innerHTML = '<tr class="loading-row"><td colspan="8">데이터를 불러오는 중...</td></tr>';
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오는 중...</td></tr>';
     emptyState.hidden = true;
     try {
         const url = filter ? "/api/recommendations?filter=" + encodeURIComponent(filter) : "/api/recommendations";
@@ -28,7 +28,7 @@ async function loadRecommendations(filter) {
         }
         applySearchAndRender();
     } catch (err) {
-        tbody.innerHTML = '<tr class="loading-row"><td colspan="8">데이터를 불러오지 못했습니다.</td></tr>';
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오지 못했습니다.</td></tr>';
     }
 }
 
@@ -70,6 +70,7 @@ function renderTable(data) {
             '<td>' + fmt(item.sentimentScore) + '</td>' +
             '<td>' + fmt(item.finalScore) + '</td>' +
             '<td>' + renderProbability(item) + '</td>' +
+            '<td>' + renderMomentum(item) + '</td>' +
             '<td><span class="rec-badge ' + (REC_BADGE_CLASS[item.recommendation] || "") + '">' + (REC_LABEL[item.recommendation] || "-") + '</span>' + renderNuance(item.recommendationNuance) + '</td>' +
             '</tr>';
     }).join("");
@@ -107,6 +108,15 @@ function renderNotableFallHorizon(item) {
     const text = "유력 하락구간: 약 " + item.notableFallHorizonApproxDate + " 전후 (" + fmt(item.notableFallHorizonProbability) + "%)";
     return '<span class="prob-horizon prob-horizon--notable prob-horizon--fall" title="' + esc(text) + '">' + esc(text) + '</span>';
 }
+
+// 참고 지표 - 점수·확률에는 안 들어감. "상위 20%"는 서버가 필터 전 그날 전 종목 기준으로 매긴다.
+function renderMomentum(item) {
+    if (item.momentum12m == null) return "-";
+    const top = item.momentumTop20 ? '<span class="nuance-tag nuance-tag--positive">상위 20%</span>' : "";
+    return fmtSignedPct(item.momentum12m) + top;
+}
+
+function fmtSignedPct(v) { return (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }

@@ -294,6 +294,9 @@ function renderHeader(item) {
         fallProbEl.textContent = "하락(보합포함) 확률: " + fmt(100 - item.riseProbability) + "%";
     }
 
+    document.getElementById("momentumVal").textContent = item.momentum12m == null
+        ? "--" : (item.momentum12m > 0 ? "+" : "") + fmt(item.momentum12m) + "%";
+
     const notableEl = document.getElementById("notableHorizonNote");
     notableEl.textContent = (item.notableHorizonDays != null)
         ? "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)"

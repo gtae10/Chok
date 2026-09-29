@@ -67,6 +67,10 @@ public class Recommendation {
     @Column(name = "notable_fall_horizon_approx_date")
     private LocalDate notableFallHorizonApproxDate;
 
+    // 12-1개월 모멘텀(%) - 화면 참고 지표 전용, 점수·확률 계산에는 안 쓰임. 이력 1년 미만이면 null
+    @Column(name = "momentum_12m")
+    private Double momentum12m;
+
     @Column(length = 20)
     private String recommendation;
 
@@ -134,6 +138,9 @@ public class Recommendation {
 
     public LocalDate getNotableFallHorizonApproxDate() { return notableFallHorizonApproxDate; }
     public void setNotableFallHorizonApproxDate(LocalDate notableFallHorizonApproxDate) { this.notableFallHorizonApproxDate = notableFallHorizonApproxDate; }
+
+    public Double getMomentum12m() { return momentum12m; }
+    public void setMomentum12m(Double momentum12m) { this.momentum12m = momentum12m; }
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }

@@ -272,4 +272,42 @@ class PerformanceTrackingServiceTest {
 
         verifyNoInteractions(recommendationRepository);
     }
+
+    @Test
+    @DisplayName("선정 뒤 종가 고점: 가장 높은 종가의 날짜·며칠 뒤·진입가 대비 수익률 (같은 값이면 먼저 온 날)")
+    void getPerformanceSummary_reports_peak_after_selection() {
+        LocalDate date = LocalDate.now().minusDays(10);
+        PerformanceSnapshot s = snapshot("005930", "삼성전자", date, 1, 10000);
+        when(performanceSnapshotRepository.findAllOrderBySnapshotDateDescRankAsc()).thenReturn(List.of(s));
+        when(priceHistoryRepository.findLatestByTicker("005930")).thenReturn(Optional.of(price(11000)));
+        when(priceHistoryRepository.findByTickerSince("005930", date.plusDays(1))).thenReturn(List.of(
+                priceOn(date.plusDays(1), 10500), priceOn(date.plusDays(3), 12000),
+                priceOn(date.plusDays(6), 12000), priceOn(date.plusDays(8), 11000)));
+
+        var item = service.getPerformanceSummary().getItems().get(0);
+
+        assertThat(item.getPeakDays()).isEqualTo(3L);
+        assertThat(item.getPeakDate()).isEqualTo(date.plusDays(3).toString());
+        assertThat(item.getPeakReturnRate()).isEqualTo(0.2); // (12000-10000)/10000
+    }
+
+    @Test
+    @DisplayName("선정 뒤 거래일이 아직 없으면 고점은 비워 둔다")
+    void getPerformanceSummary_peak_is_empty_before_next_trading_day() {
+        LocalDate date = LocalDate.now();
+        PerformanceSnapshot s = snapshot("005930", "삼성전자", date, 1, 10000);
+        when(performanceSnapshotRepository.findAllOrderBySnapshotDateDescRankAsc()).thenReturn(List.of(s));
+        when(priceHistoryRepository.findByTickerSince("005930", date.plusDays(1))).thenReturn(List.of());
+
+        var item = service.getPerformanceSummary().getItems().get(0);
+
+        assertThat(item.getPeakDays()).isNull();
+        assertThat(item.getPeakReturnRate()).isNull();
+    }
+
+    private PriceHistory priceOn(LocalDate d, int closePrice) {
+        PriceHistory p = price(closePrice);
+        p.setTradeDate(d);
+        return p;
+    }
 }
