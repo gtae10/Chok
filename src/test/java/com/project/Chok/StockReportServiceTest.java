@@ -52,7 +52,8 @@ class StockReportServiceTest {
 
         service = new StockReportService(
                 recommendationRepository, newsSentimentRepository, stockReportRepository,
-                Map.of("openai", llmProvider), appProperties
+                Map.of("openai", llmProvider), appProperties,
+                org.mockito.Mockito.mock(com.project.Chok.service.TagService.class)
         );
     }
 

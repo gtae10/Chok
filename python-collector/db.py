@@ -100,6 +100,17 @@ def insert_price_rows(rows):
         cur.close()
 
 
+@retry_on_deadlock
+def update_issuance_rows(values):
+    """values: {ticker: 순발행}. 이번에 못 구한 종목은 이전 값을 지우지 않고 그대로 둔다."""
+    if not values:
+        return
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.executemany("UPDATE stocks SET issuance_252=%s WHERE ticker=%s",
+                        [(v, t) for t, v in values.items()])
+        cur.close()
+
 def _test_retry_on_deadlock():
     calls = {"n": 0}
 

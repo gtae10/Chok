@@ -45,9 +45,11 @@ public class StockReportService {
 
             - 등급이 STRONG_BUY/STRONG_SELL이고 기술·감성 지표가 같은 방향으로 일치할 때만
               확신 있는 어조("~할 가능성이 높습니다", "뚜렷한 상승 신호")를 쓰세요.
-            - HOLD 등급이거나, 기술점수와 감성점수가 서로 엇갈리거나, 상승확률이 학습된 모델이
-              아니라 휴리스틱 추정치일 뿐이면 반드시 "신호가 혼재되어 있다", "방향성이 뚜렷하지
-              않다", "판단을 보류하는 것이 합리적이다" 같은 신중한 표현을 쓰세요.
+            - HOLD 등급이거나, 기술점수와 감성점수가 서로 엇갈리면 반드시 "신호가 혼재되어
+              있다", "방향성이 뚜렷하지 않다", "판단을 보류하는 것이 합리적이다" 같은 신중한
+              표현을 쓰세요.
+            - 태그는 지금 상태에 대한 사실일 뿐 예측이 아닙니다. 태그를 근거로 주가 방향을
+              단정하지 마세요.
             - 입력에 없는 정보를 지어내지 마세요. 관련 뉴스가 없다고 나오면 "특별한 뉴스 재료는
               없다"고만 쓰세요.
             - 이건 투자 조언이 아니라 "현재 수집된 지표 요약"이라는 전제를 벗어나지 마세요.
@@ -60,18 +62,21 @@ public class StockReportService {
     private final StockReportRepository stockReportRepository;
     private final Map<String, LlmProvider> providers;
     private final AppProperties appProperties;
+    private final TagService tagService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public StockReportService(RecommendationRepository recommendationRepository,
                                NewsSentimentRepository newsSentimentRepository,
                                StockReportRepository stockReportRepository,
                                Map<String, LlmProvider> providers,
-                               AppProperties appProperties) {
+                               AppProperties appProperties,
+                               TagService tagService) {
         this.recommendationRepository = recommendationRepository;
         this.newsSentimentRepository = newsSentimentRepository;
         this.stockReportRepository = stockReportRepository;
         this.providers = providers;
         this.appProperties = appProperties;
+        this.tagService = tagService;
     }
 
     public record ReportResult(String reportText, boolean cached, LocalDateTime generatedAt) {}
@@ -139,16 +144,8 @@ public class StockReportService {
         }
         sb.append('\n');
 
-        if (r.getRiseProbability() != null) {
-            sb.append("상승확률: ").append(r.getRiseProbability()).append("% (출처: ")
-              .append("MODEL".equals(r.getProbabilitySource()) ? "학습된 모델" : "지표 종합 추정치(휴리스틱, 통계 검증 안 됨)")
-              .append(r.getProbabilityHorizonDays() != null ? ", " + r.getProbabilityHorizonDays() + "영업일 기준" : "")
-              .append(")\n");
-        }
-        if (r.getNotableHorizonDays() != null) {
-            sb.append("유력 구간: 약 ").append(r.getNotableHorizonApproxDate()).append(" 전후 (")
-              .append(r.getNotableHorizonProbability()).append("%) - 통계 검증된 예측은 아님\n");
-        }
+        List<String> tags = tagService.latestTagsFor(r.getTicker());
+        sb.append("태그(사실 표시, 예측 아님): ").append(tags.isEmpty() ? "없음" : String.join(", ", tags)).append('\n');
 
         sb.append("지표 상세: ").append(r.getReason()).append('\n');
 

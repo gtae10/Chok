@@ -31,7 +31,7 @@ class RecommendationControllerTest {
         AnalysisStatus status = new AnalysisStatus();
         if (running) status.tryStart("test");
 
-        return new RecommendationController(repo, null, null, null, null, status, null, null)
+        return new RecommendationController(repo, null, null, null, null, status, null, null, mock(com.project.Chok.service.TagService.class))
                 .getRecommendations(null).getBody();
     }
 

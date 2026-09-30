@@ -28,6 +28,7 @@ public class TechnicalAnalysisService {
     private static final int MOMENTUM_PERIOD = 90; // 중기 모멘텀(누적수익률) 계산 기간, 영업일 기준
     private static final int MOMENTUM_12M_LOOKBACK = 252; // 12-1개월 모멘텀: 약 12개월 전부터
     private static final int MOMENTUM_12M_SKIP = 21;      // 최근 약 1개월은 뺀다(단기 반전 효과 제외)
+    private static final int VOL_PERIOD = 60;
 
     private final RiseProbabilityService riseProbabilityService;
 
@@ -167,6 +168,25 @@ public class TechnicalAnalysisService {
         double past = priceHistory.get(n - 1 - MOMENTUM_12M_LOOKBACK).getClosePrice().doubleValue();
         double recent = priceHistory.get(n - 1 - MOMENTUM_12M_SKIP).getClosePrice().doubleValue();
         return past > 0 ? round2((recent - past) / past * 100) : null;
+    }
+
+    /**
+     * 60영업일 일간수익률 표준편차(%) - 태그 LOW_VOL20 입력. experiment_new_features.py의 vol60과
+     * 같은 정의(pandas pct_change().rolling(60).std(), 표본표준편차). 이력이 61일 미만이면 null.
+     */
+    public Double volatility60(List<PriceHistory> priceHistory) {
+        int n = priceHistory == null ? 0 : priceHistory.size();
+        if (n <= VOL_PERIOD) return null;
+        double[] r = new double[VOL_PERIOD];
+        for (int i = 0; i < VOL_PERIOD; i++) {
+            double prev = priceHistory.get(n - VOL_PERIOD - 1 + i).getClosePrice();
+            double cur = priceHistory.get(n - VOL_PERIOD + i).getClosePrice();
+            if (prev <= 0) return null;
+            r[i] = cur / prev - 1;
+        }
+        double mean = java.util.Arrays.stream(r).average().orElse(0);
+        double ss = java.util.Arrays.stream(r).map(x -> (x - mean) * (x - mean)).sum();
+        return round2(Math.sqrt(ss / (VOL_PERIOD - 1)) * 100);
     }
 
     /** N영업일 전 대비 현재까지의 누적수익률. 중기(수개월) 모멘텀을 나타내는 팩터. */

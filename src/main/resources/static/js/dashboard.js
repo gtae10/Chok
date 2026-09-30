@@ -69,7 +69,7 @@ function renderTable(data) {
             '<td>' + fmt(item.technicalScore) + '</td>' +
             '<td>' + fmt(item.sentimentScore) + '</td>' +
             '<td>' + fmt(item.finalScore) + '</td>' +
-            '<td>' + renderProbability(item) + '</td>' +
+            '<td>' + renderTags(item.tags) + '</td>' +
             '<td>' + renderMomentum(item) + '</td>' +
             '<td><span class="rec-badge ' + (REC_BADGE_CLASS[item.recommendation] || "") + '">' + (REC_LABEL[item.recommendation] || "-") + '</span>' + renderNuance(item.recommendationNuance) + '</td>' +
             '</tr>';
@@ -79,41 +79,9 @@ function renderTable(data) {
     });
 }
 
-function renderProbability(item) {
-    if (item.riseProbability == null) return "-";
-    const pct = fmt(item.riseProbability) + "%";
-    const isModel = item.probabilitySource === "MODEL";
-    const tagClass = isModel ? "prob-tag--model" : "prob-tag--heuristic";
-    const tagLabel = isModel ? "학습" : "추정";
-    const horizon = (isModel && item.probabilityHorizonDays)
-        ? '<span class="prob-horizon">(' + item.probabilityHorizonDays + '영업일 기준)</span>' : "";
-    // 하락확률은 별도 계산 없이 100-상승확률로 표시 (같은 확률의 반대쪽 표현)
-    const fallPct = '<span class="prob-horizon">하락(보합포함) ' + fmt(100 - item.riseProbability) + '%</span>';
-    return pct + '<span class="prob-tag ' + tagClass + '">' + tagLabel + '</span>' + horizon +
-        fallPct + renderNotableHorizon(item) + renderNotableFallHorizon(item);
-}
-
-// 참고용 - 통계 검증된 예측이 아님. AUC 안전장치를 통과한 후보가 없으면 서버가 애초에 null을 내려줌.
-// 대시보드는 한 행에 다른 열도 많아 폭이 좁으므로, 길어질 수 있는 이 문구만 말줄임 처리하고
-// title 속성(네이티브 툴팁)으로 전체 텍스트를 보여준다 - 커스텀 툴팁 UI 없이 브라우저 기본 기능 재사용.
-function renderNotableHorizon(item) {
-    if (item.notableHorizonDays == null) return "";
-    const text = "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)";
-    return '<span class="prob-horizon prob-horizon--notable" title="' + esc(text) + '">' + esc(text) + '</span>';
-}
-
-// findNotableHorizon()의 대칭 버전 - 매도 계열(파랑) 색상으로 구분.
-function renderNotableFallHorizon(item) {
-    if (item.notableFallHorizonDays == null) return "";
-    const text = "유력 하락구간: 약 " + item.notableFallHorizonApproxDate + " 전후 (" + fmt(item.notableFallHorizonProbability) + "%)";
-    return '<span class="prob-horizon prob-horizon--notable prob-horizon--fall" title="' + esc(text) + '">' + esc(text) + '</span>';
-}
-
-// 참고 지표 - 점수·확률에는 안 들어감. "상위 20%"는 서버가 필터 전 그날 전 종목 기준으로 매긴다.
+// 참고 지표 - 점수에는 안 들어감. "상위 20%" 여부는 태그 열(MOMENTUM_TOP20)에 나온다.
 function renderMomentum(item) {
-    if (item.momentum12m == null) return "-";
-    const top = item.momentumTop20 ? '<span class="nuance-tag nuance-tag--positive">상위 20%</span>' : "";
-    return fmtSignedPct(item.momentum12m) + top;
+    return item.momentum12m == null ? "-" : fmtSignedPct(item.momentum12m);
 }
 
 function fmtSignedPct(v) { return (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }

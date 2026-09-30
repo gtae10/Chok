@@ -1,11 +1,13 @@
 import datetime
 import time
+from zoneinfo import ZoneInfo
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import FinanceDataReader as fdr
+import numpy as np
 import pandas as pd
 import config
-from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows
+from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows, update_issuance_rows
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -49,6 +51,19 @@ def get_top_n_stocks(n=None):
     return top_stocks
 
 
+KST = ZoneInfo("Asia/Seoul")
+MARKET_CLOSE_CONFIRMED = datetime.time(16, 0)  # KRX 15:30 마감 + 여유
+
+
+def confirmed_until(now=None) -> pd.Timestamp:
+    """이 날짜 '미만'의 일봉만 확정 종가다. 장 마감 전에 수집하면 오늘 행이 장중 가격으로 저장되고,
+    그걸로 분석·성과 진입가가 기록된다(2026-09-15 코웨이 진입가 102,000원 vs 확정 종가 100,900원).
+    Docker 컨테이너가 UTC여도 한국 시각으로 판단한다."""
+    now = now or datetime.datetime.now(KST)
+    cutoff = now.date() + datetime.timedelta(days=1) if now.time() >= MARKET_CLOSE_CONFIRMED else now.date()
+    return pd.Timestamp(cutoff)
+
+
 def fetch_price_history(stock):
     """단일 종목 가격 수집 (ThreadPoolExecutor에서 호출)"""
     ticker = stock["ticker"]
@@ -70,6 +85,7 @@ def fetch_price_history(stock):
     # 결측 한 칸이 int(NaN) 예외로 번져 100종목 수집 전체가 실패하지 않도록 - 종가 없는 날은 버리고
     # 나머지 결측은 0 (거래정지일 시가/고가/저가가 원래 0으로 들어오는 것과 같은 취급)
     df = df.dropna(subset=["Close"]).fillna(0)
+    df = df[df.index < confirmed_until()]
 
     rows = []
     for date, row in df.iterrows():
@@ -130,6 +146,38 @@ def fetch_market_indicators():
     return len(rows)
 
 
+ISSUANCE_LOOKBACK = 252  # 영업일, 약 1년
+
+
+def compute_issuance(marcap: pd.DataFrame, tickers) -> dict:
+    """순발행 = log(N_t / N_t-252), N = 시가총액 / 수정종가지수. 태그 ISSUANCE_TOP20용.
+    experiment_size_turnover_issuance.py의 issuance252와 같은 정의 - 상장주식수를 그대로 쓰면
+    액면분할 때 수십 배로 튀므로, 분할에 연속인 수정종가(등락률 누적곱)로 나눈다.
+    이력이 252영업일보다 짧은 종목은 빠진다(신규상장 등)."""
+    m = marcap[marcap["Code"].isin(tickers)].sort_values(["Code", "Date"])
+    out = {}
+    for code, g in m.groupby("Code"):
+        if len(g) <= ISSUANCE_LOOKBACK:
+            continue
+        cp = (1 + g["ChangesRatio"].fillna(0) / 100).cumprod()
+        n = (g["Marcap"] / cp).to_numpy()
+        if n[-1] > 0 and n[-1 - ISSUANCE_LOOKBACK] > 0:
+            out[code] = float(np.log(n[-1] / n[-1 - ISSUANCE_LOOKBACK]))
+    return out
+
+
+def update_issuance(tickers):
+    from train_model import ensure_marcap_files, MARCAP_DIR  # 학습용 marcap 캐시를 같이 쓴다
+    year = datetime.datetime.now().year
+    ensure_marcap_files([year - 1, year])
+    cols = ["Date", "Code", "Marcap", "ChangesRatio"]
+    marcap = pd.concat([pd.read_parquet(f"{MARCAP_DIR}/marcap-{y}.parquet", columns=cols)
+                        for y in (year - 1, year)], ignore_index=True)
+    values = compute_issuance(marcap, set(tickers))
+    update_issuance_rows(values)
+    logger.info(f"순발행 갱신: {len(values)}/{len(tickers)} 종목 (marcap 기준일 {marcap['Date'].max():%Y-%m-%d})")
+
+
 def run():
     logger.info("=== 시세 수집 시작 ===")
     start = datetime.datetime.now()
@@ -147,6 +195,11 @@ def run():
                 if success:
                     processed += 1
                 logger.info(f"[{i}/{total}] {ticker} 완료")
+
+        try:
+            update_issuance([s["ticker"] for s in top_stocks])
+        except Exception as e:
+            logger.error(f"순발행 갱신 실패 (종목 시세는 정상 수집됨, 이전 값 유지): {e}")
 
         try:
             fetch_market_indicators()

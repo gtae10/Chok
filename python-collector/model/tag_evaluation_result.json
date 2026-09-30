@@ -1,0 +1,164 @@
+{
+  "horizons": [
+    5,
+    20,
+    50
+  ],
+  "criteria": {
+    "minWindows": 6,
+    "minSameSignShare": 0.7,
+    "minAbsExcess": {
+      "5": 0.005,
+      "20": 0.01,
+      "50": 0.02
+    },
+    "expectedSign": {
+      "MOMENTUM_TOP20": 1,
+      "LOW_VOL20": 1,
+      "ISSUANCE_UP": -1,
+      "BUYBACK": 1,
+      "NEWS_POS": 1,
+      "NEWS_NEG": -1
+    }
+  },
+  "backtest": {
+    "5": {
+      "MOMENTUM_TOP20": {
+        "events": 22768,
+        "dates": 1148,
+        "allDatesMean": 0.0028,
+        "windows": 230,
+        "windowMean": 0.0029,
+        "windowsExpectedSign": 130,
+        "verdict": "불통과"
+      },
+      "LOW_VOL20": {
+        "events": 26800,
+        "dates": 1340,
+        "allDatesMean": 0.0001,
+        "windows": 268,
+        "windowMean": -0.0,
+        "windowsExpectedSign": 144,
+        "verdict": "불통과"
+      },
+      "ISSUANCE_UP": {
+        "events": 11917,
+        "dates": 1148,
+        "allDatesMean": -0.0005,
+        "windows": 230,
+        "windowMean": 0.0002,
+        "windowsExpectedSign": 122,
+        "verdict": "불통과"
+      },
+      "BUYBACK": {
+        "events": 10869,
+        "dates": 1143,
+        "allDatesMean": 0.0009,
+        "windows": 230,
+        "windowMean": 0.0008,
+        "windowsExpectedSign": 110,
+        "verdict": "불통과"
+      },
+      "NEWS_POS": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "NEWS_NEG": {
+        "events": 0,
+        "verdict": "기록 없음"
+      }
+    },
+    "20": {
+      "MOMENTUM_TOP20": {
+        "events": 22449,
+        "dates": 1133,
+        "allDatesMean": 0.0095,
+        "windows": 57,
+        "windowMean": 0.0112,
+        "windowsExpectedSign": 32,
+        "verdict": "불통과"
+      },
+      "LOW_VOL20": {
+        "events": 26500,
+        "dates": 1325,
+        "allDatesMean": 0.0007,
+        "windows": 67,
+        "windowMean": 0.0006,
+        "windowsExpectedSign": 32,
+        "verdict": "불통과"
+      },
+      "ISSUANCE_UP": {
+        "events": 11737,
+        "dates": 1133,
+        "allDatesMean": -0.0019,
+        "windows": 57,
+        "windowMean": -0.002,
+        "windowsExpectedSign": 33,
+        "verdict": "불통과"
+      },
+      "BUYBACK": {
+        "events": 10503,
+        "dates": 1128,
+        "allDatesMean": 0.0048,
+        "windows": 57,
+        "windowMean": 0.0011,
+        "windowsExpectedSign": 24,
+        "verdict": "불통과"
+      },
+      "NEWS_POS": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "NEWS_NEG": {
+        "events": 0,
+        "verdict": "기록 없음"
+      }
+    },
+    "50": {
+      "MOMENTUM_TOP20": {
+        "events": 21722,
+        "dates": 1103,
+        "allDatesMean": 0.0271,
+        "windows": 23,
+        "windowMean": 0.0336,
+        "windowsExpectedSign": 15,
+        "verdict": "불통과"
+      },
+      "LOW_VOL20": {
+        "events": 25896,
+        "dates": 1295,
+        "allDatesMean": -0.0005,
+        "windows": 26,
+        "windowMean": 0.0017,
+        "windowsExpectedSign": 15,
+        "verdict": "불통과"
+      },
+      "ISSUANCE_UP": {
+        "events": 11322,
+        "dates": 1103,
+        "allDatesMean": -0.0008,
+        "windows": 23,
+        "windowMean": 0.0083,
+        "windowsExpectedSign": 13,
+        "verdict": "불통과"
+      },
+      "BUYBACK": {
+        "events": 9811,
+        "dates": 1098,
+        "allDatesMean": 0.0136,
+        "windows": 23,
+        "windowMean": 0.0055,
+        "windowsExpectedSign": 12,
+        "verdict": "불통과"
+      },
+      "NEWS_POS": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "NEWS_NEG": {
+        "events": 0,
+        "verdict": "기록 없음"
+      }
+    }
+  }
+}

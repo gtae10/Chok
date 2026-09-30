@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 
 /**
  * 사용자가 Spring Boot 앱을 상시 구동하지 않고 필요할 때만 켜는 패턴이라, 평일 18:30
@@ -52,8 +54,15 @@ public class StartupCatchUpRunner implements ApplicationRunner {
         this.stockRepository = stockRepository;
     }
 
-    /** 평일이고, 오늘자 가격/추천 데이터가 전체 종목 대비 {@link #COVERAGE_THRESHOLD} 미만이면 보정 대상. */
-    public static boolean shouldCatchUp(LocalDate today, long totalStocks, long todayPriceCoverage, long todayRecCoverage) {
+    // collect.py는 16:00 KST 전에는 오늘 일봉을 저장하지 않는다(확정 종가만, confirmed_until)
+    private static final LocalTime MARKET_CLOSE_CONFIRMED = LocalTime.of(16, 0);
+
+    /**
+     * 평일이고, 오늘자 추천(또는 마감 뒤라면 오늘자 가격)이 전체 종목 대비 {@link #COVERAGE_THRESHOLD} 미만이면 보정 대상.
+     * 마감 전엔 오늘 가격이 원래 없으므로 가격 커버리지는 보지 않는다 - 보면 낮에 재시작할 때마다 보정이 다시 돈다.
+     */
+    public static boolean shouldCatchUp(LocalDate today, boolean afterClose, long totalStocks,
+                                        long todayPriceCoverage, long todayRecCoverage) {
         DayOfWeek day = today.getDayOfWeek();
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) {
             return false;
@@ -61,7 +70,7 @@ public class StartupCatchUpRunner implements ApplicationRunner {
         if (totalStocks == 0) {
             return false;
         }
-        boolean priceMissing = todayPriceCoverage < totalStocks * COVERAGE_THRESHOLD;
+        boolean priceMissing = afterClose && todayPriceCoverage < totalStocks * COVERAGE_THRESHOLD;
         boolean recMissing = todayRecCoverage < totalStocks * COVERAGE_THRESHOLD;
         return priceMissing || recMissing;
     }
@@ -78,7 +87,8 @@ public class StartupCatchUpRunner implements ApplicationRunner {
         long todayPriceCoverage = priceHistoryRepository.countDistinctTickersByTradeDate(today);
         long todayRecCoverage = recommendationRepository.countByRecDate(today);
 
-        if (!shouldCatchUp(today, totalStocks, todayPriceCoverage, todayRecCoverage)) {
+        boolean afterClose = !LocalTime.now(ZoneId.of("Asia/Seoul")).isBefore(MARKET_CLOSE_CONFIRMED);
+        if (!shouldCatchUp(today, afterClose, totalStocks, todayPriceCoverage, todayRecCoverage)) {
             log.info("시작 시 자동 보정: 건너뜀 (날짜={}, 종목수={}, 가격 {}/{}, 분석 {}/{})",
                     today, totalStocks, todayPriceCoverage, totalStocks, todayRecCoverage, totalStocks);
             return;

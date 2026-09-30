@@ -45,13 +45,11 @@
             <span class="score-card__label">종합 점수</span>
             <span id="finalScoreVal" class="score-card__value">--</span>
         </div>
-        <div class="score-card">
-            <span class="score-card__label">상승 확률</span>
-            <span id="riseProbVal" class="score-card__value">--</span>
-            <span id="probSourceTag" class="prob-tag"></span>
-            <span id="fallProbVal" class="prob-horizon"></span>
+        <div class="score-card" title="예측이 아니라 지금 상태를 나타내는 사실 태그입니다. 각 태그에 마우스를 올리면 정의가 나옵니다.">
+            <span class="score-card__label">태그</span>
+            <span id="tagsVal">--</span>
         </div>
-        <div class="score-card" title="12-1개월 모멘텀: 약 1년 전부터 1개월 전까지의 주가 수익률(최근 1개월 제외). 과거 5년 검증에서 상위 종목이 하위 종목보다 더 오른 경향이 있었지만 구간별로 흔들려, 점수·확률 계산에는 넣지 않은 참고 지표입니다.">
+        <div class="score-card" title="12-1개월 모멘텀: 약 1년 전부터 1개월 전까지의 주가 수익률(최근 1개월 제외). 과거 5년 검증에서 상위 종목이 하위 종목보다 더 오른 경향이 있었지만 구간별로 흔들려, 점수 계산에는 넣지 않은 참고 지표입니다.">
             <span class="score-card__label">12-1개월 모멘텀</span>
             <span id="momentumVal" class="score-card__value">--</span>
             <span class="prob-horizon">참고 지표 · 점수에 미반영</span>
@@ -59,9 +57,7 @@
     </div>
 
     <p class="prob-caveat">
-        상승확률/하락확률은 실제 통계 검증된 예측이 아닌 참고용 지표입니다.
-        <span id="notableHorizonNote"></span>
-        <span id="notableFallHorizonNote" class="prob-horizon--fall"></span>
+        점수와 태그는 참고용 정보이며 예측이 아닙니다. 태그별 실제 성과는 기록이 쌓이는 대로 검증합니다.
     </p>
 
     <div class="chart-section">
@@ -90,12 +86,10 @@
     <div class="chart-section">
         <h2>추천 점수 추이</h2>
         <p class="chart-desc">
-            이 종목의 종합점수와 상승확률이 시간에 따라 어떻게 바뀌어왔는지 보여주는 차트입니다.
-            둘 다 0~100 스케일이며, 숫자가 높을수록 더 긍정적인 신호를 뜻합니다.
+            이 종목의 종합점수가 시간에 따라 어떻게 바뀌어왔는지 보여주는 차트입니다(0~100).
         </p>
         <div class="chart-legend">
             <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>
-            <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#3E7BFA"></i>상승확률</span>
         </div>
         <div class="chart-wrap">
             <svg id="historyChart" viewBox="0 0 800 260" preserveAspectRatio="none"></svg>
@@ -117,6 +111,7 @@
 </footer>
 
 <script th:src="@{/js/score-trend-chart.js}"></script>
+<script th:src="@{/js/tags.js}"></script>
 <script th:src="@{/js/stock-detail.js}"></script>
 <script th:src="@{/js/feedback-widget.js}"></script>
 </body>

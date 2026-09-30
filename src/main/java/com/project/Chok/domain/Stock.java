@@ -26,6 +26,10 @@ public class Stock {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // 순발행 log(1년 전 대비 주식수) - collect.py가 marcap으로 계산해 수집 때마다 갱신 (태그 ISSUANCE_UP/BUYBACK)
+    @Column(name = "issuance_252")
+    private Double issuance252;
+
     public String getTicker() { return ticker; }
     public void setTicker(String ticker) { this.ticker = ticker; }
 
@@ -43,4 +47,7 @@ public class Stock {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Double getIssuance252() { return issuance252; }
+    public void setIssuance252(Double issuance252) { this.issuance252 = issuance252; }
 }

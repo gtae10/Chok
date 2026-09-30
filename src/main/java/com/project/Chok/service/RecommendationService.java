@@ -37,6 +37,7 @@ public class RecommendationService {
     private final SentimentAnalysisService sentimentAnalysisService;
     private final NewsDeduplicationService newsDeduplicationService;
     private final PerformanceTrackingService performanceTrackingService;
+    private final TagService tagService;
 
     private final AppProperties appProperties;
 
@@ -50,6 +51,7 @@ public class RecommendationService {
                                  SentimentAnalysisService sentimentAnalysisService,
                                  NewsDeduplicationService newsDeduplicationService,
                                  PerformanceTrackingService performanceTrackingService,
+                                 TagService tagService,
                                  AppProperties appProperties) {
         this.stockRepository = stockRepository;
         this.priceHistoryRepository = priceHistoryRepository;
@@ -61,6 +63,7 @@ public class RecommendationService {
         this.sentimentAnalysisService = sentimentAnalysisService;
         this.newsDeduplicationService = newsDeduplicationService;
         this.performanceTrackingService = performanceTrackingService;
+        this.tagService = tagService;
         this.appProperties = appProperties;
     }
 
@@ -146,6 +149,12 @@ public class RecommendationService {
 
         // 실전 성과 신규 편입은 중단(2026-09-29 결정) - 기존 보유 종목만 추적한다.
         // 다시 편입하려면 여기서 performanceTrackingService.saveSnapshot(today)를 호출하면 된다.
+        // 대신 태그별 기록을 남긴다(C1) - 성과 집계는 python-collector/evaluate_tags.py
+        try {
+            tagService.snapshot(today);
+        } catch (Exception e) {
+            log.error("태그 스냅샷 저장 실패 (date={}): {}", today, e.getMessage());
+        }
 
         return processed.get();
     }
@@ -223,6 +232,9 @@ public class RecommendationService {
                 techResult.getNotableFallHorizonDays(), techResult.getNotableFallHorizonProbability(),
                 techResult.getNotableFallHorizonApproxDate(),
                 technicalAnalysisService.momentum12m(prices),
+                technicalAnalysisService.volatility60(prices),
+                stock.getIssuance252(),
+                strongestRecentNewsScore(ticker, today),
                 recommendation, nuance, reason);
     }
 
@@ -327,6 +339,16 @@ public class RecommendationService {
         return new SentimentOutcome(sum / count, fallbackUsed);
     }
 
+    /** 최근 lookback 뉴스 중 |감성점수|가 가장 큰 값(부호 포함), 없으면 null - 태그 NEWS_POS/NEG 입력. */
+    private Double strongestRecentNewsScore(String ticker, LocalDate today) {
+        int lookback = appProperties.getAnalysis().getNewsLookbackDays();
+        return newsSentimentRepository.findByTickerSince(ticker, today.minusDays(lookback)).stream()
+                .map(NewsSentiment::getSentimentScore)
+                .filter(java.util.Objects::nonNull)
+                .max(java.util.Comparator.comparingDouble(Math::abs))
+                .orElse(null);
+    }
+
     /** 감성분석 실패율이 비정상적으로 높으면(대규모 API 장애 가능성) 눈에 띄게 경고한다.
      * 2026-06-27~07-23 API 장애로 638건이 조용히 오류 폴백값으로 저장됐던 사고 이후 추가. */
     private static final double ABNORMAL_FALLBACK_RATE = 0.5;
@@ -388,6 +410,7 @@ public class RecommendationService {
                                     String notableHorizonApproxDate,
                                     Integer notableFallHorizonDays, Double notableFallHorizonProbability,
                                     String notableFallHorizonApproxDate, Double momentum12m,
+                                    Double vol60, Double issuance252, Double materialNewsScore,
                                     String recommendation, String recommendationNuance, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
@@ -414,23 +437,14 @@ public class RecommendationService {
         entity.setNotableFallHorizonProbability(notableFallHorizonProbability);
         entity.setNotableFallHorizonApproxDate(notableFallHorizonApproxDate == null ? null : LocalDate.parse(notableFallHorizonApproxDate));
         entity.setMomentum12m(momentum12m);
+        entity.setVol60(vol60);
+        entity.setIssuance252(issuance252);
+        entity.setMaterialNewsScore(materialNewsScore);
         entity.setRecommendation(recommendation);
         entity.setRecommendationNuance(recommendationNuance);
         entity.setReason(reason);
 
         recommendationRepository.save(entity);
-    }
-
-    /**
-     * 모멘텀 상위 share(예: 0.2) 경계값 - 이 값 이상이면 상위권. 값이 있는 종목끼리만 센다.
-     * 필터(매수만 보기 등) 전에 그날 전 종목으로 계산해야 "상위 20%"의 기준이 흔들리지 않는다.
-     */
-    public static Double topShareCutoff(List<Double> values, double share) {
-        List<Double> sorted = values.stream().filter(java.util.Objects::nonNull)
-                .sorted(java.util.Comparator.reverseOrder()).toList();
-        if (sorted.isEmpty()) return null;
-        int k = Math.max(1, (int) Math.ceil(sorted.size() * share));
-        return sorted.get(k - 1);
     }
 
     private double round2(double v) {

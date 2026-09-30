@@ -182,6 +182,22 @@ class PerformanceTrackingServiceTest {
     }
 
     @Test
+    @DisplayName("저장된 진입가가 장중 가격이어도 선정일 확정 종가로 수익률을 계산한다")
+    void getPerformanceSummary_uses_confirmed_close_as_entry() {
+        // 2026-09-15 코웨이: 장중 분석으로 102,000원이 저장됐지만 그날 확정 종가는 100,900원
+        LocalDate date = LocalDate.of(2026, 9, 15);
+        PerformanceSnapshot s = snapshot("021240", "코웨이", date, 3, 102000);
+        when(performanceSnapshotRepository.findAllOrderBySnapshotDateDescRankAsc()).thenReturn(List.of(s));
+        when(priceHistoryRepository.findByTickerAndTradeDate("021240", date)).thenReturn(Optional.of(price(100900)));
+        when(priceHistoryRepository.findLatestByTicker("021240")).thenReturn(Optional.of(price(99400)));
+
+        PerformanceSummaryResponse summary = service.getPerformanceSummary();
+
+        assertThat(summary.getItems().get(0).getEntryPrice()).isEqualTo(100900);
+        assertThat(summary.getItems().get(0).getReturnRate()).isEqualTo(-0.0149); // (99400-100900)/100900
+    }
+
+    @Test
     @DisplayName("현재가가 진입가보다 내리면 음의 수익률을 계산한다")
     void getPerformanceSummary_computes_negative_return() {
         LocalDate date = LocalDate.now().minusDays(2);

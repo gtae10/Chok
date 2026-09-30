@@ -124,4 +124,20 @@ class TechnicalAnalysisServiceTest {
         assertThat(service.momentum12m(createPriceHistory(252, 10000, true))).isNull();
         assertThat(service.momentum12m(createPriceHistory(253, 10000, true))).isNotNull();
     }
+
+    @Test
+    @DisplayName("60일 변동성: 일간수익률 표본표준편차(%), 이력 61일 미만이면 null")
+    void volatility60_is_sample_std_of_daily_returns() {
+        // 종가가 100, 110 번갈아 -> 수익률 +10%, -9.09% 반복 (60개 중 30개씩)
+        List<PriceHistory> data = new java.util.ArrayList<>();
+        for (int i = 0; i < 61; i++) {
+            PriceHistory p = new PriceHistory();
+            p.setClosePrice(i % 2 == 0 ? 100 : 110);
+            data.add(p);
+        }
+        double up = 0.1, down = 100.0 / 110 - 1, mean = (up + down) / 2;
+        double expected = Math.sqrt(60 * Math.pow(up - mean, 2) / 59) * 100; // 편차 크기가 모두 같음
+        assertThat(service.volatility60(data)).isEqualTo(Math.round(expected * 100) / 100.0);
+        assertThat(service.volatility60(data.subList(0, 60))).isNull();
+    }
 }

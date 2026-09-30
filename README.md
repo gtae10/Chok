@@ -14,7 +14,12 @@
 
 촉(Chok)은 KOSPI/KOSDAQ 시가총액 상위 100개 종목을 대상으로
 **기술적 분석(거래량 포함) + OpenAI 뉴스 감성 분석**을 결합해
-종목별 추천 점수와 상승확률을 산출하는 웹 대시보드다.
+종목별 추천 점수와 **사실 기반 태그**를 보여주는 웹 대시보드다.
+
+> **2026-09-30 방향 재설정** — 상승확률은 5년 검증에서 무작위 수준(AUC 0.50)을 넘지 못해 화면에서 내렸다.
+> 지금은 "오늘 뭘 봐야 하지?"(스크리너)와 "이 신호에 진짜 엣지가 있나?"(검증)를 먼저 세우고,
+> 실전 기록으로 검증된 신호만 예측에 쓰는 순서로 간다. 목표·태그 정의·판정 기준은
+> **[docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** 가 정본이다.
 
 단순히 지표를 계산해서 보여주는 데서 그치지 않고, **"상승확률"이 실제로 통계적
 근거가 있는 값인지 로지스틱 회귀 + walk-forward 검증으로 직접 확인하는 과정**과
@@ -32,8 +37,9 @@
 - 기술적 지표 계산: 이동평균(MA5/20/60), RSI, MACD, 볼린저밴드, **거래량비율 + OBV**
 - 네이버 금융 뉴스 크롤링 + OpenAI API 감성 분석
 - 기술점수 + 감성점수 가중 결합으로 최종 추천 등급 산출 (STRONG_BUY ~ STRONG_SELL)
-- **상승확률**: 로지스틱 회귀 모델(학습됐을 때) 또는 지표 종합 추정치(휴리스틱) — 어느 쪽
-  근거인지 화면에 항상 뱃지로 구분 표시
+- **사실 태그**: 모멘텀 상위 20%, 저변동성, 주식수 증가/감소, 재료성 호재/악재 — 예측이 아니라
+  "지금 이런 상태다"라는 표시. 분석 때마다 `tag_snapshots`에 기록해 태그별 실전 성과를 잰다
+  (`python-collector/evaluate_tags.py`, 정의·기준은 PROJECT_PLAN 4·5장)
 - 대시보드 종목명/티커 검색 + 등급 필터 + **컬럼 헤더 클릭 정렬**
 - 분석 실행은 **비동기 + 병렬 처리**로 진행률을 실시간 폴링하며 표시 (브라우저 타임아웃 없음)
 - **6시간마다(00/06/12/18시) 자동 수집+분석 스케줄러** (선택적 활성화, cron 설정으로 주기 변경 가능)
@@ -73,10 +79,11 @@
     ├── ② 분석 실행 버튼 → 즉시 응답 + 백그라운드 실행 (AnalysisStatus 폴링)
     │       └── 스레드풀 병렬 처리 (종목 단위 동시 분석)
     │             ├── 기술적 지표 계산 (MA/RSI/MACD/볼린저밴드/거래량/OBV)
-    │             ├── 상승확률 계산 (학습모델 있으면 사용, 없으면 휴리스틱)
+    │             ├── 태그 입력값 (12-1 모멘텀, 60일 변동성, 순발행, 재료성 뉴스)
     │             ├── 네이버 금융 뉴스 크롤링 (jsoup)
     │             └── OpenAI API 감성 분석
     │                   └── 최종 추천 점수 → MySQL 저장
+    │       └── 전 종목 완료 후 그날 태그 → tag_snapshots
     │
     └── 6시간마다 자동 스케줄러 (선택) → 위 ①②를 자동 실행
 
@@ -105,10 +112,9 @@
 - OpenAI API로 뉴스 헤드라인 분석
 - POSITIVE(+) / NEUTRAL(0) / NEGATIVE(-) 분류
 
-**상승확률 (0~100%)**:
-- 학습된 로지스틱 회귀 모델이 있으면 그걸로 계산 (화면에 "학습" 뱃지)
-- 없으면 위 지표 점수들을 조합한 추정치로 대체 (화면에 "추정" 뱃지)
-- 어느 쪽이든 "통계 검증된 예측이 아닌 참고용 지표"임을 화면에 항상 명시
+**상승확률**: 계산·저장은 하지만 화면에는 표시하지 않는다(2026-09-30). 배포 모델의 holdout
+AUC가 0.50이었고, 라벨이 "그날 중앙값보다 잘했나"인데 "상승/하락 확률"로 표시되고 있었다
+(PROJECT_PLAN 2장).
 
 ---
 
@@ -269,9 +275,25 @@
     추정한 원인("급등장에 오늘의 대형주들이 동시에 신고가 근접 → 구분력 상실")이 생존편향
     때문이었다는 것과 맞는 결과. 다만 최고치도 0.53 미만이라 `ADOPT_HIGH52W`는 아직 False 유지.
 
+13. **보조지표·캔들 패턴 후보** (`experiment_indicators_patterns.py`) — 스토캐스틱·CCI·ADX/DMI·ATR·MFI·
+    이격도·일목 구름대 8개 지표와 캔들 패턴 9개를 PIT 유니버스에서 검증. 50일 기준 ATR(`+atr14`)이
+    IC 0.097(8/10 폴드)로 가장 컸지만, 모델 상위 10%가 하위 10%보다 평균 1.95% 뒤처졌다 — 변동성은
+    "중앙값을 넘을 확률"은 올리지만 평균 수익은 올리지 않는다. 거래정지일(시가·고가·저가 0) 보정 후
+    재실행해도 결과는 거의 같았다.
+14. **규모·회전율·순발행** (`experiment_size_turnover_issuance.py`) — marcap 시총·거래대금으로 만든 후보.
+    **순발행(1년 주식수 변화)** 이 50일 IC 0.052(9/10 폴드), 단독 순위 IC −0.090으로 **10개 폴드 모두
+    같은 방향** — 지금까지 가장 일관된 신호. 상위 10% 추천이 하위보다 뒤처지던 문제(−4.6%)도 거의
+    사라진다(−0.07%). 회전율은 폴드 편차가 커 불안정, 규모는 무효.
+15. **방향 재설정 + 태그 백테스트** (`evaluate_tags.py`, 2026-09-30) — 예측기부터 만드는 대신 사실 태그를
+    보여주고 태그별 성과를 재는 구조로 바꿨다. 태그 v1의 백테스트(평균 대비 초과수익, 겹치지 않는 창)에서
+    **사전에 정한 기준을 통과한 태그는 없었다**: 모멘텀은 크기는 크지만(50일 +3.4%) 구간별로 흔들렸고,
+    순발행은 순위 전체로는 일관됐지만 ±2% 경계 태그로는 드러나지 않았다. 최종 판정은 앞으로 쌓이는
+    실전 기록으로 한다 — 상세는 [PROJECT_PLAN 5장](docs/PROJECT_PLAN.md).
+
 **현재 결론**: purge 적용 + 5년치 재검증 후에도 AUC가 0.5 근처(랜덤 수준)에 머물러,
-지금 확보한 데이터/특징 조합으로는 뚜렷한 예측력을 확인하지 못했다. 그래서 상승확률은
-기본적으로 휴리스틱으로 서빙되고, 학습 모델은 검증을 통과할 때만 대체 사용된다.
+지금 확보한 데이터/특징 조합으로는 뚜렷한 예측력을 확인하지 못했다. (이전 판에는
+"학습 모델은 검증을 통과할 때만 사용"이라고 적었지만 실제 코드에는 그런 기준이 없었다 — 2026-09-30
+점검에서 발견해 상승확률 자체를 화면에서 내렸다.)
 `backtest.py`로 KOSPI/KOSDAQ을 나눠 기술점수 vs 무작위 선택도 비교했는데, 두 시장
 모두 무작위보다 뚜렷이 낫다는 근거를 찾지 못했다 — 결과가 기대에 못 미쳐도 그대로 보고한다.
 
@@ -364,12 +386,13 @@ Chok/
 ├── src/main/java/com/project/Chok/
 │   ├── config/            AppProperties (chok.* 설정 바인딩)
 │   ├── controller/        REST API, 대시보드 라우팅
-│   ├── domain/             Stock, PriceHistory, TechnicalScore, NewsSentiment, Recommendation
+│   ├── domain/             Stock, PriceHistory, TechnicalScore, NewsSentiment, Recommendation, TagSnapshot
 │   ├── dto/                데이터 전달 객체
 │   ├── repository/        Spring Data JPA
 │   └── service/
 │       ├── TechnicalAnalysisService     기술적 지표 + 거래량 지표 계산
-│       ├── RiseProbabilityService       학습모델 로드 및 상승확률 계산
+│       ├── RiseProbabilityService       학습모델 로드 및 상승확률 계산 (화면 미표시, 저장만)
+│       ├── TagService                   사실 태그 규칙(정본) + 그날 태그 스냅샷
 │       ├── SentimentAnalysisService     OpenAI API 뉴스 감성 분석
 │       ├── NewsCollectorService         네이버 금융 뉴스 크롤링
 │       ├── DataCollectionService        Python 수집기 실행 (ProcessBuilder)
@@ -377,18 +400,21 @@ Chok/
 │       ├── RecommendationService        종합 점수/추천등급 산출 (병렬 처리)
 │       ├── AnalysisStatus               분석 진행상태 (비동기 폴링용)
 │       └── AnalysisScheduler            자동 수집+분석 / 모델 재학습 스케줄
+├── docs/PROJECT_PLAN.md                 목표·태그 정의·판정 기준·결정 기록 (정본)
 ├── src/main/resources/
 │   ├── application.properties            (git 미포함 — 실제 값)
 │   ├── application.properties.example    (git 포함 — 템플릿)
 │   ├── templates/                        dashboard.html, stock-detail.html
 │   └── static/                           css, js
 └── python-collector/
-    ├── collect.py                        시세 수집 (FinanceDataReader, 종목당 5년치 백필)
+    ├── collect.py                        시세 수집 (확정 종가만) + 순발행 갱신(marcap)
+    ├── evaluate_tags.py                  태그별 백테스트/실전 성과 집계·판정
     ├── train_model.py                    상승확률 로지스틱 회귀 학습 (walk-forward 검증 포함)
     ├── backtest.py                       v1/v2 백테스트 + KOSPI/KOSDAQ 분리 비교
     ├── sample_sentiment_for_review.py    실제 감성분석 표본 사람 검토용 CSV 생성
     ├── sentiment_consistency_check.py    근접중복 헤드라인 간 감성점수 일관성 검증
     ├── sentiment_predictive_check.py     감성점수 vs 이후 수익률 추적 (장기 관찰용)
+    ├── test_collect.py / test_evaluate_tags.py   자가점검 (python test_*.py)
     ├── config.py / db.py
     └── requirements.txt
 ```

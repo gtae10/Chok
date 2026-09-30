@@ -37,7 +37,15 @@ async function loadStockDetail() {
         await loadNewsPage();
     } catch(e) { console.error(e); }
 
+    loadTags(ticker);
     loadAiReport(ticker); // LLM 호출이라 응답이 늦을 수 있어 다른 로딩과 분리, 완료 대기 안 함
+}
+
+async function loadTags(ticker) {
+    try {
+        const res = await fetch("/api/stocks/" + ticker + "/tags");
+        document.getElementById("tagsVal").innerHTML = renderTags(await res.json());
+    } catch (e) { console.error(e); }
 }
 
 async function loadAiReport(ticker) {
@@ -277,35 +285,8 @@ function renderHeader(item) {
     document.getElementById("sentimentScoreVal").textContent = fmt(item.sentimentScore);
     document.getElementById("finalScoreVal").textContent = fmt(item.finalScore);
 
-    const riseProbEl = document.getElementById("riseProbVal");
-    const probTagEl = document.getElementById("probSourceTag");
-    const fallProbEl = document.getElementById("fallProbVal");
-    if (item.riseProbability == null) {
-        riseProbEl.textContent = "--";
-        probTagEl.textContent = "";
-        fallProbEl.textContent = "";
-    } else {
-        riseProbEl.textContent = fmt(item.riseProbability) + "%";
-        const isModel = item.probabilitySource === "MODEL";
-        const horizon = (isModel && item.probabilityHorizonDays) ? " · " + item.probabilityHorizonDays + "영업일 기준" : "";
-        probTagEl.textContent = (isModel ? "학습 기반" : "추정치") + horizon;
-        probTagEl.className = "prob-tag " + (isModel ? "prob-tag--model" : "prob-tag--heuristic");
-        // 하락확률은 별도로 계산하지 않고 100-상승확률로 표시 (같은 확률의 반대쪽 표현일 뿐)
-        fallProbEl.textContent = "하락(보합포함) 확률: " + fmt(100 - item.riseProbability) + "%";
-    }
-
     document.getElementById("momentumVal").textContent = item.momentum12m == null
         ? "--" : (item.momentum12m > 0 ? "+" : "") + fmt(item.momentum12m) + "%";
-
-    const notableEl = document.getElementById("notableHorizonNote");
-    notableEl.textContent = (item.notableHorizonDays != null)
-        ? "유력 구간: 약 " + item.notableHorizonApproxDate + " 전후 (" + fmt(item.notableHorizonProbability) + "%)"
-        : "";
-
-    const notableFallEl = document.getElementById("notableFallHorizonNote");
-    notableFallEl.textContent = (item.notableFallHorizonDays != null)
-        ? "유력 하락구간: 약 " + item.notableFallHorizonApproxDate + " 전후 (" + fmt(item.notableFallHorizonProbability) + "%)"
-        : "";
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

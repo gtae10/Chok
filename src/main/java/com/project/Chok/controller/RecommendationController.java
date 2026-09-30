@@ -14,6 +14,7 @@ import com.project.Chok.service.AnalysisStatus;
 import com.project.Chok.service.DataCollectionService;
 import com.project.Chok.service.RecommendationService;
 import com.project.Chok.service.StockReportService;
+import com.project.Chok.service.TagService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,8 +29,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class RecommendationController {
 
-    private static final double MOMENTUM_TOP_SHARE = 0.2; // "모멘텀 상위 20%" 표시 기준
-
     private final RecommendationRepository recommendationRepository;
     private final PriceHistoryRepository priceHistoryRepository;
     private final NewsSentimentRepository newsSentimentRepository;
@@ -38,6 +37,7 @@ public class RecommendationController {
     private final AnalysisStatus analysisStatus;
     private final AppProperties appProperties;
     private final StockReportService stockReportService;
+    private final TagService tagService;
 
     public RecommendationController(RecommendationRepository recommendationRepository,
                                     PriceHistoryRepository priceHistoryRepository,
@@ -46,7 +46,8 @@ public class RecommendationController {
                                     RecommendationService recommendationService,
                                     AnalysisStatus analysisStatus,
                                     AppProperties appProperties,
-                                    StockReportService stockReportService) {
+                                    StockReportService stockReportService,
+                                    TagService tagService) {
         this.recommendationRepository = recommendationRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.newsSentimentRepository = newsSentimentRepository;
@@ -55,6 +56,7 @@ public class RecommendationController {
         this.analysisStatus = analysisStatus;
         this.appProperties = appProperties;
         this.stockReportService = stockReportService;
+        this.tagService = tagService;
     }
 
     @PostMapping("/collection/run")
@@ -136,8 +138,7 @@ public class RecommendationController {
 
         List<Recommendation> recs = recommendationRepository
                 .findByRecDateOrderByFinalScoreDesc(latestDate);
-        Double momentumCutoff = RecommendationService.topShareCutoff(
-                recs.stream().map(Recommendation::getMomentum12m).toList(), MOMENTUM_TOP_SHARE);
+        Map<String, List<String>> tags = tagService.tagsOn(latestDate);
 
         if (filter != null && !filter.isBlank()) {
             recs = recs.stream()
@@ -147,10 +148,14 @@ public class RecommendationController {
 
         return ResponseEntity.ok(recs.stream().map(r -> {
             RecommendationResponse resp = new RecommendationResponse(r);
-            resp.setMomentumTop20(momentumCutoff != null && r.getMomentum12m() != null
-                    && r.getMomentum12m() >= momentumCutoff);
+            resp.setTags(tags.getOrDefault(r.getTicker(), List.of()));
             return resp;
         }).collect(Collectors.toList()));
+    }
+
+    @GetMapping("/stocks/{ticker}/tags")
+    public ResponseEntity<List<String>> getTags(@PathVariable String ticker) {
+        return ResponseEntity.ok(tagService.latestTagsFor(ticker));
     }
 
     @GetMapping("/stocks/{ticker}/prices")

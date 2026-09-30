@@ -95,7 +95,12 @@ public class PerformanceTrackingService {
                     Integer currentPrice = priceHistoryRepository.findLatestByTicker(s.getTicker())
                             .map(PriceHistory::getClosePrice)
                             .orElse(null);
-                    return new PerformanceItemResponse(s, currentPrice, today, findPeakAfter(s));
+                    // 저장된 진입가는 장중에 분석했으면 장중 가격이다(2026-09-15 코웨이 102,000 vs 종가 100,900).
+                    // 선정일 확정 종가가 있으면 그걸 쓴다 - 수집은 이제 확정 종가만 저장한다(collect.confirmed_until)
+                    Integer entryPrice = priceHistoryRepository.findByTickerAndTradeDate(s.getTicker(), s.getSnapshotDate())
+                            .map(PriceHistory::getClosePrice)
+                            .orElse(s.getEntryPrice());
+                    return new PerformanceItemResponse(s, entryPrice, currentPrice, today, findPeakAfter(s));
                 })
                 .toList();
 

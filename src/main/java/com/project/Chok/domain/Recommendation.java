@@ -71,6 +71,16 @@ public class Recommendation {
     @Column(name = "momentum_12m")
     private Double momentum12m;
 
+    // 태그 입력값 (TagService) - 그날 값 그대로 남겨 나중에 태그를 다시 검증할 수 있게 한다
+    @Column(name = "vol60")
+    private Double vol60; // 60영업일 일간수익률 표준편차(%)
+
+    @Column(name = "issuance_252")
+    private Double issuance252; // 분석 시점의 Stock.issuance252
+
+    @Column(name = "material_news_score")
+    private Double materialNewsScore; // 최근 lookback 뉴스 중 |감성점수|가 가장 큰 값(부호 포함)
+
     @Column(length = 20)
     private String recommendation;
 
@@ -141,6 +151,12 @@ public class Recommendation {
 
     public Double getMomentum12m() { return momentum12m; }
     public void setMomentum12m(Double momentum12m) { this.momentum12m = momentum12m; }
+    public Double getVol60() { return vol60; }
+    public void setVol60(Double vol60) { this.vol60 = vol60; }
+    public Double getIssuance252() { return issuance252; }
+    public void setIssuance252(Double issuance252) { this.issuance252 = issuance252; }
+    public Double getMaterialNewsScore() { return materialNewsScore; }
+    public void setMaterialNewsScore(Double materialNewsScore) { this.materialNewsScore = materialNewsScore; }
 
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }

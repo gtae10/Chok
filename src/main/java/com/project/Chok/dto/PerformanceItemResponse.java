@@ -25,7 +25,8 @@ public class PerformanceItemResponse {
     private Long peakDays;
     private Double peakReturnRate;
 
-    public PerformanceItemResponse(PerformanceSnapshot s, Integer currentPrice, LocalDate today, PriceHistory peak) {
+    /** entryPrice: 선정일 확정 종가 (PerformanceTrackingService가 price_history에서 다시 읽어 넘긴다) */
+    public PerformanceItemResponse(PerformanceSnapshot s, Integer entryPrice, Integer currentPrice, LocalDate today, PriceHistory peak) {
         this.id = s.getId();
         this.ticker = s.getTicker();
         this.name = s.getName();
@@ -35,17 +36,17 @@ public class PerformanceItemResponse {
         this.sentimentScore = s.getSentimentScore();
         this.finalScore = s.getFinalScore();
         this.riseProbability = s.getRiseProbability();
-        this.entryPrice = s.getEntryPrice();
+        this.entryPrice = entryPrice;
         this.currentPrice = currentPrice;
-        this.returnRate = (currentPrice != null && s.getEntryPrice() != null && s.getEntryPrice() != 0)
-                ? round4((currentPrice - s.getEntryPrice()) / (double) s.getEntryPrice())
+        this.returnRate = (currentPrice != null && entryPrice != null && entryPrice != 0)
+                ? round4((currentPrice - entryPrice) / (double) entryPrice)
                 : null;
         this.holdingDays = ChronoUnit.DAYS.between(s.getSnapshotDate(), today);
         if (peak != null) {
             this.peakDate = peak.getTradeDate().toString();
             this.peakDays = ChronoUnit.DAYS.between(s.getSnapshotDate(), peak.getTradeDate());
-            this.peakReturnRate = (s.getEntryPrice() != null && s.getEntryPrice() != 0)
-                    ? round4((peak.getClosePrice() - s.getEntryPrice()) / (double) s.getEntryPrice())
+            this.peakReturnRate = (entryPrice != null && entryPrice != 0)
+                    ? round4((peak.getClosePrice() - entryPrice) / (double) entryPrice)
                     : null;
         }
     }
