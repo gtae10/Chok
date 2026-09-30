@@ -14,6 +14,9 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
     @Query("SELECT MAX(r.recDate) FROM Recommendation r")
     LocalDate findLatestRecDate();
 
+    @Query("SELECT MAX(r.recDate) FROM Recommendation r WHERE r.recDate < :date")
+    LocalDate findLatestRecDateBefore(@Param("date") LocalDate date);
+
     @Query("SELECT r FROM Recommendation r WHERE r.recDate = :recDate ORDER BY r.finalScore DESC")
     List<Recommendation> findByRecDateOrderByFinalScoreDesc(@Param("recDate") LocalDate recDate);
 

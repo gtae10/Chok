@@ -88,7 +88,7 @@ class RecommendationServiceTest {
                 createStock("005930", "삼성전자"),
                 createStock("000660", "SK하이닉스")
         );
-        when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(stocks);
+        when(stockRepository.findCurrentUniverseOrderByMarketCapDesc()).thenReturn(stocks);
         mockNormalStock("005930");
         mockNormalStock("000660");
 
@@ -139,7 +139,7 @@ class RecommendationServiceTest {
                 createStock("005930", "삼성전자"),
                 createStock("000660", "SK하이닉스")
         );
-        when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(stocks);
+        when(stockRepository.findCurrentUniverseOrderByMarketCapDesc()).thenReturn(stocks);
 
         // 첫 번째 종목에서 예외 발생
         when(priceHistoryRepository.findByTickerOrderByTradeDateAsc("005930"))
@@ -236,7 +236,7 @@ class RecommendationServiceTest {
     @Test
     @DisplayName("가격 데이터가 2일 이상 오래되면 AnalysisStatus에 경고가 남는다")
     void stale_price_data_sets_warning() {
-        when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(List.of());
+        when(stockRepository.findCurrentUniverseOrderByMarketCapDesc()).thenReturn(List.of());
         when(priceHistoryRepository.findLatestTradeDateAcrossAll())
                 .thenReturn(LocalDate.now().minusDays(10));
 
@@ -251,7 +251,7 @@ class RecommendationServiceTest {
     @Test
     @DisplayName("가격 데이터가 최신이면 경고가 없다")
     void fresh_price_data_sets_no_warning() {
-        when(stockRepository.findAllOrderByMarketCapDesc()).thenReturn(List.of());
+        when(stockRepository.findCurrentUniverseOrderByMarketCapDesc()).thenReturn(List.of());
         when(priceHistoryRepository.findLatestTradeDateAcrossAll())
                 .thenReturn(LocalDate.now());
 

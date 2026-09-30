@@ -124,6 +124,15 @@ public class RecommendationController {
     ) {
         LocalDate latestDate = recommendationRepository.findLatestRecDate();
         if (latestDate == null) return ResponseEntity.ok(List.of());
+        // 분석은 종목마다 끝나는 대로 오늘 날짜로 저장하므로, 도는 중엔 오늘 행이 일부뿐이다.
+        // 직전 날짜보다 적게 쌓였으면 직전(완료된) 날짜를 보여준다.
+        if (analysisStatus.isRunning()) {
+            LocalDate prevDate = recommendationRepository.findLatestRecDateBefore(latestDate);
+            if (prevDate != null && recommendationRepository.countByRecDate(latestDate)
+                    < recommendationRepository.countByRecDate(prevDate)) {
+                latestDate = prevDate;
+            }
+        }
 
         List<Recommendation> recs = recommendationRepository
                 .findByRecDateOrderByFinalScoreDesc(latestDate);

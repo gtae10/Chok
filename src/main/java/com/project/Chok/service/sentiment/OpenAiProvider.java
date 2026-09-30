@@ -54,6 +54,7 @@ public class OpenAiProvider implements LlmProvider {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class)
+                .timeout(CALL_TIMEOUT)
                 .block();
 
         JsonNode root = parseEnvelope(responseBody);

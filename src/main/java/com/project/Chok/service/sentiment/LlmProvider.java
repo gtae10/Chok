@@ -1,11 +1,16 @@
 package com.project.Chok.service.sentiment;
 
+import java.time.Duration;
+
 /**
  * 감성 분석에 사용하는 LLM 채팅 API를 프로바이더별로 추상화한다.
  * 프롬프트 작성과 응답 JSON({score,label,summary}) 파싱은 SentimentAnalysisService에서
  * 공통으로 처리하고, 여기서는 각 프로바이더의 요청 형식/인증/응답 envelope 차이만 감춘다.
  */
 public interface LlmProvider {
+
+    // 응답이 멈추면 분석 스레드가 영원히 대기하고 AnalysisStatus가 RUNNING에 갇힌다 - 상한을 건다
+    Duration CALL_TIMEOUT = Duration.ofSeconds(60);
 
     /** API 키 등 필수 설정이 되어 있는지 여부. */
     boolean isConfigured();

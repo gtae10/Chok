@@ -42,6 +42,14 @@ class SentimentAnalysisServiceErrorClassificationTest {
     }
 
     @Test
+    @DisplayName("Mono.timeout 초과(block()이 감싼 TimeoutException) -> 타임아웃으로 분류")
+    void classifies_reactor_timeout_as_timeout() {
+        Exception e = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> reactor.core.publisher.Mono.never().timeout(java.time.Duration.ofMillis(10)).block());
+        assertThat(newService().classifyFailure(e)).isEqualTo("타임아웃");
+    }
+
+    @Test
     @DisplayName("429 + insufficient_quota 응답 본문 -> 크레딧 소진으로 분류")
     void classifies_429_with_quota_body_as_credit_exhausted() {
         String body = "{\"error\":{\"type\":\"insufficient_quota\"}}";

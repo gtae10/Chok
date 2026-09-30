@@ -74,7 +74,7 @@ public class StartupCatchUpRunner implements ApplicationRunner {
         }
 
         LocalDate today = LocalDate.now();
-        long totalStocks = stockRepository.count();
+        long totalStocks = stockRepository.countCurrentUniverse();
         long todayPriceCoverage = priceHistoryRepository.countDistinctTickersByTradeDate(today);
         long todayRecCoverage = recommendationRepository.countByRecDate(today);
 

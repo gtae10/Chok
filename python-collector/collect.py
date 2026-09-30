@@ -67,6 +67,10 @@ def fetch_price_history(stock):
         logger.warning(f"{ticker}: 가격 데이터 없음")
         return ticker, False
 
+    # 결측 한 칸이 int(NaN) 예외로 번져 100종목 수집 전체가 실패하지 않도록 - 종가 없는 날은 버리고
+    # 나머지 결측은 0 (거래정지일 시가/고가/저가가 원래 0으로 들어오는 것과 같은 취급)
+    df = df.dropna(subset=["Close"]).fillna(0)
+
     rows = []
     for date, row in df.iterrows():
         rows.append({

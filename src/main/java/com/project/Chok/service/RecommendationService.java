@@ -98,7 +98,7 @@ public class RecommendationService {
     );
 
     public int runFullAnalysis(AnalysisStatus status) {
-        List<Stock> stocks = stockRepository.findAllOrderByMarketCapDesc();
+        List<Stock> stocks = stockRepository.findCurrentUniverseOrderByMarketCapDesc();
         LocalDate today = LocalDate.now();
         checkStalePriceData(today, status);
         int total = stocks.size();

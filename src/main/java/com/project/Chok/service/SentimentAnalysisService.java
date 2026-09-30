@@ -183,6 +183,9 @@ public class SentimentAnalysisService {
             }
             return "요청 오류(HTTP " + status + ")";
         }
+        if (e.getCause() instanceof TimeoutException) { // LlmProvider.CALL_TIMEOUT 초과 (block()이 감싸서 던짐)
+            return "타임아웃";
+        }
         if (e instanceof WebClientRequestException) {
             Throwable cause = e.getCause();
             boolean timeout = cause instanceof TimeoutException
