@@ -96,6 +96,10 @@ class RecommendationServiceTest {
         int result = service.runFullAnalysis();
 
         assertThat(result).isEqualTo(2);
+        // 같은 날 앞선 분석 뒤 유니버스에서 빠진 종목의 오늘 행을 지우고 나서 태그를 기록한다
+        var inOrder = inOrder(recommendationRepository, tagService);
+        inOrder.verify(recommendationRepository).deleteByRecDateAndTickerNotIn(LocalDate.now(), List.of("005930", "000660"));
+        inOrder.verify(tagService).snapshot(LocalDate.now());
     }
 
     @Test

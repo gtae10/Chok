@@ -37,4 +37,9 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
 
     @Query("SELECT COUNT(r) FROM Recommendation r WHERE r.recDate = :recDate")
     long countByRecDate(@Param("recDate") LocalDate recDate);
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Recommendation r WHERE r.recDate = :recDate AND r.ticker NOT IN :tickers")
+    int deleteByRecDateAndTickerNotIn(@Param("recDate") LocalDate recDate, @Param("tickers") List<String> tickers);
 }

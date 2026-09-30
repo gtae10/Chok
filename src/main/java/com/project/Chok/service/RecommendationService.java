@@ -151,6 +151,13 @@ public class RecommendationService {
         // 다시 편입하려면 여기서 performanceTrackingService.saveSnapshot(today)를 호출하면 된다.
         // 대신 태그별 기록을 남긴다(C1) - 성과 집계는 python-collector/evaluate_tags.py
         try {
+            // 같은 날 앞선 분석 뒤 상위 N에서 빠진 종목의 오늘 행은 지운다 - 남기면 화면 목록과
+            // 태그 순위 경계(상위 20%)가 이번에 분석하지 않은 종목까지 섞인 채로 계산된다
+            List<String> analyzed = stocks.stream().map(Stock::getTicker).toList();
+            if (!analyzed.isEmpty()) {
+                int removed = recommendationRepository.deleteByRecDateAndTickerNotIn(today, analyzed);
+                if (removed > 0) log.info("유니버스에서 빠진 종목의 오늘 추천 {}건 삭제", removed);
+            }
             tagService.snapshot(today);
         } catch (Exception e) {
             log.error("태그 스냅샷 저장 실패 (date={}): {}", today, e.getMessage());
