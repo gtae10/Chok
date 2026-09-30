@@ -34,7 +34,9 @@ public class TagService {
 
     static final double TOP_SHARE = 0.2;
     static final double ISSUANCE_THRESHOLD = 0.02;       // log 기준 약 ±2% 주식수 변화
-    static final double MATERIAL_NEWS_THRESHOLD = 0.6;   // 감성 프롬프트의 "구체적·즉각적 재무 임팩트" 경계
+    // 0.6(감성 프롬프트의 재무 임팩트 경계)은 첫날 100종목 중 56개가 호재로 걸려 구분력이 없었다.
+    // 0.8 = 개별 뉴스 1,718건 중 상위 0.6% (2026-09-30 실측, PROJECT_PLAN D13)
+    static final double MATERIAL_NEWS_THRESHOLD = 0.8;
 
     private final RecommendationRepository recommendationRepository;
     private final TagSnapshotRepository tagSnapshotRepository;

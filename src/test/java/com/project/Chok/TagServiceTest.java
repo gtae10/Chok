@@ -29,9 +29,9 @@ class TagServiceTest {
         // 10종목: 모멘텀·변동성 1..10 -> 모멘텀 상위 20% = 9,10 / 저변동성 하위 20% = 1,2
         List<Recommendation> recs = new java.util.ArrayList<>(IntStream.rangeClosed(1, 10)
                 .mapToObj(i -> rec("T" + i, (double) i, (double) i, 0.0, 0.0)).toList());
-        recs.add(rec("UP", null, null, 0.05, 0.7));      // 증자 +5%, 재료성 호재
-        recs.add(rec("BB", null, null, -0.05, -0.6));    // 소각 -5%, 재료성 악재(경계값 포함)
-        recs.add(rec("SMALL", null, null, 0.01, 0.59));  // 경계 미만은 태그 없음
+        recs.add(rec("UP", null, null, 0.05, 0.85));     // 증자 +5%, 재료성 호재
+        recs.add(rec("BB", null, null, -0.05, -0.8));    // 소각 -5%, 재료성 악재(경계값 포함)
+        recs.add(rec("SMALL", null, null, 0.01, 0.79));  // 경계 미만은 태그 없음
 
         Map<String, List<String>> tags = TagService.compute(recs);
 

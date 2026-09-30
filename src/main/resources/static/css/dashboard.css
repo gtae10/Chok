@@ -312,3 +312,13 @@ a { color: inherit; text-decoration: none; }
     display: inline-block; margin: 2px 4px 2px 0; padding: 1px 7px; border-radius: 10px;
     font-size: 0.68rem; color: #C9CFE0; background: rgba(137,147,176,0.16); white-space: nowrap;
 }
+
+/* 화면 하단 지표·태그 설명 (tags.js renderGlossary) */
+.glossary { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; margin: 12px 0 0; }
+.glossary dt { color: #C9CFE0; font-size: 0.8rem; white-space: nowrap; }
+.glossary dd { margin: 0; color: #8993B0; font-size: 0.8rem; line-height: 1.5; }
+.glossary__basis { display: block; color: #5C6786; font-size: 0.72rem; margin-top: 2px; }
+@media (max-width: 640px) {
+    .glossary { grid-template-columns: 1fr; gap: 4px; }
+    .glossary dd { margin-bottom: 10px; }
+}
