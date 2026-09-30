@@ -72,8 +72,10 @@ def load_pit_ohlcv():
     adj = m["close_price"] / m["Close"].where(m["Close"] > 0)
     for c in ("Open", "High", "Low"):
         m[c.lower()] = m[c] * adj
-    # 거래정지 등으로 시가가 0이면 캔들 모양이 없으니 종가로 채운다(몸통 0 → 패턴 미해당)
-    m["open"] = m["open"].where(m["Open"] > 0, m["close_price"])
+    # 거래정지일은 시가·고가·저가가 모두 0으로 온다(2024년 KOSPI/KOSDAQ 24,614행) - 셋 다 종가로
+    # 채운다. 고가·저가를 0으로 두면 ATR·스토캐스틱·CCI·MFI·구름대가 수 주~수 달간 왜곡된다
+    for c in ("open", "high", "low"):
+        m[c] = m[c].where(m["Open"] > 0, m["close_price"])
     price_df = m.rename(columns={"Code": "ticker", "Date": "trade_date", "Volume": "volume"})
     price_df["volume"] = price_df["volume"].astype(float)
     universe = price_df.loc[price_df["rank"] <= PIT_TOP_N, ["ticker", "trade_date"]]

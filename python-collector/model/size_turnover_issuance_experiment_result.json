@@ -1,0 +1,286 @@
+{
+  "topN": 100,
+  "horizons": {
+    "5": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.5011,
+        "icMean": 0.0074,
+        "icStd": 0.0303,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.001
+      },
+      "+size": {
+        "nFolds": 10,
+        "aucMean": 0.5004,
+        "icMean": 0.0044,
+        "icStd": 0.026,
+        "icPositiveFolds": 5,
+        "spreadMean": -0.0012
+      },
+      "+turnover20": {
+        "nFolds": 10,
+        "aucMean": 0.5115,
+        "icMean": 0.0289,
+        "icStd": 0.0379,
+        "icPositiveFolds": 8,
+        "spreadMean": -0.0014
+      },
+      "+issuance252": {
+        "nFolds": 10,
+        "aucMean": 0.507,
+        "icMean": 0.0187,
+        "icStd": 0.0276,
+        "icPositiveFolds": 9,
+        "spreadMean": 0.0022
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5123,
+        "icMean": 0.0281,
+        "icStd": 0.034,
+        "icPositiveFolds": 7,
+        "spreadMean": 0.0007
+      },
+      "only:size": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.0084,
+        "icStd": 0.0183,
+        "icPositiveFolds": 6,
+        "spreadMean": 0.0012
+      },
+      "only:turnover20": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0306,
+        "icStd": 0.0387,
+        "icPositiveFolds": 3,
+        "spreadMean": 0.0024
+      },
+      "only:issuance252": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0302,
+        "icStd": 0.0233,
+        "icPositiveFolds": 1,
+        "spreadMean": -0.0032
+      }
+    },
+    "10": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.5021,
+        "icMean": 0.0025,
+        "icStd": 0.0435,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0112
+      },
+      "+size": {
+        "nFolds": 10,
+        "aucMean": 0.5012,
+        "icMean": -0.001,
+        "icStd": 0.0379,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0111
+      },
+      "+turnover20": {
+        "nFolds": 10,
+        "aucMean": 0.5168,
+        "icMean": 0.0309,
+        "icStd": 0.0498,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0109
+      },
+      "+issuance252": {
+        "nFolds": 10,
+        "aucMean": 0.5094,
+        "icMean": 0.0183,
+        "icStd": 0.0365,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0046
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5185,
+        "icMean": 0.0333,
+        "icStd": 0.0463,
+        "icPositiveFolds": 8,
+        "spreadMean": -0.005
+      },
+      "only:size": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.014,
+        "icStd": 0.0242,
+        "icPositiveFolds": 8,
+        "spreadMean": 0.0008
+      },
+      "only:turnover20": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0418,
+        "icStd": 0.0571,
+        "icPositiveFolds": 3,
+        "spreadMean": 0.005
+      },
+      "only:issuance252": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0429,
+        "icStd": 0.0298,
+        "icPositiveFolds": 1,
+        "spreadMean": -0.0073
+      }
+    },
+    "20": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.501,
+        "icMean": 0.0093,
+        "icStd": 0.0534,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.015
+      },
+      "+size": {
+        "nFolds": 10,
+        "aucMean": 0.5007,
+        "icMean": 0.0089,
+        "icStd": 0.0486,
+        "icPositiveFolds": 5,
+        "spreadMean": -0.0147
+      },
+      "+turnover20": {
+        "nFolds": 10,
+        "aucMean": 0.5144,
+        "icMean": 0.0289,
+        "icStd": 0.0681,
+        "icPositiveFolds": 6,
+        "spreadMean": -0.0198
+      },
+      "+issuance252": {
+        "nFolds": 10,
+        "aucMean": 0.5152,
+        "icMean": 0.0358,
+        "icStd": 0.0425,
+        "icPositiveFolds": 8,
+        "spreadMean": 0.0003
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5187,
+        "icMean": 0.0366,
+        "icStd": 0.0619,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0091
+      },
+      "only:size": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.021,
+        "icStd": 0.0336,
+        "icPositiveFolds": 8,
+        "spreadMean": -0.0009
+      },
+      "only:turnover20": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0466,
+        "icStd": 0.0827,
+        "icPositiveFolds": 4,
+        "spreadMean": 0.0139
+      },
+      "only:issuance252": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0587,
+        "icStd": 0.0274,
+        "icPositiveFolds": 0,
+        "spreadMean": -0.0137
+      }
+    },
+    "50": {
+      "base": {
+        "nFolds": 10,
+        "aucMean": 0.4983,
+        "icMean": -0.0146,
+        "icStd": 0.0347,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0462
+      },
+      "+size": {
+        "nFolds": 10,
+        "aucMean": 0.4976,
+        "icMean": -0.014,
+        "icStd": 0.0262,
+        "icPositiveFolds": 4,
+        "spreadMean": -0.0421
+      },
+      "+turnover20": {
+        "nFolds": 10,
+        "aucMean": 0.5252,
+        "icMean": 0.0401,
+        "icStd": 0.1008,
+        "icPositiveFolds": 6,
+        "spreadMean": -0.0543
+      },
+      "+issuance252": {
+        "nFolds": 10,
+        "aucMean": 0.5257,
+        "icMean": 0.0515,
+        "icStd": 0.036,
+        "icPositiveFolds": 9,
+        "spreadMean": -0.0007
+      },
+      "+all3": {
+        "nFolds": 10,
+        "aucMean": 0.5284,
+        "icMean": 0.0519,
+        "icStd": 0.094,
+        "icPositiveFolds": 6,
+        "spreadMean": -0.0266
+      },
+      "only:size": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": 0.0277,
+        "icStd": 0.0522,
+        "icPositiveFolds": 7,
+        "spreadMean": -0.0054
+      },
+      "only:turnover20": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0661,
+        "icStd": 0.135,
+        "icPositiveFolds": 4,
+        "spreadMean": 0.0434
+      },
+      "only:issuance252": {
+        "nFolds": 10,
+        "aucMean": null,
+        "icMean": -0.0904,
+        "icStd": 0.0417,
+        "icPositiveFolds": 0,
+        "spreadMean": -0.0294
+      }
+    }
+  },
+  "passed": {
+    "5": [
+      "+turnover20",
+      "+all3"
+    ],
+    "10": [
+      "+turnover20",
+      "+all3"
+    ],
+    "20": [
+      "+issuance252",
+      "+all3"
+    ],
+    "50": [
+      "+issuance252"
+    ]
+  }
+}

@@ -137,18 +137,20 @@ def ensure_marcap_files(years) -> None:
             log.warning("marcap %d 갱신 실패 - 기존 파일로 진행: %s", year, e)
 
 
-def load_pit_price_history():
+def load_pit_price_history(extra_cols=()):
     """반환: (price_df, universe)
     price_df: 기간 중 한 번이라도 상위 PIT_TOP_N에 든 종목 전체의 가격 (특징 계산용 - MA60 등
               과거 창은 유니버스 편입 이전 구간도 필요하므로 자르지 않는다)
     universe: 날짜별로 그날 상위 PIT_TOP_N이었던 (ticker, trade_date) - 표본은 여기로 제한
     marcap의 Close는 액면분할 미반영이라, KRX 등락률(ChangesRatio - 분할 시 조정된 기준가
-    대비)을 누적곱해 수정주가 지수를 만든다. DB 수정주가와 20일 수익률 99.7% 일치 확인됨."""
+    대비)을 누적곱해 수정주가 지수를 만든다. DB 수정주가와 20일 수익률 99.7% 일치 확인됨.
+    extra_cols: 실험용으로 함께 돌려받을 marcap 원본 컬럼 (예: "Amount", "Stocks")"""
     this_year = datetime.now().year
     years = range(this_year - PIT_YEARS_BACK, this_year + 1)
     ensure_marcap_files(years)
 
     cols = ["Date", "Code", "Market", "Marcap", "ChangesRatio", "Volume"]
+    cols += [c for c in extra_cols if c not in cols]
     m = pd.concat([pd.read_parquet(os.path.join(MARCAP_DIR, f"marcap-{y}.parquet"), columns=cols)
                    for y in years], ignore_index=True)
     m = m[m["Market"].isin(["KOSPI", "KOSDAQ"])]
@@ -161,7 +163,8 @@ def load_pit_price_history():
     price_df = m.rename(columns={"Code": "ticker", "Date": "trade_date", "Volume": "volume"})
     price_df["volume"] = price_df["volume"].astype(float)
     universe = price_df.loc[price_df["rank"] <= PIT_TOP_N, ["ticker", "trade_date"]]
-    return price_df[["ticker", "trade_date", "close_price", "volume"]].reset_index(drop=True), universe
+    keep = ["ticker", "trade_date", "close_price", "volume", *extra_cols]
+    return price_df[keep].reset_index(drop=True), universe
 
 
 def restrict_to_universe(dataset: pd.DataFrame, universe: pd.DataFrame, horizons) -> pd.DataFrame:
