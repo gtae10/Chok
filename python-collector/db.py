@@ -1,3 +1,4 @@
+import random
 import time
 import mysql.connector
 from mysql.connector import pooling
@@ -13,13 +14,13 @@ def retry_on_deadlock(func):
     """10개 스레드가 동시에 price_history/stocks에 벌크 insert를 하다 보니
     InnoDB 데드락이 종종 발생한다 - MySQL이 권장하는 대로 트랜잭션을 재시도한다."""
     def wrapper(*args, **kwargs):
-        attempts = 3
+        attempts = 8
         for attempt in range(attempts):
             try:
                 return func(*args, **kwargs)
             except mysql.connector.errors.InternalError as e:
                 if e.errno == DEADLOCK_ERRNO and attempt < attempts - 1:
-                    time.sleep(0.3 * (attempt + 1))
+                    time.sleep(random.uniform(0.1, 0.3) * (attempt + 1))  # 지터: 스레드들이 같은 타이밍에 재충돌하지 않게
                     continue
                 raise
     return wrapper
