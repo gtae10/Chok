@@ -113,11 +113,11 @@ function renderChart(prices) {
     tooltip.hidden = true;
 
     if (!prices || prices.length === 0) {
-        svg.innerHTML = '<text x="400" y="160" fill="#5C6786" font-size="14" text-anchor="middle">가격 데이터가 없습니다</text>';
+        svg.innerHTML = '<text x="400" y="160" fill="' + cssVar("--text-faint") + '" font-size="14" text-anchor="middle">가격 데이터가 없습니다</text>';
         return;
     }
     if (prices.length === 1) {
-        svg.innerHTML = '<text x="400" y="160" fill="#5C6786" font-size="14" text-anchor="middle">일별 시세라 1일 단위 추이는 표시할 수 없어요. 1주 이상을 선택해보세요.</text>';
+        svg.innerHTML = '<text x="400" y="160" fill="' + cssVar("--text-faint") + '" font-size="14" text-anchor="middle">일별 시세라 1일 단위 추이는 표시할 수 없어요. 1주 이상을 선택해보세요.</text>';
         return;
     }
 
@@ -135,15 +135,15 @@ function renderChart(prices) {
         };
     });
     const isUp = closes[closes.length - 1] >= closes[0];
-    const color = isUp ? "#E0473C" : "#3E7BFA";
+    const color = isUp ? cssVar("--up") : cssVar("--down");
     const line = pts.map(function(pt, i) { return (i === 0 ? "M" : "L") + " " + pt.x.toFixed(1) + " " + pt.y.toFixed(1); }).join(" ");
     const area = line + " L " + pts[pts.length-1].x.toFixed(1) + " " + (H-PB) + " L " + pts[0].x.toFixed(1) + " " + (H-PB) + " Z";
     let grid = "";
     for (let i = 0; i <= 4; i++) {
         const y = PT + (i / 4) * ph;
         const p = maxP - (i / 4) * range;
-        grid += '<line x1="' + PL + '" y1="' + y + '" x2="' + (W-PR) + '" y2="' + y + '" stroke="#283454" stroke-width="1"/>';
-        grid += '<text x="' + (PL-8) + '" y="' + (y+4) + '" fill="#5C6786" font-size="11" text-anchor="end">' + Math.round(p).toLocaleString() + '</text>';
+        grid += '<line x1="' + PL + '" y1="' + y + '" x2="' + (W-PR) + '" y2="' + y + '" stroke="' + cssVar("--line") + '" stroke-width="1"/>';
+        grid += '<text x="' + (PL-8) + '" y="' + (y+4) + '" fill="' + cssVar("--text-faint") + '" font-size="11" text-anchor="end">' + Math.round(p).toLocaleString() + '</text>';
     }
     svg.innerHTML =
         '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' +
@@ -153,10 +153,10 @@ function renderChart(prices) {
         grid +
         '<path d="' + area + '" fill="url(#g)"/>' +
         '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round"/>' +
-        '<text x="' + PL + '" y="' + (H-8) + '" fill="#5C6786" font-size="11">' + pts[0].date + '</text>' +
-        '<text x="' + (W-PR) + '" y="' + (H-8) + '" fill="#5C6786" font-size="11" text-anchor="end">' + pts[pts.length-1].date + '</text>' +
-        '<line id="hoverLine" x1="0" y1="' + PT + '" x2="0" y2="' + (H-PB) + '" stroke="#8993B0" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>' +
-        '<circle id="hoverDot" r="4" fill="' + color + '" stroke="#0E1525" stroke-width="2" visibility="hidden"/>';
+        '<text x="' + PL + '" y="' + (H-8) + '" fill="' + cssVar("--text-faint") + '" font-size="11">' + pts[0].date + '</text>' +
+        '<text x="' + (W-PR) + '" y="' + (H-8) + '" fill="' + cssVar("--text-faint") + '" font-size="11" text-anchor="end">' + pts[pts.length-1].date + '</text>' +
+        '<line id="hoverLine" x1="0" y1="' + PT + '" x2="0" y2="' + (H-PB) + '" stroke="' + cssVar("--text-faint") + '" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>' +
+        '<circle id="hoverDot" r="4" fill="' + color + '" stroke="' + cssVar("--surface") + '" stroke-width="2" visibility="hidden"/>';
 
     attachChartHover(svg, tooltip, pts, PL, W - PR, function(p) {
         return '<div class="chart-tooltip__date">' + p.date + '</div>' +
@@ -206,7 +206,7 @@ function renderPeriodStats(fullPrices, range) {
     const container = document.getElementById("dailyStats");
 
     if (!fullPrices || fullPrices.length === 0) {
-        container.innerHTML = '<p style="text-align:center;color:#5C6786;">데이터가 없습니다</p>';
+        container.innerHTML = '<p style="text-align:center;color:var(--text-faint);">데이터가 없습니다</p>';
         return;
     }
 
@@ -242,7 +242,7 @@ function renderPeriodStats(fullPrices, range) {
         : (base ? base.date + ' ~ ' + latest.date : latest.date + ' 기준');
 
     container.innerHTML =
-        '<p style="text-align:center;color:#5C6786;font-size:0.8rem;margin-bottom:16px;">' + dateLabel + '</p>' +
+        '<p style="text-align:center;color:var(--text-faint);font-size:0.8rem;margin-bottom:16px;">' + dateLabel + '</p>' +
         '<div class="daily-stats__grid">' +
             statItem("종가", latest.close.toLocaleString() + "원") +
             statItem(RANGE_COMPARE_LABEL[range] || "전일대비", changeHtml) +
@@ -290,7 +290,11 @@ function renderHeader(item) {
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }
-function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+// 수집된 헤드라인에 &quot; 같은 HTML 엔티티가 그대로 들어 있어, 먼저 풀고 나서 이스케이프한다.
+function esc(s) {
+    const t = document.createElement("textarea"); t.innerHTML = s || "";
+    const d = document.createElement("div"); d.textContent = t.value; return d.innerHTML;
+}
 
 function renderHistoryChart(history) {
     renderScoreTrendChart(document.getElementById("historyChart"), history);
@@ -299,7 +303,7 @@ function renderHistoryChart(history) {
 function renderNews(list) {
     const el = document.getElementById("newsList");
     if (!list || list.length === 0) {
-        el.innerHTML = '<li style="list-style:none;text-align:center;color:#5C6786;padding:32px;">수집된 뉴스가 없습니다.</li>';
+        el.innerHTML = '<li style="list-style:none;text-align:center;color:var(--text-faint);padding:32px;">수집된 뉴스가 없습니다.</li>';
         return;
     }
     el.innerHTML = list.map(function(n) {

@@ -12,7 +12,6 @@
     <div class="topbar__inner">
         <span class="brand">촉<em>Chok</em></span>
         <div class="topbar__meta">
-            <span id="lastUpdated" class="meta-pill">기준일 확인 중...</span>
             <input type="text" id="searchInput" class="search-input" placeholder="종목명 또는 티커 검색...">
             <a th:href="@{/performance}" class="btn-ghost">실전 성과</a>
             <button id="collectBtn" class="btn-ghost">① 시세 수집</button>
@@ -24,46 +23,93 @@
 <main class="layout">
 
     <div id="staleDataBanner" class="stale-banner" hidden></div>
-
-    <div class="filters" style="margin-top: 24px;">
-        <button class="filter-chip is-active" data-filter="">전체</button>
-        <button class="filter-chip" data-filter="STRONG_BUY">적극 매수</button>
-        <button class="filter-chip" data-filter="BUY">매수</button>
-        <button class="filter-chip" data-filter="HOLD">중립</button>
-        <button class="filter-chip" data-filter="SELL">매도</button>
-        <button class="filter-chip" data-filter="STRONG_SELL">적극 매도</button>
-    </div>
-
-    <div class="table-wrap">
-        <table class="stock-table">
-            <thead>
-            <tr>
-                <th>#</th>
-                <th class="sortable" data-sort="name">종목명<span class="sort-arrow"></span></th>
-                <th>시장</th>
-                <th class="sortable" data-sort="technicalScore">기술점수<span class="sort-arrow"></span></th>
-                <th class="sortable" data-sort="sentimentScore">감성점수<span class="sort-arrow"></span></th>
-                <th class="sortable" data-sort="finalScore">종합점수<span class="sort-arrow"></span></th>
-                <th title="예측이 아니라 지금 상태를 나타내는 사실 태그입니다. 각 태그에 마우스를 올리면 정의가 나옵니다.">태그</th>
-                <th class="sortable" data-sort="momentum12m" title="12-1개월 모멘텀: 약 1년 전부터 1개월 전까지의 주가 수익률(최근 1개월 제외). 과거 5년 검증에서 상위 종목이 하위 종목보다 더 오른 경향이 있었지만 구간별로 흔들려, 점수 계산에는 넣지 않은 참고 지표입니다.">12-1 모멘텀<span class="sort-arrow"></span></th>
-                <th>추천</th>
-            </tr>
-            </thead>
-            <tbody id="stockTableBody">
-            <tr class="loading-row"><td colspan="9">데이터를 불러오는 중...</td></tr>
-            </tbody>
-        </table>
-        <div id="emptyState" class="empty-state" hidden>
-            <p>분석된 데이터가 없습니다.</p>
-            <p>① 시세 수집 → ② 분석 실행 버튼을 순서대로 눌러주세요.</p>
-        </div>
-    </div>
-
-    <p class="prob-caveat">
-        점수와 태그는 참고용 정보이며 예측이 아닙니다. 태그별 실제 성과는 기록이 쌓이는 대로 검증합니다.
-    </p>
-
     <div id="statusMsg" class="status-msg" hidden></div>
+
+    <!-- 1. 브리핑 헤더: 기준일 + 등급 분포 (누르면 아래 전체 종목이 그 등급으로 좁혀진다) -->
+    <section class="hero">
+        <div class="hero__top">
+            <h1>오늘의 브리핑</h1>
+            <span id="lastUpdated" class="hero__date">기준일 확인 중...</span>
+        </div>
+        <div id="dist" class="dist"></div>
+    </section>
+
+    <!-- 2. 오늘 주목: 재료성 호재/악재 태그 종목 -->
+    <section id="notableSection" class="section" hidden>
+        <div class="section-head">
+            <h2>오늘 주목</h2>
+            <span class="section-head__sub">최근 3일 뉴스에 재료성 호재·악재가 있는 종목</span>
+        </div>
+        <div id="notableRow" class="card-row"></div>
+    </section>
+
+    <!-- 3. 점수 TOP 5 -->
+    <section class="section">
+        <div class="section-head">
+            <h2>종합점수 TOP 5</h2>
+            <span class="section-head__sub">참고용 점수이며 예측이 아닙니다</span>
+        </div>
+        <div id="top5" class="top5"></div>
+    </section>
+
+    <!-- 4. 태그로 찾기 -->
+    <section class="section">
+        <div class="section-head">
+            <h2>태그로 찾기</h2>
+            <span class="section-head__sub">여러 개를 고르면 모두 가진 종목만 남습니다</span>
+        </div>
+        <div id="tagExplorer" class="tag-explorer"></div>
+    </section>
+
+    <!-- 5. 전체 종목 (모바일에서는 카드 목록) -->
+    <section id="listSection" class="section">
+        <div class="section-head">
+            <h2>전체 종목</h2>
+            <span id="resultCount" class="result-count"></span>
+        </div>
+
+        <div class="list-tools">
+            <div class="filters">
+                <button class="filter-chip is-active" data-filter="">전체</button>
+                <button class="filter-chip" data-filter="STRONG_BUY">적극 매수</button>
+                <button class="filter-chip" data-filter="BUY">매수</button>
+                <button class="filter-chip" data-filter="HOLD">중립</button>
+                <button class="filter-chip" data-filter="SELL">매도</button>
+                <button class="filter-chip" data-filter="STRONG_SELL">적극 매도</button>
+            </div>
+        </div>
+
+        <div class="table-wrap desktop-only">
+            <table class="stock-table">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th class="sortable" data-sort="name">종목명<span class="sort-arrow"></span></th>
+                    <th>시장</th>
+                    <th class="sortable" data-sort="technicalScore">기술점수<span class="sort-arrow"></span></th>
+                    <th class="sortable" data-sort="sentimentScore">감성점수<span class="sort-arrow"></span></th>
+                    <th class="sortable" data-sort="finalScore">종합점수<span class="sort-arrow"></span></th>
+                    <th title="예측이 아니라 지금 상태를 나타내는 사실 태그입니다. 각 태그에 마우스를 올리면 정의가 나옵니다.">태그</th>
+                    <th class="sortable" data-sort="momentum12m" title="12-1개월 모멘텀: 약 1년 전부터 1개월 전까지의 주가 수익률(최근 1개월 제외). 과거 5년 검증에서 상위 종목이 하위 종목보다 더 오른 경향이 있었지만 구간별로 흔들려, 점수 계산에는 넣지 않은 참고 지표입니다.">12-1 모멘텀<span class="sort-arrow"></span></th>
+                    <th>추천</th>
+                </tr>
+                </thead>
+                <tbody id="stockTableBody">
+                <tr class="loading-row"><td colspan="9">데이터를 불러오는 중...</td></tr>
+                </tbody>
+            </table>
+            <div id="emptyState" class="empty-state" hidden>
+                <p>조건에 맞는 종목이 없습니다.</p>
+                <p>분석 데이터가 없다면 ① 시세 수집 → ② 분석 실행을 순서대로 눌러주세요.</p>
+            </div>
+        </div>
+
+        <div id="stockCards" class="stock-cards"></div>
+
+        <p class="prob-caveat">
+            점수와 태그는 참고용 정보이며 예측이 아닙니다. 태그별 실제 성과는 기록이 쌓이는 대로 검증합니다.
+        </p>
+    </section>
 
     <section id="tagGlossary" class="chart-section"></section>
 
@@ -72,6 +118,16 @@
 <footer class="footer">
     <p>본 서비스의 점수와 추천 등급은 참고용 보조 지표이며, 수익을 보장하지 않습니다. 모든 투자 판단과 책임은 사용자 본인에게 있습니다.</p>
 </footer>
+
+<!-- 종목 상세 슬라이드 패널: /stocks/{ticker}?embed=1 을 iframe으로 재사용 -->
+<div id="panelBackdrop" class="panel-backdrop"></div>
+<aside id="panel" class="panel" aria-label="종목 상세" aria-hidden="true">
+    <div class="panel__head">
+        <a id="panelFull" href="#">전체 화면으로 열기 ↗</a>
+        <button id="panelClose" class="panel__close" aria-label="닫기">×</button>
+    </div>
+    <iframe id="panelFrame" class="panel__frame" title="종목 상세"></iframe>
+</aside>
 
 <script th:src="@{/js/tags.js}"></script>
 <script th:src="@{/js/dashboard.js}"></script>

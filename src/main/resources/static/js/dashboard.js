@@ -1,5 +1,7 @@
 const REC_LABEL = { STRONG_BUY: "적극 매수", BUY: "매수", HOLD: "중립", SELL: "매도", STRONG_SELL: "적극 매도" };
 const REC_BADGE_CLASS = { STRONG_BUY: "rec-badge--strongbuy", BUY: "rec-badge--buy", HOLD: "rec-badge--hold", SELL: "rec-badge--sell", STRONG_SELL: "rec-badge--strongsell" };
+const REC_GROUP = { STRONG_BUY: "buy", BUY: "buy", HOLD: "hold", SELL: "sell", STRONG_SELL: "sell" };
+const GROUP_LABEL = { buy: "매수", hold: "중립", sell: "매도" };
 const NUANCE_LABEL = { SLIGHTLY_POSITIVE: "약간 긍정", SLIGHTLY_NEGATIVE: "약간 부정", UNCERTAIN: "판단 보류" };
 const NUANCE_CLASS = { SLIGHTLY_POSITIVE: "nuance-tag--positive", SLIGHTLY_NEGATIVE: "nuance-tag--negative", UNCERTAIN: "nuance-tag--neutral" };
 
@@ -9,35 +11,97 @@ function renderNuance(nuance) {
 }
 
 let allData = [];
-let currentFilter = "";
+let recFilter = "";            // "" | 정확한 등급(BUY...) | "group:buy|hold|sell" (분포 막대 클릭)
 let currentSearch = "";
+let activeTags = new Set();    // 태그로 찾기 - 선택한 태그를 모두 가진 종목만 (AND)
 let currentSort = { key: "finalScore", dir: "desc" };
 
-async function loadRecommendations(filter) {
-    filter = filter || "";
+async function loadRecommendations() {
     const tbody = document.getElementById("stockTableBody");
-    const emptyState = document.getElementById("emptyState");
     tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오는 중...</td></tr>';
-    emptyState.hidden = true;
     try {
-        const url = filter ? "/api/recommendations?filter=" + encodeURIComponent(filter) : "/api/recommendations";
-        const res = await fetch(url);
+        const res = await fetch("/api/recommendations");
         allData = await res.json();
         if (allData.length > 0 && allData[0].date) {
-            document.getElementById("lastUpdated").textContent = "기준일: " + allData[0].date;
+            document.getElementById("lastUpdated").textContent = "기준일 " + allData[0].date;
         }
-        applySearchAndRender();
+        renderBriefing();
+        renderTagExplorer();
+        renderList();
     } catch (err) {
         tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오지 못했습니다.</td></tr>';
     }
 }
 
-function applySearchAndRender() {
-    const kw = currentSearch.trim().toLowerCase();
-    let data = !kw ? allData : allData.filter(function(i) {
-        return i.name.toLowerCase().indexOf(kw) >= 0 || i.ticker.toLowerCase().indexOf(kw) >= 0;
+/* ── 브리핑: 분포 / 오늘 주목 / TOP 5 ─────────────────────────────── */
+
+function scoreBar(v) {
+    return '<span class="score-cell"><i style="--w:' + Math.max(0, Math.min(100, Number(v) || 0)) + '%"></i></span>';
+}
+
+function renderBriefing() {
+    const count = { buy: 0, hold: 0, sell: 0 };
+    allData.forEach(function(i) { if (REC_GROUP[i.recommendation]) count[REC_GROUP[i.recommendation]]++; });
+    document.getElementById("dist").innerHTML = ["buy", "hold", "sell"].map(function(g) {
+        return '<button class="dist__seg dist__seg--' + g + '" style="flex:' + Math.max(count[g], 1) + '" data-group="' + g + '">' +
+            GROUP_LABEL[g] + '<b>' + count[g] + '</b></button>';
+    }).join("");
+
+    const pos = allData.filter(function(i) { return (i.tags || []).indexOf("NEWS_POS") >= 0; });
+    const neg = allData.filter(function(i) { return (i.tags || []).indexOf("NEWS_NEG") >= 0; });
+    const byScore = function(a, b) { return (b.finalScore || 0) - (a.finalScore || 0); };
+    const card = function(i, cls, label) {
+        return '<button class="pick ' + cls + '" data-ticker="' + i.ticker + '">' +
+            '<div class="pick__name">' + esc(i.name) + '</div>' +
+            '<div class="pick__sub">' + i.ticker + ' · ' + i.market + '</div>' +
+            '<div class="pick__row"><span class="fact-tag">' + label + '</span>' +
+            '<span class="pick__score">' + fmt(i.finalScore) + '</span></div></button>';
+    };
+    const notable = pos.sort(byScore).map(function(i) { return card(i, "pick--pos", "재료성 호재"); })
+        .concat(neg.sort(byScore).map(function(i) { return card(i, "pick--neg", "재료성 악재"); }));
+    document.getElementById("notableSection").hidden = notable.length === 0;
+    document.getElementById("notableRow").innerHTML = notable.join("");
+
+    document.getElementById("top5").innerHTML = allData.slice().sort(byScore).slice(0, 5).map(function(i, idx) {
+        return '<button class="top-card" data-ticker="' + i.ticker + '">' +
+            '<div class="top-card__rank">' + (idx + 1) + '</div>' +
+            '<div class="top-card__name">' + esc(i.name) + '</div>' +
+            '<div class="top-card__sub">' + i.ticker + ' · ' + i.market + '</div>' +
+            '<div class="top-card__score">' + fmt(i.finalScore) + '</div>' +
+            scoreBar(i.finalScore) +
+            '<span class="rec-badge ' + (REC_BADGE_CLASS[i.recommendation] || "") + '">' + (REC_LABEL[i.recommendation] || "-") + '</span></button>';
+    }).join("");
+}
+
+/* ── 태그로 찾기 ─────────────────────────────────────────────────── */
+
+function renderTagExplorer() {
+    const counts = {};
+    allData.forEach(function(i) { (i.tags || []).forEach(function(t) { counts[t] = (counts[t] || 0) + 1; }); });
+    const chips = Object.keys(TAG_META).filter(function(t) { return counts[t]; }).map(function(t) {
+        return '<button class="tag-chip' + (activeTags.has(t) ? ' is-active' : '') + '" data-tag="' + t + '" title="' + TAG_META[t].desc + '">' +
+            TAG_META[t].label + '<em>' + counts[t] + '</em></button>';
     });
-    renderTable(applySort(data));
+    if (activeTags.size > 0) chips.push('<button class="tag-clear" id="tagClear">선택 해제</button>');
+    document.getElementById("tagExplorer").innerHTML = chips.join("");
+}
+
+/* ── 전체 종목: 표(데스크톱) + 카드(모바일) ───────────────────────── */
+
+function matchesRec(item) {
+    if (!recFilter) return true;
+    if (recFilter.indexOf("group:") === 0) return REC_GROUP[item.recommendation] === recFilter.slice(6);
+    return item.recommendation === recFilter;
+}
+
+function visibleData() {
+    const kw = currentSearch.trim().toLowerCase();
+    return allData.filter(function(i) {
+        if (!matchesRec(i)) return false;
+        if (kw && i.name.toLowerCase().indexOf(kw) < 0 && i.ticker.toLowerCase().indexOf(kw) < 0) return false;
+        const tags = i.tags || [];
+        return Array.from(activeTags).every(function(t) { return tags.indexOf(t) >= 0; });
+    });
 }
 
 function applySort(data) {
@@ -56,27 +120,50 @@ function applySort(data) {
     return sorted;
 }
 
-function renderTable(data) {
+function recBadge(item) {
+    return '<span class="rec-badge ' + (REC_BADGE_CLASS[item.recommendation] || "") + '">' + (REC_LABEL[item.recommendation] || "-") + '</span>';
+}
+
+function renderList() {
+    const data = applySort(visibleData());
     const tbody = document.getElementById("stockTableBody");
     const emptyState = document.getElementById("emptyState");
-    if (data.length === 0) { tbody.innerHTML = ""; emptyState.hidden = false; return; }
+    const label = recFilter.indexOf("group:") === 0 ? GROUP_LABEL[recFilter.slice(6)] + " 계열 · " : "";
+    document.getElementById("resultCount").textContent = label + data.length + " / " + allData.length + "종목";
+
+    if (data.length === 0) {
+        tbody.innerHTML = "";
+        document.getElementById("stockCards").innerHTML = "";
+        emptyState.hidden = false;
+        return;
+    }
     emptyState.hidden = true;
+
     tbody.innerHTML = data.map(function(item, idx) {
         return '<tr data-ticker="' + item.ticker + '">' +
-            '<td>' + (idx + 1) + '</td>' +
+            '<td><span>' + (idx + 1) + '</span></td>' +
             '<td>' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></td>' +
             '<td>' + item.market + '</td>' +
             '<td>' + fmt(item.technicalScore) + '</td>' +
             '<td>' + fmt(item.sentimentScore) + '</td>' +
-            '<td>' + fmt(item.finalScore) + '</td>' +
+            '<td class="score-cell"><b>' + fmt(item.finalScore) + '</b><i style="--w:' + Math.max(0, Math.min(100, Number(item.finalScore) || 0)) + '%"></i></td>' +
             '<td>' + renderTags(item.tags) + '</td>' +
             '<td>' + renderMomentum(item) + '</td>' +
-            '<td><span class="rec-badge ' + (REC_BADGE_CLASS[item.recommendation] || "") + '">' + (REC_LABEL[item.recommendation] || "-") + '</span>' + renderNuance(item.recommendationNuance) + '</td>' +
+            '<td>' + recBadge(item) + renderNuance(item.recommendationNuance) + '</td>' +
             '</tr>';
     }).join("");
-    tbody.querySelectorAll("tr[data-ticker]").forEach(function(row) {
-        row.addEventListener("click", function() { window.location.href = "/stocks/" + row.dataset.ticker; });
-    });
+
+    document.getElementById("stockCards").innerHTML = data.map(function(item, idx) {
+        const tags = (item.tags || []).length ? '<div class="stock-card__tags">' + renderTags(item.tags) + '</div>' : '';
+        return '<button class="stock-card" data-ticker="' + item.ticker + '">' +
+            '<div class="stock-card__top">' +
+                '<span class="stock-card__rank">' + (idx + 1) + '</span>' +
+                '<span class="stock-card__name">' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></span>' +
+                '<span class="stock-card__score"><b>' + fmt(item.finalScore) + '</b>' + recBadge(item) + '</span>' +
+            '</div>' + tags +
+            '<div class="stock-card__meta">12-1 모멘텀 ' + renderMomentum(item) + ' · ' + item.market + '</div>' +
+            '</button>';
+    }).join("");
 }
 
 // 참고 지표 - 점수에는 안 들어감. "상위 20%" 여부는 태그 열(MOMENTUM_TOP20)에 나온다.
@@ -92,14 +179,65 @@ function esc(s) { const d = document.createElement("div"); d.textContent = s; re
 function showStatus(msg, isError) {
     const el = document.getElementById("statusMsg");
     el.textContent = msg;
-    el.style.color = isError ? "#FF7A6E" : "#C9A96A";
+    el.classList.toggle("status-msg--error", !!isError);
     el.hidden = false;
     setTimeout(function() { el.hidden = true; }, 4000);
 }
 
+/* ── 우측 슬라이드 패널 ──────────────────────────────────────────── */
+
+function openPanel(ticker) {
+    document.getElementById("panelFrame").src = "/stocks/" + ticker + "?embed=1";
+    document.getElementById("panelFull").href = "/stocks/" + ticker;
+    document.getElementById("panel").setAttribute("aria-hidden", "false");
+    document.body.classList.add("panel-open");
+    history.replaceState(null, "", "#" + ticker);   // 새로고침·링크 공유로 같은 종목 패널이 다시 열린다
+}
+
+function closePanel() {
+    document.body.classList.remove("panel-open");
+    document.getElementById("panel").setAttribute("aria-hidden", "true");
+    history.replaceState(null, "", location.pathname);
+    // 닫히는 애니메이션이 끝난 뒤 비운다 - 다음에 열 때 이전 종목이 번쩍 보이지 않게
+    setTimeout(function() {
+        if (!document.body.classList.contains("panel-open")) document.getElementById("panelFrame").removeAttribute("src");
+    }, 300);
+}
+
+document.getElementById("panelClose").addEventListener("click", closePanel);
+document.getElementById("panelBackdrop").addEventListener("click", closePanel);
+document.addEventListener("keydown", function(e) { if (e.key === "Escape") closePanel(); });
+
+// 카드·표 행 어디서든 data-ticker를 가진 요소를 누르면 패널을 연다 (이벤트 위임)
+document.addEventListener("click", function(e) {
+    const t = e.target.closest("[data-ticker]");
+    if (t) { openPanel(t.dataset.ticker); return; }
+
+    const seg = e.target.closest(".dist__seg");
+    if (seg) {
+        recFilter = "group:" + seg.dataset.group;
+        document.querySelectorAll(".filter-chip").forEach(function(c) { c.classList.remove("is-active"); });
+        renderList();
+        document.getElementById("listSection").scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+    }
+
+    const chip = e.target.closest(".tag-chip");
+    if (chip) {
+        const tag = chip.dataset.tag;
+        if (activeTags.has(tag)) activeTags.delete(tag); else activeTags.add(tag);
+        renderTagExplorer();
+        renderList();
+        return;
+    }
+    if (e.target.id === "tagClear") { activeTags.clear(); renderTagExplorer(); renderList(); }
+});
+
+/* ── 검색 / 정렬 / 등급 필터 ─────────────────────────────────────── */
+
 document.getElementById("searchInput").addEventListener("input", function(e) {
     currentSearch = e.target.value;
-    applySearchAndRender();
+    renderList();
 });
 
 document.querySelectorAll("th.sortable").forEach(function(th) {
@@ -112,7 +250,7 @@ document.querySelectorAll("th.sortable").forEach(function(th) {
             currentSort = { key: key, dir: key === "name" ? "asc" : "desc" };
         }
         updateSortHeaderUI();
-        applySearchAndRender();
+        renderList();
     });
 });
 
@@ -129,10 +267,12 @@ document.querySelectorAll(".filter-chip").forEach(function(chip) {
     chip.addEventListener("click", function() {
         document.querySelectorAll(".filter-chip").forEach(function(c) { c.classList.remove("is-active"); });
         chip.classList.add("is-active");
-        currentFilter = chip.dataset.filter || "";
-        loadRecommendations(currentFilter);
+        recFilter = chip.dataset.filter || "";
+        renderList();
     });
 });
+
+/* ── 수집 / 분석 실행 ───────────────────────────────────────────── */
 
 document.getElementById("collectBtn").addEventListener("click", async function(e) {
     const btn = e.currentTarget;
@@ -185,7 +325,7 @@ function pollAnalysisStatus(btn) {
                 } else {
                     showStatus("분석 완료! " + s.processedCount + "개 종목 처리됨");
                 }
-                loadRecommendations(currentFilter);
+                loadRecommendations();
             } else if (s.phase === "FAILED") {
                 showStatus("분석 실패: " + (s.errorMessage || "알 수 없는 오류"), true);
             }
@@ -198,6 +338,7 @@ function pollAnalysisStatus(btn) {
 }
 
 loadRecommendations();
+if (/^#[0-9A-Z]{6}$/.test(location.hash)) openPanel(location.hash.slice(1));
 
 (async function checkInitialAnalysisStatus() {
     try {

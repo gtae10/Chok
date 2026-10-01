@@ -117,7 +117,7 @@ function toggleTrendRow(row) {
             '<div class="chart-section trend-detail">' +
                 '<p class="chart-desc">선정일부터 오늘까지 이 종목의 종합점수가 어떻게 바뀌어왔는지 보여주는 차트입니다(0~100).</p>' +
                 '<div class="chart-legend">' +
-                    '<span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>' +
+                    '<span class="chart-legend__item"><i class="chart-legend__dot" ></i>종합점수</span>' +
                 '</div>' +
                 '<div class="chart-wrap">' +
                     '<svg class="trend-chart" viewBox="0 0 800 260" preserveAspectRatio="none"></svg>' +
@@ -134,7 +134,7 @@ async function loadTrend(id, svg) {
         renderScoreTrendChart(svg, trendCache[id]);
         return;
     }
-    svg.innerHTML = '<text x="400" y="130" fill="#5C6786" font-size="14" text-anchor="middle">불러오는 중...</text>';
+    svg.innerHTML = '<text x="400" y="130" fill="' + cssVar("--text-faint") + '" font-size="14" text-anchor="middle">불러오는 중...</text>';
     try {
         const res = await fetch('/api/performance/' + id + '/trend');
         if (!res.ok) throw new Error('trend fetch failed: ' + res.status);
@@ -144,7 +144,7 @@ async function loadTrend(id, svg) {
         if (String(expandedId) === String(id)) renderScoreTrendChart(svg, trend);
     } catch (err) {
         console.error(err);
-        svg.innerHTML = '<text x="400" y="130" fill="#5C6786" font-size="14" text-anchor="middle">추이를 불러오지 못했습니다</text>';
+        svg.innerHTML = '<text x="400" y="130" fill="' + cssVar("--text-faint") + '" font-size="14" text-anchor="middle">추이를 불러오지 못했습니다</text>';
     }
 }
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>종목 상세 - 촉</title>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <script>if (location.search.indexOf("embed=1") >= 0) document.documentElement.classList.add("is-embed");</script>
 </head>
 <body>
 
@@ -89,7 +90,7 @@
             이 종목의 종합점수가 시간에 따라 어떻게 바뀌어왔는지 보여주는 차트입니다(0~100).
         </p>
         <div class="chart-legend">
-            <span class="chart-legend__item"><i class="chart-legend__dot" style="background:#C9A96A"></i>종합점수</span>
+            <span class="chart-legend__item"><i class="chart-legend__dot"></i>종합점수</span>
         </div>
         <div class="chart-wrap">
             <svg id="historyChart" viewBox="0 0 800 260" preserveAspectRatio="none"></svg>
@@ -99,7 +100,7 @@
     <div class="news-section">
         <h2>최근 뉴스 감성 분석</h2>
         <ul id="newsList" class="news-list">
-            <li style="list-style:none; text-align:center; color:#5C6786; padding:32px;">불러오는 중...</li>
+            <li style="list-style:none; text-align:center; color:var(--text-faint); padding:32px;">불러오는 중...</li>
         </ul>
         <button id="newsLoadMoreBtn" class="btn-ghost news-load-more" hidden>더보기</button>
     </div>
