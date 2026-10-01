@@ -28,6 +28,7 @@ async function loadRecommendations() {
         renderBriefing();
         renderTagExplorer();
         renderList();
+        loadChanges();
     } catch (err) {
         tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오지 못했습니다.</td></tr>';
     }
@@ -71,6 +72,40 @@ function renderBriefing() {
             scoreBar(i.finalScore) +
             '<span class="rec-badge ' + (REC_BADGE_CLASS[i.recommendation] || "") + '">' + (REC_LABEL[i.recommendation] || "-") + '</span></button>';
     }).join("");
+}
+
+
+/* ── 어제 대비 태그 변화 (GET /api/tags/board 의 changes) ─────────────── */
+
+async function loadChanges() {
+    try {
+        const b = await (await fetch("/api/tags/board")).json();
+        renderChanges(b.changes);
+    } catch (e) { /* 보조 섹션이라 실패하면 숨겨 둔다 */ }
+}
+
+function renderChanges(c) {
+    const sec = document.getElementById("changesSection");
+    if (!c || (c.added.length === 0 && c.removed.length === 0)) { sec.hidden = true; return; }
+    const names = {};
+    allData.forEach(function(i) { names[i.ticker] = i.name; });
+    const chip = function(x, sign) {
+        const open = names[x.ticker] != null;   // 지금 분석 대상이 아니면(순위 이탈) 눌러도 목록에 없으니 글자만
+        return '<' + (open ? 'button data-ticker="' + x.ticker + '"' : 'span') + ' class="change-chip change-chip--' + (sign === "+" ? "add" : "del") + '">' +
+            sign + ' ' + esc(x.name || names[x.ticker] || x.ticker) + '</' + (open ? 'button' : 'span') + '>';
+    };
+    const rows = Object.keys(TAG_META).map(function(tag) {
+        const add = c.added.filter(function(x) { return x.tag === tag; });
+        const del = c.removed.filter(function(x) { return x.tag === tag; });
+        if (add.length + del.length === 0) return "";
+        return '<div class="change-row"><span class="fact-tag">' + TAG_META[tag].label + '</span>' +
+            '<div class="change-row__chips">' +
+            add.map(function(x) { return chip(x, "+"); }).join("") +
+            del.map(function(x) { return chip(x, "−"); }).join("") + '</div></div>';
+    }).join("");
+    document.getElementById("changes").innerHTML = rows;
+    document.getElementById("changesSub").textContent = c.prevDate + " → " + c.date + " · 새로 붙음 " + c.added.length + " · 사라짐 " + c.removed.length;
+    sec.hidden = false;
 }
 
 /* ── 태그로 찾기 ─────────────────────────────────────────────────── */

@@ -44,4 +44,26 @@ class TagServiceTest {
         assertThat(tags.get("BB")).containsExactly(TagService.BUYBACK, TagService.NEWS_NEG);
         assertThat(tags.get("SMALL")).isEmpty();
     }
+
+    @Test
+    @DisplayName("평일 수는 다음 날부터 to까지, 주말은 건너뛴다")
+    void countsWeekdaysBetween() {
+        // 2026-09-30(수) -> 2026-10-07(수): 목·금·월·화·수 = 5 (토·일 제외)
+        assertThat(TagService.weekdaysBetween(java.time.LocalDate.of(2026, 9, 30), java.time.LocalDate.of(2026, 10, 7))).isEqualTo(5);
+        assertThat(TagService.weekdaysBetween(java.time.LocalDate.of(2026, 10, 1), java.time.LocalDate.of(2026, 10, 1))).isZero();
+    }
+
+    @Test
+    @DisplayName("직전 기록일 대비 새로 붙은 태그와 사라진 태그를 가려낸다")
+    @SuppressWarnings("unchecked")
+    void diffsTagsAgainstPreviousDay() {
+        Map<String, List<String>> prev = Map.of("A", List.of("BUYBACK", "LOW_VOL20"), "B", List.of("NEWS_POS"));
+        Map<String, List<String>> today = Map.of("A", List.of("BUYBACK"), "C", List.of("NEWS_NEG"));
+
+        Map<String, Object> d = TagService.diff(java.time.LocalDate.of(2026, 10, 1), java.time.LocalDate.of(2026, 9, 30), today, prev);
+
+        assertThat((List<Map<String, String>>) d.get("added")).containsExactly(Map.of("ticker", "C", "tag", "NEWS_NEG"));
+        assertThat((List<Map<String, String>>) d.get("removed")).containsExactlyInAnyOrder(
+                Map.of("ticker", "A", "tag", "LOW_VOL20"), Map.of("ticker", "B", "tag", "NEWS_POS"));
+    }
 }

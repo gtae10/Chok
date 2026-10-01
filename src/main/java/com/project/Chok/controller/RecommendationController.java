@@ -153,6 +153,11 @@ public class RecommendationController {
         }).collect(Collectors.toList()));
     }
 
+    @GetMapping("/tags/board")
+    public ResponseEntity<Map<String, Object>> getTagBoard() {
+        return ResponseEntity.ok(tagService.board());
+    }
+
     @GetMapping("/stocks/{ticker}/tags")
     public ResponseEntity<List<String>> getTags(@PathVariable String ticker) {
         return ResponseEntity.ok(tagService.latestTagsFor(ticker));

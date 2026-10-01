@@ -19,8 +19,17 @@
 
 <main class="layout layout--wide">
 
+    <!-- 태그 검증 진행 보드: 사실 태그가 이후 시장보다 나았는지 판정하려면 기록이 얼마나 더 필요한가 -->
+    <section class="section">
+        <div class="section-head">
+            <h2>태그 검증 진행 보드</h2>
+            <span id="boardMeta" class="section-head__sub"></span>
+        </div>
+        <div id="tagBoard"></div>
+    </section>
+
     <div class="detail-head" style="border-bottom: none; padding-bottom: 0;">
-        <h1 style="font-size: 1.5rem;">실전 성과 추적</h1>
+        <h1 style="font-size: 1.5rem;">상위 종목 실전 성과 추적</h1>
         <p class="detail-head__reason">선정일의 종합점수 상위 종목을 지금 현재가 기준으로 추적합니다. 새 종목 편입은 멈춘 상태이고, 고점은 선정 뒤 종가가 가장 높았던 날입니다.</p>
     </div>
 
@@ -73,6 +82,8 @@
 </footer>
 
 <script th:src="@{/js/score-trend-chart.js}"></script>
+<script th:src="@{/js/tags.js}"></script>
+<script th:src="@{/js/tag-board.js}"></script>
 <script th:src="@{/js/performance.js}"></script>
 <script th:src="@{/js/feedback-widget.js}"></script>
 </body>
