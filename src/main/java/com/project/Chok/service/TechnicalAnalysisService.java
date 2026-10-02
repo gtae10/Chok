@@ -171,6 +171,22 @@ public class TechnicalAnalysisService {
     }
 
     /**
+     * 52주 신고가 대비 위치(%) - 태그 BREAKOUT_52W 입력. 오늘 종가가 직전 252영업일(오늘 제외) 최고 종가보다
+     * 얼마나 위/아래인지: 0 이상이면 신고가 돌파. python-collector/evaluate_entry.py의 BREAKOUT_52W와 같은 정의.
+     * 이력이 253일 미만이면 null.
+     */
+    public Double high52wGap(List<PriceHistory> priceHistory) {
+        int n = priceHistory == null ? 0 : priceHistory.size();
+        if (n <= MOMENTUM_12M_LOOKBACK) return null;
+        int prevHigh = 0;
+        for (int i = n - 1 - MOMENTUM_12M_LOOKBACK; i < n - 1; i++) {
+            prevHigh = Math.max(prevHigh, priceHistory.get(i).getClosePrice());
+        }
+        double today = priceHistory.get(n - 1).getClosePrice();
+        return prevHigh > 0 ? round2((today - prevHigh) / prevHigh * 100) : null;
+    }
+
+    /**
      * 60영업일 일간수익률 표준편차(%) - 태그 LOW_VOL20 입력. experiment_new_features.py의 vol60과
      * 같은 정의(pandas pct_change().rolling(60).std(), 표본표준편차). 이력이 61일 미만이면 null.
      */

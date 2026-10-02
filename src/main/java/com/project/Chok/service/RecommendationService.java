@@ -240,6 +240,7 @@ public class RecommendationService {
                 techResult.getNotableFallHorizonApproxDate(),
                 technicalAnalysisService.momentum12m(prices),
                 technicalAnalysisService.volatility60(prices),
+                technicalAnalysisService.high52wGap(prices),
                 stock.getIssuance252(),
                 strongestRecentNewsScore(ticker, today),
                 recommendation, nuance, reason);
@@ -417,7 +418,7 @@ public class RecommendationService {
                                     String notableHorizonApproxDate,
                                     Integer notableFallHorizonDays, Double notableFallHorizonProbability,
                                     String notableFallHorizonApproxDate, Double momentum12m,
-                                    Double vol60, Double issuance252, Double materialNewsScore,
+                                    Double vol60, Double high52wGap, Double issuance252, Double materialNewsScore,
                                     String recommendation, String recommendationNuance, String reason) {
         Recommendation entity = recommendationRepository
                 .findHistoryByTicker(stock.getTicker())
@@ -445,6 +446,7 @@ public class RecommendationService {
         entity.setNotableFallHorizonApproxDate(notableFallHorizonApproxDate == null ? null : LocalDate.parse(notableFallHorizonApproxDate));
         entity.setMomentum12m(momentum12m);
         entity.setVol60(vol60);
+        entity.setHigh52wGap(high52wGap);
         entity.setIssuance252(issuance252);
         entity.setMaterialNewsScore(materialNewsScore);
         entity.setRecommendation(recommendation);

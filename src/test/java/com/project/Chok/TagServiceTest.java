@@ -46,6 +46,19 @@ class TagServiceTest {
     }
 
     @Test
+    @DisplayName("52주 신고가 위치가 0 이상이면 BREAKOUT_52W, 미만이거나 값이 없으면 안 붙는다")
+    void tagsBreakoutAtOrAbovePriorHigh() {
+        Recommendation up = rec("UP", null, null, null, null);
+        up.setHigh52wGap(0.0);
+        Recommendation below = rec("BELOW", null, null, null, null);
+        below.setHigh52wGap(-0.01);
+        Map<String, List<String>> tags = TagService.compute(List.of(up, below, rec("NONE", null, null, null, null)));
+        assertThat(tags.get("UP")).containsExactly(TagService.BREAKOUT_52W);
+        assertThat(tags.get("BELOW")).isEmpty();
+        assertThat(tags.get("NONE")).isEmpty();
+    }
+
+    @Test
     @DisplayName("평일 수는 다음 날부터 to까지, 주말은 건너뛴다")
     void countsWeekdaysBetween() {
         // 2026-09-30(수) -> 2026-10-07(수): 목·금·월·화·수 = 5 (토·일 제외)

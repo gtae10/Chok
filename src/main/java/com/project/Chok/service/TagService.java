@@ -34,6 +34,8 @@ public class TagService {
     public static final String BUYBACK = "BUYBACK";
     public static final String NEWS_POS = "NEWS_POS";
     public static final String NEWS_NEG = "NEWS_NEG";
+    // 2026-10-02 추가(PROJECT_PLAN D14). 이 태그의 실전 기록은 추가일부터 시작한다.
+    public static final String BREAKOUT_52W = "BREAKOUT_52W";
 
     static final double TOP_SHARE = 0.2;
     static final double ISSUANCE_THRESHOLD = 0.02;       // log 기준 약 ±2% 주식수 변화
@@ -69,6 +71,7 @@ public class TagService {
             if (r.getIssuance252() != null && r.getIssuance252() <= -ISSUANCE_THRESHOLD) t.add(BUYBACK);
             if (r.getMaterialNewsScore() != null && r.getMaterialNewsScore() >= MATERIAL_NEWS_THRESHOLD) t.add(NEWS_POS);
             if (r.getMaterialNewsScore() != null && r.getMaterialNewsScore() <= -MATERIAL_NEWS_THRESHOLD) t.add(NEWS_NEG);
+            if (r.getHigh52wGap() != null && r.getHigh52wGap() >= 0) t.add(BREAKOUT_52W);
             tags.put(r.getTicker(), t);
         }
         return tags;

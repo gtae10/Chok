@@ -36,7 +36,7 @@ RESULT_PATH = os.path.join("model", "tag_evaluation_result.json")
 # ── 판정 기준 v1 (2026-09-30 고정, 실전 기록 시작 전) ── 바꾸면 PROJECT_PLAN.md 5장과 함께 바꾼다
 EXPECTED_SIGN = {  # 사전 가설 - 반대 방향으로 나오면 크기와 무관하게 불통과
     "MOMENTUM_TOP20": +1, "LOW_VOL20": +1, "ISSUANCE_UP": -1,
-    "BUYBACK": +1, "NEWS_POS": +1, "NEWS_NEG": -1,
+    "BUYBACK": +1, "NEWS_POS": +1, "NEWS_NEG": -1, "BREAKOUT_52W": +1,
 }
 MIN_WINDOWS = 6               # 겹치지 않는 창 최소 개수
 MIN_SAME_SIGN_SHARE = 0.7     # 가설 방향과 같은 부호인 창 비율
@@ -58,12 +58,13 @@ def top_share_mask(values: pd.Series, share: float) -> pd.Series:
 
 
 def tags_for_day(day: pd.DataFrame) -> pd.DataFrame:
-    """day: 한 날짜의 유니버스 (ticker, momentum12m, vol60, issuance252) -> (ticker, tag) 행."""
+    """day: 한 날짜의 유니버스 (ticker, momentum12m, vol60, issuance252, gap52) -> (ticker, tag) 행."""
     masks = {
         "MOMENTUM_TOP20": top_share_mask(day["momentum12m"], TOP_SHARE),
         "LOW_VOL20": top_share_mask(-day["vol60"], TOP_SHARE),
         "ISSUANCE_UP": day["issuance252"] >= ISSUANCE_THRESHOLD,
         "BUYBACK": day["issuance252"] <= -ISSUANCE_THRESHOLD,
+        "BREAKOUT_52W": day["gap52"] >= 0,
     }
     return pd.concat([pd.DataFrame({"ticker": day.loc[m.fillna(False), "ticker"], "tag": tag})
                       for tag, m in masks.items()], ignore_index=True)
@@ -124,6 +125,7 @@ def backtest() -> dict:
     g = price_df.groupby("ticker")["close_price"]
     # TechnicalAnalysisService.momentum12m / volatility60, collect.compute_issuance와 같은 정의
     price_df["momentum12m"] = g.shift(21) / g.shift(252) - 1
+    price_df["gap52"] = price_df["close_price"] / g.transform(lambda s: s.shift(1).rolling(252).max()) - 1
     price_df["vol60"] = g.transform(lambda s: s.pct_change().rolling(60).std())
     shares = price_df["Marcap"] / price_df["close_price"]
     price_df["issuance252"] = np.log(shares / shares.groupby(price_df["ticker"]).shift(252))

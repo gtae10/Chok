@@ -1,0 +1,116 @@
+{
+  "5": {
+    "PULLBACK": {
+      "events": 12425,
+      "dates": 1160,
+      "allDatesMean": -0.0008,
+      "windows": 237,
+      "windowMean": -0.0007,
+      "windowsExpectedSign": 114,
+      "verdict": "불통과"
+    },
+    "OVERSOLD": {
+      "events": 6120,
+      "dates": 1028,
+      "allDatesMean": -0.0028,
+      "windows": 234,
+      "windowMean": -0.0021,
+      "windowsExpectedSign": 98,
+      "verdict": "불통과"
+    },
+    "BREAKOUT_52W": {
+      "events": 4861,
+      "dates": 907,
+      "allDatesMean": 0.007,
+      "windows": 207,
+      "windowMean": 0.0066,
+      "windowsExpectedSign": 102,
+      "verdict": "불통과"
+    },
+    "VOL_SURGE_UP": {
+      "events": 1828,
+      "dates": 853,
+      "allDatesMean": 0.0036,
+      "windows": 243,
+      "windowMean": 0.009,
+      "windowsExpectedSign": 116,
+      "verdict": "불통과"
+    }
+  },
+  "20": {
+    "PULLBACK": {
+      "events": 12299,
+      "dates": 1145,
+      "allDatesMean": -0.0012,
+      "windows": 60,
+      "windowMean": 0.0049,
+      "windowsExpectedSign": 31,
+      "verdict": "불통과"
+    },
+    "OVERSOLD": {
+      "events": 6075,
+      "dates": 1016,
+      "allDatesMean": -0.0024,
+      "windows": 65,
+      "windowMean": -0.0048,
+      "windowsExpectedSign": 26,
+      "verdict": "불통과"
+    },
+    "BREAKOUT_52W": {
+      "events": 4846,
+      "dates": 898,
+      "allDatesMean": 0.0219,
+      "windows": 55,
+      "windowMean": 0.0434,
+      "windowsExpectedSign": 31,
+      "verdict": "불통과"
+    },
+    "VOL_SURGE_UP": {
+      "events": 1813,
+      "dates": 845,
+      "allDatesMean": 0.0025,
+      "windows": 67,
+      "windowMean": -0.0133,
+      "windowsExpectedSign": 22,
+      "verdict": "불통과"
+    }
+  },
+  "50": {
+    "PULLBACK": {
+      "events": 11828,
+      "dates": 1115,
+      "allDatesMean": 0.0039,
+      "windows": 24,
+      "windowMean": 0.0172,
+      "windowsExpectedSign": 12,
+      "verdict": "불통과"
+    },
+    "OVERSOLD": {
+      "events": 5676,
+      "dates": 996,
+      "allDatesMean": 0.0012,
+      "windows": 27,
+      "windowMean": 0.0596,
+      "windowsExpectedSign": 11,
+      "verdict": "불통과"
+    },
+    "BREAKOUT_52W": {
+      "events": 4812,
+      "dates": 880,
+      "allDatesMean": 0.0262,
+      "windows": 23,
+      "windowMean": 0.0488,
+      "windowsExpectedSign": 15,
+      "verdict": "불통과"
+    },
+    "VOL_SURGE_UP": {
+      "events": 1783,
+      "dates": 830,
+      "allDatesMean": 0.0011,
+      "windows": 27,
+      "windowMean": -0.0369,
+      "windowsExpectedSign": 10,
+      "verdict": "불통과"
+    }
+  }
+}

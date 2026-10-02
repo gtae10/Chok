@@ -71,6 +71,10 @@ public class Recommendation {
     @Column(name = "momentum_12m")
     private Double momentum12m;
 
+    // 52주 신고가 대비 위치(%) - 태그 BREAKOUT_52W 입력, 0 이상 = 신고가 돌파
+    @Column(name = "high_52w_gap")
+    private Double high52wGap;
+
     // 태그 입력값 (TagService) - 그날 값 그대로 남겨 나중에 태그를 다시 검증할 수 있게 한다
     @Column(name = "vol60")
     private Double vol60; // 60영업일 일간수익률 표준편차(%)
@@ -149,6 +153,8 @@ public class Recommendation {
     public LocalDate getNotableFallHorizonApproxDate() { return notableFallHorizonApproxDate; }
     public void setNotableFallHorizonApproxDate(LocalDate notableFallHorizonApproxDate) { this.notableFallHorizonApproxDate = notableFallHorizonApproxDate; }
 
+    public Double getHigh52wGap() { return high52wGap; }
+    public void setHigh52wGap(Double high52wGap) { this.high52wGap = high52wGap; }
     public Double getMomentum12m() { return momentum12m; }
     public void setMomentum12m(Double momentum12m) { this.momentum12m = momentum12m; }
     public Double getVol60() { return vol60; }

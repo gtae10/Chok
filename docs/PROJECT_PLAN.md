@@ -122,6 +122,7 @@ C를 통과한 것만 A로 올린다.
 | `LOW_VOL20` | 저변동성 | 60영업일 일간수익률 표본표준편차가 그날 하위 20% | `vol60` · `TechnicalAnalysisService.volatility60` | 가능 | + |
 | `ISSUANCE_UP` | 주식수 증가 | 순발행 log(N_t / N_t−252) ≥ +0.02 | `issuance_252` · `collect.compute_issuance` | 가능 | − |
 | `BUYBACK` | 주식수 감소 | 순발행 ≤ −0.02 | 〃 | 가능 | + |
+| `BREAKOUT_52W` | 52주 신고가 돌파 | 오늘 종가 ≥ 직전 252영업일(오늘 제외) 최고 종가 (2026-10-02 추가, D14) | `high_52w_gap` · `TechnicalAnalysisService.high52wGap` | 가능 | + |
 | `NEWS_POS` | 재료성 호재 | 최근 lookback(3일) 뉴스 중 \|감성점수\| 최대값이 ≥ +0.8 | `material_news_score` · `RecommendationService.strongestRecentNewsScore` | **불가** (과거 뉴스 소급 불가) | + |
 | `NEWS_NEG` | 재료성 악재 | 위 값이 ≤ −0.8 | 〃 | **불가** | − |
 
@@ -293,3 +294,4 @@ C를 통과한 것만 A로 올린다.
 | 태그 정의 바꾸기 | 이 문서 4장 → `TagService`(+`VERSION`) → `evaluate_tags.py` → `tags.js` 설명 → 두 테스트 |
 
 `evaluate_tags.py`는 DB 접속이 안 되면 실전 집계만 건너뛰고 백테스트 결과는 저장한다.
+| D14 | 2026-10-02 | 진입 규칙 4종을 백테스트하고 BREAKOUT_52W만 태그로 추가 | `evaluate_entry.py`(PULLBACK·OVERSOLD·BREAKOUT_52W·VOL_SURGE_UP, 임계값은 실행 전 고정). **4개 모두 v1 기준 불통과.** 52주 신고가만 모든 날짜 평균이 +0.70%(5일)·+2.19%(20일)·+2.62%(50일)로 일관되게 플러스(창 평균 +0.66% / +4.34% / +4.88%)지만 일관성 49~65%로 70% 미만. 눌림목·과매도·거래량 급증은 근거 없음. "사라" 신호가 아니라 검증 중인 사실 태그로만 표시하고, 실전 기록은 추가일부터 쌓는다. 4개 규칙을 시험했으니 우연 가능성 배제 못함 |
