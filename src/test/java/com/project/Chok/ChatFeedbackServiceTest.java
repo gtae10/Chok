@@ -119,7 +119,7 @@ class ChatFeedbackServiceTest {
 
         ChatFeedbackService.ChatResult result = service.chat("5.5.5.5", "c", "추천해줘", List.of());
 
-        assertThat(result.reply()).contains("삼성전자가 관심 후보입니다.").contains("투자 참고용 안내");
+        assertThat(result.reply()).contains("삼성전자가 관심 후보입니다.").contains("참고용 데이터");
         ArgumentCaptor<String> sent = ArgumentCaptor.forClass(String.class);
         verify(llmProvider).chat(anyString(), sent.capture(), anyInt());
         assertThat(sent.getValue()).contains("[분석 데이터] 기준일 2026-10-02")

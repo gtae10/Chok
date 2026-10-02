@@ -245,7 +245,7 @@ public class AppProperties {
     // chok.chat.* - AI 피드백 챗봇 (로그인 없어 사용자별 제한 불가 - IP+요청 단위로만 상한)
     // ─────────────────────────────────────────
     public static class Chat {
-        private int maxTokens = 900;
+        private int maxTokens = 500;
         private int maxMessageLength = 1000;
         private int maxHistoryMessages = 20;
         private int maxRequestsPerWindow = 20;
