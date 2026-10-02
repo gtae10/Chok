@@ -92,3 +92,11 @@ $env:DB_HOST = "<host>"; $env:DB_PORT = "<port>"; $env:DB_NAME = "<DB_NAME>"   #
 
 로컬 MySQL(네이티브)은 그대로 남아 있다. 문제가 있으면 `.env`를 지우거나 `DB_*`를 비우고 기존처럼 실행하면 된다.
 다만 클라우드에서 쌓은 기록은 로컬에 없으니, 되돌리기 전에 클라우드에서 덤프를 떠 둔다.
+
+## 8. 이전 기록 (2026-10-02)
+
+- 로컬 MySQL(`chok`) → Aiven 무료 MySQL(`defaultdb`)로 덤프·복원 완료. 행 수 일치: `price_history` 232,852 / `recommendations` 2,754 / `tag_snapshots` 231.
+- 이 PC에서 `docker compose up --build`로 클라우드 DB에 연결해 실행, 화면·`/api/tags/board` 확인.
+- 클라우드 DB 기준 전체 분석 1회 약 42초 (로컬 약 1분), 78/78건 오류 없음.
+- 스케줄러(`CHOK_SCHEDULER_ENABLED=true`)는 이 PC에서만 켠다.
+- 남은 일: Aiven 비밀번호 재설정(설정 중 노출됨) 후 `.env` 갱신, 두 번째 컴퓨터에서 같은 화면 확인.
