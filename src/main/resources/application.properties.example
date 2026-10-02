@@ -80,7 +80,7 @@ chok.model.min-samples=500
 chok.model.min-auc-for-highlight=0.55
 
 # chok.chat.* - AI 피드백 챗봇 (로그인 없어 IP+요청 단위로만 남용 방지)
-chok.chat.max-tokens=500
+chok.chat.max-tokens=900
 chok.chat.max-message-length=1000
 chok.chat.max-history-messages=20
 chok.chat.max-requests-per-window=20

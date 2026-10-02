@@ -29,6 +29,8 @@ class ChatFeedbackServiceTest {
 
     @Mock private LlmProvider llmProvider;
     @Mock private FeedbackLogRepository feedbackLogRepository;
+    @Mock private com.project.Chok.repository.RecommendationRepository recommendationRepository;
+    @Mock private com.project.Chok.service.TagService tagService;
 
     private AppProperties appProperties;
     private ChatFeedbackService service;
@@ -41,7 +43,8 @@ class ChatFeedbackServiceTest {
         appProperties.getChat().setWindowMinutes(10);
         appProperties.getChat().setMaxMessageLength(50);
 
-        service = new ChatFeedbackService(Map.of("openai", llmProvider), appProperties, feedbackLogRepository);
+        service = new ChatFeedbackService(Map.of("openai", llmProvider), appProperties, feedbackLogRepository,
+                recommendationRepository, tagService);
     }
 
     @Test
@@ -99,5 +102,38 @@ class ChatFeedbackServiceTest {
         verify(feedbackLogRepository).save(captor.capture());
         assertThat(captor.getValue().getUserMessage()).isEqualTo("이 서비스 뭐하는 곳이야?");
         assertThat(captor.getValue().getAssistantReply()).isEqualTo("이 서비스는 참고용 지표를 보여줍니다.");
+    }
+
+    @Test
+    @DisplayName("답변에 분석 종목이 언급되면 투자 유의 문구를 서버가 붙이고, 종목 데이터가 LLM 입력에 들어간다")
+    void appends_disclaimer_when_reply_mentions_stock_and_sends_context() {
+        com.project.Chok.domain.Recommendation r = new com.project.Chok.domain.Recommendation();
+        r.setTicker("005930"); r.setName("삼성전자"); r.setMarket("KOSPI");
+        r.setFinalScore(70.0); r.setTechnicalScore(65.0); r.setSentimentScore(0.2); r.setHigh52wGap(0.0);
+        java.time.LocalDate d = java.time.LocalDate.of(2026, 10, 2);
+        when(recommendationRepository.findLatestRecDate()).thenReturn(d);
+        when(recommendationRepository.findByRecDateOrderByFinalScoreDesc(d)).thenReturn(List.of(r));
+        when(tagService.tagsOn(d)).thenReturn(Map.of("005930", List.of("BREAKOUT_52W")));
+        when(llmProvider.isConfigured()).thenReturn(true);
+        when(llmProvider.chat(anyString(), anyString(), anyInt())).thenReturn("{\"reply\": \"삼성전자가 관심 후보입니다.\"}");
+
+        ChatFeedbackService.ChatResult result = service.chat("5.5.5.5", "c", "추천해줘", List.of());
+
+        assertThat(result.reply()).contains("삼성전자가 관심 후보입니다.").contains("투자 참고용 안내");
+        ArgumentCaptor<String> sent = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).chat(anyString(), sent.capture(), anyInt());
+        assertThat(sent.getValue()).contains("[분석 데이터] 기준일 2026-10-02")
+                .contains("삼성전자(005930, KOSPI)").contains("52주신고가돌파");
+    }
+
+    @Test
+    @DisplayName("분석 종목을 언급하지 않은 일반 답변에는 유의 문구를 붙이지 않는다")
+    void no_disclaimer_for_general_answers() {
+        when(llmProvider.isConfigured()).thenReturn(true);
+        when(llmProvider.chat(anyString(), anyString(), anyInt())).thenReturn("{\"reply\": \"태그는 사실 표시입니다.\"}");
+
+        ChatFeedbackService.ChatResult result = service.chat("6.6.6.6", "c", "태그가 뭐예요", List.of());
+
+        assertThat(result.reply()).isEqualTo("태그는 사실 표시입니다.");
     }
 }

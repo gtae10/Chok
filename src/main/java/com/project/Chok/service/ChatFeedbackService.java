@@ -4,14 +4,19 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.Chok.config.AppProperties;
 import com.project.Chok.domain.FeedbackLog;
+import com.project.Chok.domain.Recommendation;
 import com.project.Chok.dto.ChatMessage;
 import com.project.Chok.repository.FeedbackLogRepository;
+import com.project.Chok.repository.RecommendationRepository;
 import com.project.Chok.service.sentiment.LlmProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,29 +68,50 @@ public class ChatFeedbackService {
                뭉뚱그리지 말고, 학습/추정 구분과 N영업일 기준처럼 화면에 실제 보이는
                표현을 그대로 쓰세요).
             2. 사용자의 의견/불편사항/개선 요청은 편하게 받고 정중하게 감사를 표하세요.
-            3. 절대 원칙: "이 종목을 사세요/파세요" 같은 구체적 투자 조언이나 특정 가격·
-               시점을 확정적으로 예측하는 말을 하면 안 됩니다. 사이트 전체가 지켜온
-               "참고용 지표이며 확정 예측이 아니다"라는 원칙을 챗봇도 동일하게 지켜야
-               합니다.
-            4. "이 종목 사도 되나요?" 같은 질문에는 직접 답하지 말고, 이미 화면에 표시된
-               기술점수/감성점수/태그 등 지표를 참고하되 최종 판단은 본인 몫이라고
-               안내하세요.
+            3. 종목 추천 요청("뭐 살까요", "추천해줘", "이 종목 어때요")에는 사용자 메시지에
+               붙은 [분석 데이터]만 근거로 "관심 후보"를 최대 5개까지 제시할 수 있습니다.
+               - 후보마다 근거가 된 지표(종합/기술/감성점수, 태그, 모멘텀, 52주 신고가 대비
+                 위치)를 데이터에 있는 값 그대로 인용하세요.
+               - [분석 데이터]에 없는 정보(실적, 재무, 외부 뉴스, 목표가, 미래 주가 전망)는
+                 쓰지 마세요. 데이터에 없는 종목을 물으면 이 서비스의 분석 대상이 아니라고
+                 답하세요.
+               - 수익을 보장하거나 확정적으로 단정하는 표현, 매수 가격·수량·시점 지정은
+                 금지입니다. "사세요/파세요"가 아니라 "이 지표들이 해당됩니다" 식으로
+                 데이터를 보여주세요.
+               - 추천에는 반드시 검증 상태를 한 문장 포함하세요: 지금의 점수와 태그는 과거
+                 5년 백테스트에서 검증 기준을 통과하지 못했으며, 그래서 예측이 아니라
+                 참고용이라는 점입니다.
+            4. 추천이 아닌 일반 질문에는 이 항목을 쓰지 말고 1~2번대로 답하세요.
 
-            JSON으로만 응답 (마크다운 금지): {"reply": "한국어 2~4문장"}
+            JSON으로만 응답 (마크다운 금지): {"reply": "한국어. 일반 질문은 2~4문장, 종목 추천은 후보별 한 줄씩 최대 8문장"}
             """;
+
+    // 추천이 섞인 답변 끝에 서버가 항상 붙인다 - LLM이 빼먹어도 화면에는 나가도록 코드로 보장
+    static final String DISCLAIMER = "\n\n※ 투자 참고용 안내: 수집된 데이터를 정리한 것일 뿐 투자 권유나 수익 보장이 아닙니다. "
+            + "점수와 태그는 과거 검증에서 기준을 통과하지 못한 보조 지표이며, 투자 판단과 결과의 책임은 본인에게 있습니다.";
+    private static final int CONTEXT_TOP = 30;
+    private static final int CONTEXT_MAX = 50;
+    private static final Map<String, String> TAG_LABEL = Map.of(
+            "MOMENTUM_TOP20", "모멘텀상위20%", "LOW_VOL20", "저변동성", "ISSUANCE_UP", "주식수증가",
+            "BUYBACK", "주식수감소", "NEWS_POS", "재료성호재", "NEWS_NEG", "재료성악재", "BREAKOUT_52W", "52주신고가돌파");
 
     private final Map<String, LlmProvider> providers;
     private final AppProperties appProperties;
     private final FeedbackLogRepository feedbackLogRepository;
+    private final RecommendationRepository recommendationRepository;
+    private final TagService tagService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final Map<String, RateWindow> rateLimiter = new ConcurrentHashMap<>();
 
     public ChatFeedbackService(Map<String, LlmProvider> providers, AppProperties appProperties,
-                               FeedbackLogRepository feedbackLogRepository) {
+                               FeedbackLogRepository feedbackLogRepository,
+                               RecommendationRepository recommendationRepository, TagService tagService) {
         this.providers = providers;
         this.appProperties = appProperties;
         this.feedbackLogRepository = feedbackLogRepository;
+        this.recommendationRepository = recommendationRepository;
+        this.tagService = tagService;
     }
 
     public record ChatResult(String reply, boolean rateLimited) {}
@@ -112,11 +138,20 @@ public class ChatFeedbackService {
             return new ChatResult("현재 챗봇을 사용할 수 없습니다 (LLM 프로바이더 미설정).", false);
         }
 
-        String userMessage = buildTranscript(history, trimmedMessage, cfg);
+        List<Recommendation> recs = List.of();
+        Map<String, List<String>> tags = Map.of();
+        LocalDate dataDate = recommendationRepository.findLatestRecDate();
+        if (dataDate != null) {
+            recs = recommendationRepository.findByRecDateOrderByFinalScoreDesc(dataDate);
+            tags = tagService.tagsOn(dataDate);
+        }
+        List<Recommendation> picked = pickForContext(recs, tags, trimmedMessage);
+        String userMessage = buildStockContext(dataDate, picked, tags) + buildTranscript(history, trimmedMessage, cfg);
         String reply;
         try {
             String rawText = provider.chat(SYSTEM_PROMPT, userMessage, cfg.getMaxTokens());
             reply = parseReply(rawText);
+            if (mentionsAny(reply, picked)) reply += DISCLAIMER;
         } catch (Exception e) {
             log.error("피드백 챗봇 응답 생성 실패: {}", e.getMessage());
             reply = "죄송해요, 지금은 답변을 생성하지 못했어요. 잠시 후 다시 시도해주세요.";
@@ -124,6 +159,44 @@ public class ChatFeedbackService {
 
         saveFeedbackLog(conversationId, trimmedMessage, reply);
         return new ChatResult(reply, false);
+    }
+
+    /** 챗봇에 넘길 종목: 사용자가 이름으로 언급한 종목 -> 종합점수 상위 -> 태그가 붙은 종목 순, 최대 CONTEXT_MAX개. */
+    static List<Recommendation> pickForContext(List<Recommendation> recs, Map<String, List<String>> tags, String message) {
+        Map<String, Recommendation> picked = new LinkedHashMap<>();
+        for (Recommendation r : recs) {
+            if (r.getName() != null && message.contains(r.getName())) picked.put(r.getTicker(), r);
+        }
+        for (int i = 0; i < Math.min(CONTEXT_TOP, recs.size()); i++) picked.putIfAbsent(recs.get(i).getTicker(), recs.get(i));
+        for (Recommendation r : recs) {
+            if (picked.size() >= CONTEXT_MAX) break;
+            if (!tags.getOrDefault(r.getTicker(), List.of()).isEmpty()) picked.putIfAbsent(r.getTicker(), r);
+        }
+        return new ArrayList<>(picked.values());
+    }
+
+    /** 사용자 메시지 앞에 붙는 [분석 데이터] 블록 - LLM이 추천할 때 쓸 수 있는 유일한 근거. */
+    static String buildStockContext(LocalDate date, List<Recommendation> picked, Map<String, List<String>> tags) {
+        if (date == null || picked.isEmpty()) return "[분석 데이터]\n아직 분석된 데이터가 없습니다.\n\n";
+        StringBuilder sb = new StringBuilder("[분석 데이터] 기준일 ").append(date)
+                .append(" (종합점수 순, 전 종목이 아닌 일부)\n");
+        for (Recommendation r : picked) {
+            sb.append("- ").append(r.getName()).append('(').append(r.getTicker()).append(", ").append(r.getMarket())
+              .append(") 종합 ").append(fmt(r.getFinalScore())).append(" 기술 ").append(fmt(r.getTechnicalScore()))
+              .append(" 감성 ").append(fmt(r.getSentimentScore()));
+            List<String> t = tags.getOrDefault(r.getTicker(), List.of());
+            if (!t.isEmpty()) sb.append(" | 태그: ").append(String.join(", ", t.stream().map(x -> TAG_LABEL.getOrDefault(x, x)).toList()));
+            if (r.getMomentum12m() != null) sb.append(" | 12-1개월 모멘텀 ").append(fmt(r.getMomentum12m())).append('%');
+            if (r.getHigh52wGap() != null) sb.append(" | 52주 신고가 대비 ").append(fmt(r.getHigh52wGap())).append('%');
+            sb.append('\n');
+        }
+        return sb.append('\n').toString();
+    }
+
+    private static String fmt(Double v) { return v == null ? "-" : String.format("%.1f", v); }
+
+    private static boolean mentionsAny(String reply, List<Recommendation> picked) {
+        return picked.stream().anyMatch(r -> r.getName() != null && r.getName().length() >= 2 && reply.contains(r.getName()));
     }
 
     /** 클라이언트 IP당 windowMinutes 동안 maxRequestsPerWindow회 초과 시 거부하는 고정 윈도우 제한. */
