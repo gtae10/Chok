@@ -55,7 +55,8 @@ public class NewsCollectorService {
                         date = LocalDate.now();
                     }
 
-                    articles.add(new NewsArticle(headline, fullUrl, date));
+                    articles.add(new NewsArticle(headline, fullUrl, date,
+                            org.jsoup.parser.Parser.unescapeEntities(item.path("body").asText(""), false)));
                 }
             }
 

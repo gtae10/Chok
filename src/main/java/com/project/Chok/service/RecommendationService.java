@@ -287,7 +287,15 @@ public class RecommendationService {
     private SentimentOutcome analyzeNewsSentiment(Stock stock, LocalDate today,
                                                    AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback) {
         int maxNews = appProperties.getAnalysis().getNewsPerStock();
-        List<NewsArticle> articles = newsCollectorService.fetchRecentNews(stock.getTicker(), maxNews);
+        List<NewsArticle> fetched = newsCollectorService.fetchRecentNews(stock.getTicker(), maxNews);
+        // 네이버는 기사 전문에 종목명이 한 번만 나와도(광고·안내 문구 포함) 종목 뉴스로 묶는다 - 제목·본문 앞부분에
+        // 종목명이 없는 기사는 감성점수와 재료성 태그에 섞이지 않게 LLM 호출 전에 버린다 (NewsRelevance 참고)
+        List<NewsArticle> articles = fetched.stream()
+                .filter(a -> NewsRelevance.isRelevant(stock.getName(), a.getHeadline(), a.getBody()))
+                .toList();
+        if (articles.size() < fetched.size()) {
+            log.info("종목과 무관한 뉴스 제외: 종목={}, {}건 → {}건", stock.getTicker(), fetched.size(), articles.size());
+        }
 
         if (articles.isEmpty()) return SentimentOutcome.of(0.0);
 
