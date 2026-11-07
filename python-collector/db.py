@@ -102,6 +102,32 @@ def insert_price_rows(rows):
 
 
 @retry_on_deadlock
+def upsert_short_rows(rows):
+    """rows: (ticker, trade_date, short_ratio) 튜플 목록. short_ratio = KRX 공매도 잔고 '비중'(%)."""
+    if not rows:
+        return
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.executemany(
+            """INSERT INTO short_balance (ticker, trade_date, short_ratio)
+               VALUES (%s, %s, %s)
+               ON DUPLICATE KEY UPDATE short_ratio=VALUES(short_ratio)""",
+            rows
+        )
+        cur.close()
+
+
+def max_short_trade_date():
+    """short_balance에 저장된 가장 최근 trade_date (datetime.date). 비어 있으면 None."""
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT MAX(trade_date) FROM short_balance")
+        (value,) = cur.fetchone()
+        cur.close()
+    return value
+
+
+@retry_on_deadlock
 def update_issuance_rows(values):
     """values: {ticker: 순발행}. 이번에 못 구한 종목은 이전 값을 지우지 않고 그대로 둔다."""
     if not values:

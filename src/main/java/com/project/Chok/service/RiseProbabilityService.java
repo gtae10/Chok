@@ -13,7 +13,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * python-collector/train_model.py 가 학습해서 내보낸 로지스틱 회귀 계수(JSON)를 읽어
@@ -29,10 +32,17 @@ public class RiseProbabilityService {
 
     private static final Logger log = LoggerFactory.getLogger(RiseProbabilityService.class);
 
+    /** featureNames가 없는 옛 모델 JSON용 기본 순서 (train_model.py 초기 8개 특징) */
     public static final List<String> FEATURE_NAMES = List.of(
             "priceVsMa5", "ma5VsMa20", "ma20VsMa60", "rsiNorm",
             "macdHistNorm", "bbPercentB", "logVolumeRatio", "momentum90"
     );
+
+    public static final String SHORT_RATIO = "shortRatio";
+
+    /** Java가 계산할 줄 아는 특징 전체. 모델이 이 밖의 이름을 요구하면 그 모델은 쓰지 않는다. */
+    private static final Set<String> KNOWN_FEATURES = Stream.concat(FEATURE_NAMES.stream(), Stream.of(SHORT_RATIO))
+            .collect(Collectors.toUnmodifiableSet());
 
     // 영업일 -> 대략적인 달력일 근사치 (주말 감안, 완벽한 거래일 캘린더는 불필요)
     private static final double BUSINESS_TO_CALENDAR_DAYS = 7.0 / 5.0;
@@ -49,14 +59,10 @@ public class RiseProbabilityService {
     }
 
     /** 모델이 있으면 표준화 + 시그모이드로 확률(0~100)을 계산, 없으면 null */
-    public Double predict(double[] features) {
+    public Double predict(Map<String, Double> features) {
         ModelData model = loadModelIfAvailable();
         if (model == null) return null;
-        Double probability = computeProbability(model, features);
-        if (probability == null) {
-            log.warn("모델 특징 개수({})와 계산된 특징 개수({})가 다름 - 모델 무시", model.weights.length, features.length);
-        }
-        return probability;
+        return computeProbability(model, features);
     }
 
     public boolean isModelAvailable() {
@@ -80,7 +86,7 @@ public class RiseProbabilityService {
      * 그 중 상승확률이 가장 높은 기간 하나를 고른다. 후보가 하나도 없으면 null
      * (다중비교 문제 방지 - AUC 기준 미달 기간을 억지로 보여주지 않음).
      */
-    public NotableHorizon findNotableHorizon(double[] features) {
+    public NotableHorizon findNotableHorizon(Map<String, Double> features) {
         return findExtremeHorizon(features, true);
     }
 
@@ -89,11 +95,11 @@ public class RiseProbabilityService {
      * 가장 낮은(하락 쪽으로 가장 확신 있는) 기간을 고른다. 별도 모델을 새로 학습하지 않고
      * 같은 기간별 모델들을 재사용한다 - 상승확률이 낮다는 것 자체가 곧 하락 쪽 신호이므로.
      */
-    public NotableHorizon findNotableFallHorizon(double[] features) {
+    public NotableHorizon findNotableFallHorizon(Map<String, Double> features) {
         return findExtremeHorizon(features, false);
     }
 
-    private NotableHorizon findExtremeHorizon(double[] features, boolean highest) {
+    private NotableHorizon findExtremeHorizon(Map<String, Double> features, boolean highest) {
         double minAuc = appProperties.getModel().getMinAucForHighlight();
 
         NotableHorizon best = null;
@@ -113,13 +119,22 @@ public class RiseProbabilityService {
         return best;
     }
 
-    private Double computeProbability(ModelData model, double[] features) {
-        if (model.weights.length != features.length) return null;
+    /**
+     * 모델 JSON의 featureNames 순서대로 특징 이름 -> 값 맵에서 벡터를 꺼내 계산한다.
+     * 값이 없는 특징(예: 공매도 데이터가 없는 종목)은 그 특징의 학습 평균으로 채운다 = 표준화값 0.
+     */
+    private Double computeProbability(ModelData model, Map<String, Double> features) {
+        if (!model.usable) return null;
 
         double z = model.bias;
-        for (int i = 0; i < features.length; i++) {
+        for (int i = 0; i < model.featureNames.size(); i++) {
+            Double value = features.get(model.featureNames.get(i));
+            if (value == null) {
+                log.debug("특징 {} 값 없음 - 모델 평균으로 대체 (기간={}일)", model.featureNames.get(i), model.forwardDays);
+                continue;
+            }
             double std = model.featureStds[i] == 0 ? 1.0 : model.featureStds[i];
-            double standardized = (features[i] - model.featureMeans[i]) / std;
+            double standardized = (value - model.featureMeans[i]) / std;
             z += model.weights[i] * standardized;
         }
         double probability = 1.0 / (1.0 + Math.exp(-z));
@@ -164,6 +179,9 @@ public class RiseProbabilityService {
             data.holdoutAccuracy = raw.get("holdoutAccuracy") == null ? null : ((Number) raw.get("holdoutAccuracy")).doubleValue();
             data.holdoutAuc = raw.get("holdoutAuc") == null ? null : ((Number) raw.get("holdoutAuc")).doubleValue();
             data.forwardDays = raw.get("forwardDays") == null ? 5 : ((Number) raw.get("forwardDays")).intValue();
+            List<?> names = (List<?>) raw.get("featureNames");
+            data.featureNames = names == null ? FEATURE_NAMES : names.stream().map(String::valueOf).toList();
+            data.usable = checkUsable(file, data);
 
             modelCache.put(file.getAbsolutePath(), new CachedEntry(lastModified, data));
             log.info("상승확률 모델 로드 완료 (파일={}, 기간={}일, 학습일={}, 샘플수={}, AUC={})",
@@ -173,6 +191,21 @@ public class RiseProbabilityService {
             log.warn("상승확률 모델 파일 읽기 실패 ({}): {}", file.getAbsolutePath(), e.getMessage());
             return null;
         }
+    }
+
+    /** 모델 파일당 한 번(로드·캐시 갱신 시)만 검사·경고한다. 통과 못 하면 그 모델은 null 처리. */
+    private boolean checkUsable(File file, ModelData data) {
+        List<String> unknown = data.featureNames.stream().filter(n -> !KNOWN_FEATURES.contains(n)).toList();
+        if (!unknown.isEmpty()) {
+            log.warn("모델 {} 이(가) Java가 모르는 특징 {} 을(를) 요구 - 모델 무시", file.getName(), unknown);
+            return false;
+        }
+        int n = data.featureNames.size();
+        if (data.weights.length != n || data.featureMeans.length != n || data.featureStds.length != n) {
+            log.warn("모델 {} 특징 이름 개수({})와 계수 개수({})가 다름 - 모델 무시", file.getName(), n, data.weights.length);
+            return false;
+        }
+        return true;
     }
 
     private double[] toDoubleArray(List<?> list) {
@@ -192,6 +225,8 @@ public class RiseProbabilityService {
     }
 
     private static class ModelData {
+        List<String> featureNames;
+        boolean usable;
         double[] weights;
         double[] featureMeans;
         double[] featureStds;

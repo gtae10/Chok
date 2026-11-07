@@ -1,4 +1,5 @@
 import datetime
+import os
 import time
 from zoneinfo import ZoneInfo
 import logging
@@ -7,7 +8,7 @@ import FinanceDataReader as fdr
 import numpy as np
 import pandas as pd
 import config
-from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows, update_issuance_rows
+from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows, update_issuance_rows, upsert_short_rows, max_short_trade_date
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -178,6 +179,74 @@ def update_issuance(tickers):
     logger.info(f"순발행 갱신: {len(values)}/{len(tickers)} 종목 (marcap 기준일 {marcap['Date'].max():%Y-%m-%d})")
 
 
+SHORT_MAX_BACKFILL_DAYS = 60  # 달력일. 마지막 저장일 다음날부터 메우되, 아무리 오래 비어도 이만큼만 거슬러 간다
+SHORT_STALE_DAYS = 7  # 최신 저장일이 이보다 오래되면 KRX 로그인/pykrx 문제로 보고 ERROR
+
+
+def short_fetch_dates(last_saved, today):
+    """공매도 잔고를 받아야 할 평일 목록: last_saved 다음날 ~ today, 최대 SHORT_MAX_BACKFILL_DAYS일 전까지.
+    KRX는 T+2에 공개하므로 최근 이틀은 빈 응답이 정상이고, 다음 실행 때 다시 시도된다."""
+    floor = today - datetime.timedelta(days=SHORT_MAX_BACKFILL_DAYS)
+    start = max(last_saved + datetime.timedelta(days=1), floor) if last_saved else floor
+    days = (today - start).days + 1
+    return [d for d in (start + datetime.timedelta(days=i) for i in range(days)) if d.weekday() < 5]
+
+
+def fetch_short_rows_for_date(stock, day, tickers):
+    """하루치 전 종목 공매도 잔고 비중(%) - 날짜당 시장별 요청 1번. 0은 '공매도 없음'이라 그대로 둔다."""
+    rows = []
+    for market in ("KOSPI", "KOSDAQ"):
+        df = stock.get_shorting_balance_by_ticker(day.strftime("%Y%m%d"), market)
+        if df is None or df.empty or "비중" not in df.columns:
+            continue  # 휴장일이거나 아직 미공개(T+2)
+        ratios = df["비중"].dropna()
+        rows += [(t, day.isoformat(), round(float(v), 4)) for t, v in ratios.items() if t in tickers]
+    return rows
+
+
+def _drop_pykrx_root_logs(record):
+    """pykrx는 조회 실패(미공개 날짜 포함) 때 root에 logging.info(args, kwargs)를 잘못된 포맷으로 남겨
+    '--- Logging error ---' 트레이스가 찍힌다. 실패 여부는 우리가 직접 판단하므로 그 기록만 버린다."""
+    return "pykrx" not in record.pathname
+
+
+def fetch_short_balance(tickers):
+    """마지막 저장일 다음날부터 오늘까지 날짜별로 KRX(pykrx) 공매도 잔고 비중을 받아 short_balance에 저장한다.
+    tickers(상위 N 유니버스)만 남긴다. 어느 날짜에서 실패하면 그 뒤는 받지 않는다 - 중간이 비면
+    MAX(trade_date)가 앞서 나가 그 구멍이 다시 안 메워지기 때문."""
+    if not (os.environ.get("KRX_ID") and os.environ.get("KRX_PW")):
+        logger.warning("KRX_ID / KRX_PW 환경변수가 없어 공매도 잔고 수집을 건너뜁니다.")
+        return 0
+    from pykrx import stock  # 로그인 정보가 있을 때만 불러온다
+    logging.getLogger().addFilter(_drop_pykrx_root_logs)
+
+    today = datetime.datetime.now(KST).date()
+    dates = short_fetch_dates(max_short_trade_date(), today)
+    wanted, total, saved_dates = set(tickers), 0, []
+    for day in dates:
+        try:
+            rows = fetch_short_rows_for_date(stock, day, wanted)
+        except Exception as e:
+            logger.error(f"{day} 공매도 잔고 조회 실패, 이후 날짜는 다음 실행에서 다시 받습니다: {e}")
+            break
+        if rows:
+            upsert_short_rows(rows)
+            total += len(rows)
+            saved_dates.append(day)
+    report_short_freshness(today, total, saved_dates, dates)
+    return total
+
+
+def report_short_freshness(today, total, saved_dates, tried_dates):
+    latest = max_short_trade_date()
+    if latest is None or (today - latest).days > SHORT_STALE_DAYS:
+        logger.error(f"공매도 잔고가 오래됨: 최신 저장일 {latest} (오늘 {today}). KRX 로그인/pykrx 문제가 의심됩니다.")
+        return
+    covered = f"{saved_dates[0]} ~ {saved_dates[-1]}, {len(saved_dates)}일" if saved_dates else "새 날짜 없음"
+    tried = f"{tried_dates[0]} ~ {tried_dates[-1]}" if tried_dates else "없음"
+    logger.info(f"공매도 잔고 저장 완료: {total}행 ({covered}, 조회 범위 {tried}, 최신 저장일 {latest})")
+
+
 def run():
     logger.info("=== 시세 수집 시작 ===")
     start = datetime.datetime.now()
@@ -205,6 +274,11 @@ def run():
             fetch_market_indicators()
         except Exception as e:
             logger.error(f"거시 지표 수집 실패 (종목 시세는 정상 수집됨): {e}")
+
+        try:
+            fetch_short_balance([s["ticker"] for s in top_stocks])
+        except Exception:
+            logger.exception("공매도 잔고 수집 실패 (종목 시세는 정상 수집됨)")
 
         elapsed = (datetime.datetime.now() - start).seconds
         logger.info(f"=== 시세 수집 완료: {processed}/{total} 종목 ({elapsed}초) ===")

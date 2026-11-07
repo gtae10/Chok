@@ -1,13 +1,17 @@
 package com.project.Chok.service;
 
 import com.project.Chok.domain.PriceHistory;
+import com.project.Chok.domain.ShortBalance;
 import com.project.Chok.dto.TechnicalIndicatorResult;
+import com.project.Chok.repository.ShortBalanceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class TechnicalAnalysisService {
@@ -29,11 +33,15 @@ public class TechnicalAnalysisService {
     private static final int MOMENTUM_12M_LOOKBACK = 252; // 12-1개월 모멘텀: 약 12개월 전부터
     private static final int MOMENTUM_12M_SKIP = 21;      // 최근 약 1개월은 뺀다(단기 반전 효과 제외)
     private static final int VOL_PERIOD = 60;
+    private static final int SHORT_LAG = 2; // KRX 공매도 잔고는 T+2 공개 - python-collector/train_model.py SHORT_LAG와 같아야 함
 
     private final RiseProbabilityService riseProbabilityService;
+    private final ShortBalanceRepository shortBalanceRepository;
 
-    public TechnicalAnalysisService(RiseProbabilityService riseProbabilityService) {
+    public TechnicalAnalysisService(RiseProbabilityService riseProbabilityService,
+                                    ShortBalanceRepository shortBalanceRepository) {
         this.riseProbabilityService = riseProbabilityService;
+        this.shortBalanceRepository = shortBalanceRepository;
     }
 
     public TechnicalIndicatorResult analyze(List<PriceHistory> priceHistory) {
@@ -98,7 +106,9 @@ public class TechnicalAnalysisService {
         finalScore = clamp(finalScore, 0, 100);
 
         // 상승확률: 학습된 모델이 있으면 그걸로, 없으면 위 점수들을 조합한 휴리스틱으로 대체
-        double[] features = buildFeatureVector(currentPrice, ma5, ma20, ma60, rsi, macdHist, bbPercentB, volumeRatio, momentum90);
+        Map<String, Double> features = buildFeatures(currentPrice, ma5, ma20, ma60, rsi, macdHist, bbPercentB, volumeRatio, momentum90);
+        Double shortRatio = shortRatioFeature(priceHistory);
+        if (shortRatio != null) features.put(RiseProbabilityService.SHORT_RATIO, shortRatio);
         Double modelProbability = riseProbabilityService.predict(features);
         double riseProbability;
         String probabilitySource;
@@ -139,21 +149,42 @@ public class TechnicalAnalysisService {
         );
     }
 
-    // ── 특징 벡터 (RiseProbabilityService.FEATURE_NAMES 순서와 반드시 일치해야 함) ──
+    // ── 특징 (이름 -> 값). 순서는 RiseProbabilityService가 각 모델 JSON의 featureNames대로 맞춘다 ──
 
-    private double[] buildFeatureVector(double close, double ma5, double ma20, double ma60,
-                                         double rsi, double macdHist, double bbPercentB,
-                                         double volumeRatio, double momentum90) {
-        return new double[]{
-                (close - ma5) / close,
-                (ma5 - ma20) / ma20,
-                (ma20 - ma60) / ma60,
-                (rsi - 50) / 50,
-                macdHist / close,
-                bbPercentB,
-                Math.log(Math.max(volumeRatio, 0.01)),
-                momentum90
-        };
+    private Map<String, Double> buildFeatures(double close, double ma5, double ma20, double ma60,
+                                              double rsi, double macdHist, double bbPercentB,
+                                              double volumeRatio, double momentum90) {
+        Map<String, Double> f = new HashMap<>();
+        f.put("priceVsMa5", (close - ma5) / close);
+        f.put("ma5VsMa20", (ma5 - ma20) / ma20);
+        f.put("ma20VsMa60", (ma20 - ma60) / ma60);
+        f.put("rsiNorm", (rsi - 50) / 50);
+        f.put("macdHistNorm", macdHist / close);
+        f.put("bbPercentB", bbPercentB);
+        f.put("logVolumeRatio", Math.log(Math.max(volumeRatio, 0.01)));
+        f.put("momentum90", momentum90);
+        return f;
+    }
+
+    /**
+     * 공매도 잔고 비중(%) 특징: 가격 마지막 날에서 정확히 SHORT_LAG 거래일 전 행의 값.
+     * python-collector/train_model.py 의 compute_short_feature(shift(SHORT_LAG))와 1:1로 같아야 한다.
+     * 그날 행이 없으면(수집 끊김 등) 오래된 값으로 대체하지 않고 null - 모델이 평균값으로 대체한다.
+     * DB 오류가 나도 null: 공매도를 안 쓰는 모델의 분석까지 실패하면 안 된다.
+     */
+    public Double shortRatioFeature(List<PriceHistory> priceHistory) {
+        int idx = priceHistory.size() - 1 - SHORT_LAG;
+        if (idx < 0) return null;
+        PriceHistory target = priceHistory.get(idx);
+        if (target.getTicker() == null || target.getTradeDate() == null) return null;
+        try {
+            return shortBalanceRepository.findByTickerAndTradeDate(target.getTicker(), target.getTradeDate())
+                    .map(ShortBalance::getShortRatio)
+                    .orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("공매도 잔고 조회 실패 ({} {}) - 평균값으로 대체: {}", target.getTicker(), target.getTradeDate(), e.getMessage());
+            return null;
+        }
     }
 
     /**

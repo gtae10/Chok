@@ -3,7 +3,9 @@ package com.project.Chok;
 import com.project.Chok.config.AppProperties;
 import com.project.Chok.config.PythonEnvironment;
 import com.project.Chok.domain.PriceHistory;
+import com.project.Chok.domain.ShortBalance;
 import com.project.Chok.dto.TechnicalIndicatorResult;
+import com.project.Chok.repository.ShortBalanceRepository;
 import com.project.Chok.service.RiseProbabilityService;
 import com.project.Chok.service.TechnicalAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,12 +21,47 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TechnicalAnalysisServiceTest {
 
     private TechnicalAnalysisService service;
+    private ShortBalanceRepository shortBalanceRepository;
 
     @BeforeEach
     void setUp() {
         // 테스트 환경엔 학습된 모델 파일이 없으므로 자동으로 휴리스틱 확률 계산으로 폴백됨
         AppProperties appProperties = new AppProperties();
-        service = new TechnicalAnalysisService(new RiseProbabilityService(new PythonEnvironment(appProperties), appProperties));
+        shortBalanceRepository = org.mockito.Mockito.mock(ShortBalanceRepository.class);
+        service = new TechnicalAnalysisService(new RiseProbabilityService(new PythonEnvironment(appProperties), appProperties),
+                shortBalanceRepository);
+    }
+
+    @Test
+    @DisplayName("공매도 특징은 마지막 가격일의 정확히 2거래일 전 행만 쓰고, 그날 행이 없으면 null")
+    void short_ratio_uses_exact_lag_row_only() {
+        List<PriceHistory> prices = createPriceHistory(5, 10000, true);
+        prices.forEach(p -> p.setTicker("005930"));
+        LocalDate lagDate = prices.get(prices.size() - 3).getTradeDate();
+        ShortBalance row = new ShortBalance();
+        row.setShortRatio(0.11);
+        org.mockito.Mockito.when(shortBalanceRepository.findByTickerAndTradeDate("005930", lagDate))
+                .thenReturn(java.util.Optional.of(row));
+
+        assertThat(service.shortRatioFeature(prices)).isEqualTo(0.11);
+
+        // 마지막 날이 하루 밀리면 2거래일 전 날짜도 바뀐다 → 그 날짜 행이 없으니 오래된 값을 쓰지 않고 null
+        PriceHistory next = new PriceHistory();
+        next.setTicker("005930");
+        next.setTradeDate(prices.get(prices.size() - 1).getTradeDate().plusDays(1));
+        prices.add(next);
+        assertThat(service.shortRatioFeature(prices)).isNull();
+    }
+
+    @Test
+    @DisplayName("공매도 조회 중 DB 오류가 나도 예외 없이 null")
+    void short_ratio_db_error_returns_null() {
+        List<PriceHistory> prices = createPriceHistory(5, 10000, true);
+        prices.forEach(p -> p.setTicker("005930"));
+        org.mockito.Mockito.when(shortBalanceRepository.findByTickerAndTradeDate(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenThrow(new RuntimeException("table missing"));
+
+        assertThat(service.shortRatioFeature(prices)).isNull();
     }
 
     // 테스트용 가격 데이터 생성 헬퍼

@@ -21,7 +21,7 @@ train_model.py
 주의: 여기서 계산하는 8개 배포 특징의 공식은
       Chok(Java)/src/main/java/com/project/Chok/service/TechnicalAnalysisService.java 의
       buildFeatureVector() 와 반드시 동일해야 한다. 한쪽만 고치면 예측이 어긋난다.
-      아래 후보 특징(52주 신고가 근접도/상대강도/감성점수)은 ablation 검증 통과 전까지는
+      아래 후보 특징(52주 신고가 근접도/상대강도/감성점수/공매도 비중)은 ablation 검증 통과 전까지는
       Java에 반영하지 않는다 - 검증 통과한 것만 buildFeatureVector()에 추가한다
       (거시지표 ablation 때와 동일한 원칙).
 """
@@ -31,8 +31,10 @@ import os
 import sys
 from datetime import datetime, timezone
 
+import mysql.connector
 import numpy as np
 import pandas as pd
+from mysql.connector import errorcode
 
 import config
 import db
@@ -93,6 +95,13 @@ ADOPT_SENTIMENT = False  # 검증 통과해도 사람이 walk_forward_detail.jso
 SENTIMENT_TARGET_FOLD_DAYS = 14  # 폴드 하나의 목표 폭 (달력일 기준, "몇 주" 단위)
 MIN_SENTIMENT_FOLDS = 3  # 이 정도는 있어야 "여러 시점 반복검증"이라고 부를 수 있음
 
+# 공매도 잔고 비중(%) - KRX는 T+2에 공개하므로 거래일 D에는 그 종목의 2거래일 전 값을 쓴다
+# (달력일이 아니라 그 종목의 가격 거래일 기준 shift). experiment_flow_short.py에서
+# 20일 IC -0.068, 10/10 구간 같은 부호. 2023-11 ~ 2025-03 공매도 금지 기간엔 거의 상수다.
+SHORT_LAG = 2
+SHORT_FEATURE = "shortRatio"
+ADOPT_SHORT = False
+
 if ADOPT_MACRO_FEATURES:
     FEATURE_NAMES = FEATURE_NAMES + MACRO_FEATURE_NAMES
 if ADOPT_HIGH52W:
@@ -101,6 +110,8 @@ if ADOPT_REL_STRENGTH:
     FEATURE_NAMES = FEATURE_NAMES + [REL_STRENGTH_FEATURE]
 if ADOPT_SENTIMENT:
     FEATURE_NAMES = FEATURE_NAMES + [SENTIMENT_FEATURE]
+if ADOPT_SHORT:
+    FEATURE_NAMES = FEATURE_NAMES + [SHORT_FEATURE]
 
 MIN_FOLD_TRAIN = 100
 MIN_FOLD_TEST = 20
@@ -290,6 +301,34 @@ def report_sentiment_availability(dataset: pd.DataFrame, sentiment_raw: pd.DataF
     return {"verifiable": False, "evaluation": sentiment_eval, "simulation": sim}
 
 
+def load_short_balance():
+    """short_balance 테이블 (collect.py fetch_short_balance / backfill_short_balance.py가 채움).
+    테이블이 아직 없으면(마이그레이션 전) 경고만 남기고 None - 공매도 특징 없이 학습을 계속한다."""
+    try:
+        with db.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT ticker, trade_date, short_ratio FROM short_balance")
+            df = pd.DataFrame(cur.fetchall(), columns=["ticker", "trade_date", "short_ratio"])
+            cur.close()
+    except mysql.connector.errors.ProgrammingError as e:
+        if e.errno != errorcode.ER_NO_SUCH_TABLE:
+            raise
+        log.warning("short_balance 테이블이 없어 공매도 특징 없이 학습합니다: %s", e)
+        return None
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    df["short_ratio"] = df["short_ratio"].astype(float)
+    return df
+
+
+def compute_short_feature(price_df: pd.DataFrame, short_df: pd.DataFrame) -> pd.DataFrame:
+    """(ticker, trade_date, SHORT_FEATURE) - 거래일 D 값 = 그 종목 가격 거래일 기준 SHORT_LAG일 전 비중.
+    가격 거래일에 먼저 맞춘 뒤 shift하므로 공매도 데이터가 빠진 날도 거래일 한 칸으로 센다. 없으면 NaN."""
+    out = price_df[["ticker", "trade_date"]].drop_duplicates().sort_values(["ticker", "trade_date"])
+    out = out.merge(short_df[["ticker", "trade_date", "short_ratio"]], on=["ticker", "trade_date"], how="left")
+    out[SHORT_FEATURE] = out.groupby("ticker")["short_ratio"].shift(SHORT_LAG)
+    return out.drop(columns=["short_ratio"])
+
+
 def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
     """티커 하나의 시계열(날짜 오름차순)에 대해 지표 + 특징 + 기간별 미래수익률을 계산한다."""
     close = g["close_price"]
@@ -355,7 +394,7 @@ def compute_features_for_ticker(g: pd.DataFrame, horizons) -> pd.DataFrame:
 
 
 def build_dataset(price_df: pd.DataFrame, horizons, macro_df: pd.DataFrame = None,
-                   sentiment_df: pd.DataFrame = None) -> pd.DataFrame:
+                   sentiment_df: pd.DataFrame = None, short_df: pd.DataFrame = None) -> pd.DataFrame:
     frames = []
     for ticker, g in price_df.groupby("ticker"):
         g = g.sort_values("trade_date").reset_index(drop=True)
@@ -384,6 +423,10 @@ def build_dataset(price_df: pd.DataFrame, horizons, macro_df: pd.DataFrame = Non
 
     if sentiment_df is not None:
         dataset = compute_sentiment_feature(dataset, sentiment_df)
+
+    # 공매도 - 시차는 가격 거래일 기준이라 dropna로 행이 빠지기 전의 price_df로 계산해 붙인다
+    if short_df is not None:
+        dataset = dataset.merge(compute_short_feature(price_df, short_df), on=["ticker", "trade_date"], how="left")
 
     # 특징 컬럼에 inf/NaN 있는 행만 제거 (기간별 수익률 컬럼은 기간마다 결측 범위가 달라서 따로 처리)
     dataset[FEATURE_NAMES] = dataset[FEATURE_NAMES].replace([np.inf, -np.inf], np.nan)
@@ -862,9 +905,17 @@ def main():
     sentiment_raw = load_sentiment_scores()
     log.info("감성점수(OK 품질) 로드 완료: %d행", len(sentiment_raw))
 
+    short_raw = load_short_balance()
+    if short_raw is not None:
+        log.info("공매도 잔고 로드 완료: %d행", len(short_raw))
+
     horizons = sorted(set(SWEEP_HORIZONS + [FORWARD_DAYS]))
-    dataset = restrict_to_universe(build_dataset(price_df, horizons, macro_df, sentiment_raw), universe, horizons)
+    dataset = restrict_to_universe(build_dataset(price_df, horizons, macro_df, sentiment_raw, short_raw), universe, horizons)
     log.info("특징 계산 완료: %d행 (지표 계산 가능 + 그날 상위 %d 종목만)", len(dataset), PIT_TOP_N)
+    if short_raw is not None and SHORT_FEATURE in dataset.columns and not short_raw.empty:
+        log.info("공매도 특징 커버리지: 데이터셋 %.1f%% 행에 %s 있음 (공매도 원본 %s ~ %s)",
+                 dataset[SHORT_FEATURE].notna().mean() * 100, SHORT_FEATURE,
+                 f"{short_raw['trade_date'].min():%Y-%m-%d}", f"{short_raw['trade_date'].max():%Y-%m-%d}")
 
     if len(dataset) < MIN_SAMPLES:
         log.warning(
@@ -895,6 +946,7 @@ def main():
             (not ADOPT_HIGH52W) and (not ADOPT_REL_STRENGTH)
             and HIGH52W_FEATURE in dataset.columns and REL_STRENGTH_FEATURE in dataset.columns,
         ),
+        "short": ([SHORT_FEATURE], (not ADOPT_SHORT) and SHORT_FEATURE in dataset.columns),
     }
 
     sweep_result = sweep_horizons(dataset, horizons, LABEL_MODE, candidate_groups)
