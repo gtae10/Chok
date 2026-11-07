@@ -1,0 +1,131 @@
+{
+  "results": {
+    "sox:gap": {
+      "days": 1371,
+      "icMean": 0.1311,
+      "icStd": 0.2204,
+      "icPositiveFolds": 10,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 467,
+        "icMean": 0.2439,
+        "icStd": 0.2236,
+        "icPositiveFolds": 10,
+        "nFolds": 10
+      }
+    },
+    "sox:intraday": {
+      "days": 1371,
+      "icMean": -0.0088,
+      "icStd": 0.1986,
+      "icPositiveFolds": 4,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 467,
+        "icMean": -0.0104,
+        "icStd": 0.2122,
+        "icPositiveFolds": 4,
+        "nFolds": 10
+      }
+    },
+    "sox:open5": {
+      "days": 1367,
+      "icMean": -0.0052,
+      "icStd": 0.2115,
+      "icPositiveFolds": 2,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 463,
+        "icMean": -0.0128,
+        "icStd": 0.214,
+        "icPositiveFolds": 4,
+        "nFolds": 10
+      }
+    },
+    "nasdaq:gap": {
+      "days": 1371,
+      "icMean": 0.1325,
+      "icStd": 0.224,
+      "icPositiveFolds": 10,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 180,
+        "icMean": 0.3234,
+        "icStd": 0.2037,
+        "icPositiveFolds": 10,
+        "nFolds": 10
+      }
+    },
+    "nasdaq:intraday": {
+      "days": 1371,
+      "icMean": -0.0093,
+      "icStd": 0.2038,
+      "icPositiveFolds": 3,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 180,
+        "icMean": -0.0299,
+        "icStd": 0.2242,
+        "icPositiveFolds": 2,
+        "nFolds": 10
+      }
+    },
+    "nasdaq:open5": {
+      "days": 1367,
+      "icMean": -0.0002,
+      "icStd": 0.2149,
+      "icPositiveFolds": 4,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 179,
+        "icMean": -0.0098,
+        "icStd": 0.1965,
+        "icPositiveFolds": 5,
+        "nFolds": 10
+      }
+    },
+    "sp500:gap": {
+      "days": 1371,
+      "icMean": 0.1236,
+      "icStd": 0.2172,
+      "icPositiveFolds": 10,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 74,
+        "icMean": 0.3171,
+        "icStd": 0.1898,
+        "icPositiveFolds": 10,
+        "nFolds": 10
+      }
+    },
+    "sp500:intraday": {
+      "days": 1371,
+      "icMean": -0.0131,
+      "icStd": 0.1955,
+      "icPositiveFolds": 3,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 74,
+        "icMean": -0.0339,
+        "icStd": 0.1872,
+        "icPositiveFolds": 3,
+        "nFolds": 10
+      }
+    },
+    "sp500:open5": {
+      "days": 1367,
+      "icMean": -0.0073,
+      "icStd": 0.2073,
+      "icPositiveFolds": 3,
+      "nFolds": 10,
+      "bigMoveDays": {
+        "days": 74,
+        "icMean": 0.0001,
+        "icStd": 0.1813,
+        "icPositiveFolds": 5,
+        "nFolds": 10
+      }
+    }
+  },
+  "passed": []
+}
