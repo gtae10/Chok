@@ -50,11 +50,19 @@ public class SentimentAnalysisService {
               PR성, "~기대된다"류 막연한 전망, 규모·실행 불확실한 초기 MOU)
             - 0.2~0.6: 협력·계약은 있으나 매출 기여 규모·시점 불명확 → 보수적으로 채점
 
+            반드시 0.0으로 채점 (톤이 아무리 강해도):
+            - 시황 기사: 코스피·코스닥·업종 전체 등락, 외국인 매매 동향 등 이 종목 고유 정보가 없는 뉴스
+            - 주가 등락 자체만 전하는 기사: "~% 급락/급등", "신저가/신고가", "특징주"처럼 이미
+              일어난 가격 움직임을 전할 뿐 새 재무 정보가 없는 경우
+            다른 회사 소식이면 "이 종목"에 미치는 방향으로 채점 (경쟁사 악재는 이 종목에 중립~호재).
+
             예시:
             - "사회 공헌으로 브랜드 이미지 개선 기대" → 0.1~0.2 (PR성)
             - "한온시스템, 한국타이어 유통망 활용 신사업 발표" → 0.2~0.3 (규모 불명확)
             - "삼성전자 3분기 영업이익 전년比 40%↑, 컨센서스 상회" → 0.7~0.9 (수치+즉각적)
             - "OO그룹 회장, 1500억대 배임 혐의로 구속기소" → -0.6~-0.8 (경영진 리스크, 구체적)
+            - "코스피 7000선 붕괴… 반도체주 급락" → 0.0 (시황)
+            - "누리호 성공에도 한화에어로 8% 급락" → 0.0 (주가 등락만 전함)
             """;
 
     private final Map<String, LlmProvider> providers;
@@ -269,9 +277,19 @@ public class SentimentAnalysisService {
 
     private SentimentResult toSentimentResult(JsonNode node) {
         double score = Math.max(-1.0, Math.min(1.0, node.path("score").asDouble(0.0)));
-        String label = node.path("label").asText("NEUTRAL");
         String summary = node.path("summary").asText("");
-        return new SentimentResult(score, label, summary);
+        return new SentimentResult(score, labelFor(score), summary);
+    }
+
+    /**
+     * 라벨은 LLM이 준 값을 쓰지 않고 점수로 정한다. LLM 라벨은 점수와 자주 어긋났다
+     * (0.6점인데 NEUTRAL, 오타 "POSITVE" 등). ±0.3은 표시용 경계다 - 2026-11 실측에서
+     * 시장 대비 초과수익으로 보면 -0.6 이하만 약한 하락 신호가 있고 나머지 구간은 차이가 없었다.
+     */
+    public static String labelFor(double score) {
+        if (score >= 0.3) return "POSITIVE";
+        if (score <= -0.3) return "NEGATIVE";
+        return "NEUTRAL";
     }
 
     private String stripCodeFence(String rawText) {

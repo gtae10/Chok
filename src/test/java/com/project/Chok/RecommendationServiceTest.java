@@ -117,7 +117,8 @@ class RecommendationServiceTest {
                         null, null, null, null, null, null, "상승추세"
                 ));
         when(newsCollectorService.fetchRecentNews(anyString(), anyInt()))
-                .thenReturn(List.of(new NewsArticle("호재 뉴스", "http://test.com", LocalDate.now())));
+                // 종목명이 없으면 무관 뉴스로 걸러져 감성분석까지 가지 않는다
+                .thenReturn(List.of(new NewsArticle("삼성전자 호재 뉴스", "http://test.com", LocalDate.now())));
         when(newsSentimentRepository.existsByTickerAndHeadlineAndDate(anyString(), anyString(), any()))
                 .thenReturn(false);
         when(newsDeduplicationService.filterSimilarDuplicates(anyString(), anyList()))

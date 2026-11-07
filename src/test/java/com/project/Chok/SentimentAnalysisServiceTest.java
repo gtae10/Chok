@@ -135,6 +135,20 @@ class SentimentAnalysisServiceTest {
     }
 
     @Test
+    @DisplayName("라벨은 LLM 값(오타 포함)을 무시하고 점수 ±0.3 기준으로 정한다")
+    void label_is_derived_from_score() {
+        when(openAiProvider.isConfigured()).thenReturn(true);
+        when(openAiProvider.chat(anyString(), anyString(), anyInt()))
+                .thenReturn("{\"score\": 0.6, \"label\": \"NEUTRAL\", \"summary\": \"어긋난 라벨\"}");
+
+        assertThat(service().analyze("가온전선", "헤드라인").getLabel()).isEqualTo("POSITIVE");
+        assertThat(SentimentAnalysisService.labelFor(0.3)).isEqualTo("POSITIVE");
+        assertThat(SentimentAnalysisService.labelFor(0.29)).isEqualTo("NEUTRAL");
+        assertThat(SentimentAnalysisService.labelFor(-0.29)).isEqualTo("NEUTRAL");
+        assertThat(SentimentAnalysisService.labelFor(-0.3)).isEqualTo("NEGATIVE");
+    }
+
+    @Test
     @DisplayName("provider.chat() 호출 중 예외 발생 시 중립 반환")
     void provider_exception_returns_neutral() {
         when(openAiProvider.isConfigured()).thenReturn(true);
