@@ -67,10 +67,6 @@ public class RecommendationService {
         this.appProperties = appProperties;
     }
 
-    public int runFullAnalysis() {
-        return runFullAnalysis(null);
-    }
-
     /**
      * 종목별 분석을 병렬로 실행한다. 뉴스 감성분석이 종목당 블로킹 API 호출 1번(뉴스 여러 건을
      * 배치로 묶어서 요청)을 포함하므로, 순차 실행 시 종목 수만큼 직렬로 대기해야 했음.
@@ -100,7 +96,26 @@ public class RecommendationService {
             LocalDate.of(2027, 12, 27), LocalDate.of(2027, 12, 31)
     );
 
-    public int runFullAnalysis(AnalysisStatus status) {
+    /** 전체 분석 결과 - 실패를 성공으로 끝내지 않게 판정한다 (스케줄러·수동 실행·시작 보정 공통). */
+    public record AnalysisResult(int processed, int total, boolean snapshotOk,
+                                 int newsFailed, int sentimentAnalyzed, int sentimentFallback) {
+        static final double MIN_SUCCESS_RATE = 0.9;
+        static final double MAX_NEWS_FAILED_RATE = 0.1;
+
+        public boolean succeeded() {
+            boolean sentimentBroken = sentimentAnalyzed >= MIN_SAMPLES_FOR_RATE_CHECK
+                    && (double) sentimentFallback / sentimentAnalyzed >= ABNORMAL_FALLBACK_RATE;
+            return snapshotOk && processed > 0 && processed >= total * MIN_SUCCESS_RATE
+                    && newsFailed <= total * MAX_NEWS_FAILED_RATE && !sentimentBroken;
+        }
+
+        public String summary() {
+            return String.format("종목 %d/%d 성공, 뉴스 실패 %d, 감성 폴백 %d/%d, 태그 스냅샷 %s",
+                    processed, total, newsFailed, sentimentFallback, sentimentAnalyzed, snapshotOk ? "성공" : "실패");
+        }
+    }
+
+    public AnalysisResult runFullAnalysisDetailed(AnalysisStatus status) {
         List<Stock> stocks = stockRepository.findCurrentUniverseOrderByMarketCapDesc();
         LocalDate today = LocalDate.now();
         checkStalePriceData(today, status);
@@ -114,13 +129,14 @@ public class RecommendationService {
 
         AtomicInteger sentimentAnalyzed = new AtomicInteger(0);
         AtomicInteger sentimentFallback = new AtomicInteger(0);
+        AtomicInteger newsFailed = new AtomicInteger(0);
 
         ExecutorService executor = Executors.newFixedThreadPool(poolSize);
         try {
             List<CompletableFuture<Void>> futures = stocks.stream()
                     .map(stock -> CompletableFuture.runAsync(() -> {
                         try {
-                            analyzeStock(stock, today, sentimentAnalyzed, sentimentFallback);
+                            analyzeStock(stock, today, sentimentAnalyzed, sentimentFallback, newsFailed);
                             processed.incrementAndGet();
                         } catch (Exception e) {
                             log.error("종목 분석 실패 (ticker={}): {}", stock.getTicker(), e.getMessage());
@@ -145,11 +161,13 @@ public class RecommendationService {
         }
 
         log.info("전체 분석 완료: {}/{} 종목", processed.get(), total);
+        if (processed.get() < total) log.warn("분석 실패 종목 {}개", total - processed.get());
         warnIfSentimentFailureRateAbnormal(sentimentAnalyzed.get(), sentimentFallback.get());
 
         // 실전 성과 신규 편입은 중단(2026-09-29 결정) - 기존 보유 종목만 추적한다.
         // 다시 편입하려면 여기서 performanceTrackingService.saveSnapshot(today)를 호출하면 된다.
         // 대신 태그별 기록을 남긴다(C1) - 성과 집계는 python-collector/evaluate_tags.py
+        boolean snapshotOk = true;
         try {
             // 같은 날 앞선 분석 뒤 상위 N에서 빠진 종목의 오늘 행은 지운다 - 남기면 화면 목록과
             // 태그 순위 경계(상위 20%)가 이번에 분석하지 않은 종목까지 섞인 채로 계산된다
@@ -161,9 +179,11 @@ public class RecommendationService {
             tagService.snapshot(today);
         } catch (Exception e) {
             log.error("태그 스냅샷 저장 실패 (date={}): {}", today, e.getMessage());
+            snapshotOk = false;
         }
 
-        return processed.get();
+        return new AnalysisResult(processed.get(), total, snapshotOk,
+                newsFailed.get(), sentimentAnalyzed.get(), sentimentFallback.get());
     }
 
     /** 오래된 가격 데이터로 분석 중이면 AnalysisStatus에 경고를 남긴다 (분석 자체는 막지 않음). */
@@ -207,19 +227,20 @@ public class RecommendationService {
 
     @Transactional
     public void analyzeStock(Stock stock, LocalDate today) {
-        analyzeStock(stock, today, new AtomicInteger(), new AtomicInteger());
+        analyzeStock(stock, today, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
     }
 
     @Transactional
     public void analyzeStock(Stock stock, LocalDate today,
-                              AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback) {
+                              AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback,
+                              AtomicInteger newsFailed) {
         String ticker = stock.getTicker();
 
         List<PriceHistory> prices = priceHistoryRepository.findByTickerOrderByTradeDateAsc(ticker);
         TechnicalIndicatorResult techResult = technicalAnalysisService.analyze(prices);
         saveTechnicalScore(ticker, today, techResult);
 
-        SentimentOutcome sentimentOutcome = analyzeNewsSentiment(stock, today, sentimentAnalyzed, sentimentFallback);
+        SentimentOutcome sentimentOutcome = analyzeNewsSentiment(stock, today, sentimentAnalyzed, sentimentFallback, newsFailed);
         double avgSentiment = sentimentOutcome.avgScore();
 
         AppProperties.Analysis analysis = appProperties.getAnalysis();
@@ -284,10 +305,26 @@ public class RecommendationService {
         }
     }
 
+    private static final int NEWS_CATCHUP_MAX_PAGES = 10;
+
     private SentimentOutcome analyzeNewsSentiment(Stock stock, LocalDate today,
-                                                   AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback) {
+                                                   AtomicInteger sentimentAnalyzed, AtomicInteger sentimentFallback,
+                                                   AtomicInteger newsFailed) {
         int maxNews = appProperties.getAnalysis().getNewsPerStock();
-        List<NewsArticle> fetched = newsCollectorService.fetchRecentNews(stock.getTicker(), maxNews);
+        // 앱이 꺼져 있어 마지막 수집일이 어제보다 오래됐으면 그 이후 기사를 페이지를 넘겨 메운다 (이력이 없으면 기존대로 최근 N건만)
+        LocalDate lastNews = newsSentimentRepository.findLatestNewsDate(stock.getTicker());
+        boolean catchUp = lastNews != null && lastNews.isBefore(today.minusDays(1));
+        List<NewsArticle> fetched;
+        try {
+            fetched = catchUp
+                    ? newsCollectorService.fetchNewsSince(stock.getTicker(), lastNews, NEWS_CATCHUP_MAX_PAGES)
+                    : newsCollectorService.fetchRecentNews(stock.getTicker(), maxNews);
+        } catch (Exception e) {
+            // 뉴스만 실패한 것 - 추천은 최근 평균으로 저장하고, 뉴스는 저장 안 해 다음 회차가 같은 since로 다시 메운다
+            log.warn("뉴스 수집 실패, 최근 평균으로 대체 (ticker={}): {}", stock.getTicker(), e.getMessage());
+            newsFailed.incrementAndGet();
+            return lookbackAverage(stock.getTicker(), today, true);
+        }
         // 네이버는 기사 전문에 종목명이 한 번만 나와도(광고·안내 문구 포함) 종목 뉴스로 묶는다 - 제목·본문 앞부분에
         // 종목명이 없는 기사는 감성점수와 재료성 태그에 섞이지 않게 LLM 호출 전에 버린다 (NewsRelevance 참고)
         List<NewsArticle> articles = fetched.stream()
@@ -311,10 +348,22 @@ public class RecommendationService {
         double sum = 0;
         int count = 0;
         boolean fallbackUsed = false;
+        // 따라잡기로 메운 옛 기사는 저장만 하고 오늘 평균에는 lookback 기간 안 기사만 넣는다
+        LocalDate windowStart = today.minusDays(appProperties.getAnalysis().getNewsLookbackDays());
 
         if (!toAnalyze.isEmpty()) {
             List<SentimentResult> sentiments = sentimentAnalysisService.analyzeBatch(
                     stock.getName(), toAnalyze);
+            long fallbacks = sentiments.stream().filter(SentimentResult::isFallback).count();
+            sentimentAnalyzed.addAndGet(sentiments.size());
+            sentimentFallback.addAndGet((int) fallbacks);
+
+            // 따라잡기 중 일부 청크만 저장되면 최신 뉴스 날짜가 뛰어 폴백된 옛 기사는 영영 다시 안 받는다 - 통째로 버린다
+            if (catchUp && fallbacks > 0) {
+                log.warn("따라잡기 감성분석 폴백 {}건 - 이번 회차 뉴스 저장 안 함 (ticker={})", fallbacks, stock.getTicker());
+                newsFailed.incrementAndGet();
+                return lookbackAverage(stock.getTicker(), today, true);
+            }
 
             for (int i = 0; i < toAnalyze.size(); i++) {
                 NewsArticle article = toAnalyze.get(i);
@@ -329,14 +378,14 @@ public class RecommendationService {
                 entity.setSentimentLabel(sentiment.getLabel());
                 entity.setSummary(sentiment.getSummary());
                 entity.setAnalyzedAt(LocalDateTime.now());
-                newsSentimentRepository.save(entity);
+                // 오류 폴백(파싱 실패·API 오류)은 저장하지 않는다 - 저장하면 exists 체크에 걸려 다시 분석되지 않는다
+                if (!sentiment.isFallback()) newsSentimentRepository.save(entity);
 
-                sum += sentiment.getScore();
-                count++;
-                fallbackUsed = fallbackUsed || sentiment.isFallback();
-
-                sentimentAnalyzed.incrementAndGet();
-                if (sentiment.isFallback()) sentimentFallback.incrementAndGet();
+                if (!article.getDate().isBefore(windowStart)) {
+                    sum += sentiment.getScore();
+                    count++;
+                    fallbackUsed = fallbackUsed || sentiment.isFallback();
+                }
             }
         }
 
@@ -345,14 +394,17 @@ public class RecommendationService {
             // NewsSentiment가 그 자체로 오류 폴백이었는지는 구분하지 않는다. news_sentiment에도
             // fallback 플래그를 추가해 여기서 걸러내는 게 이상적이지만, 지금 문제가 된 경로(위의
             // 신규 분석 실패)보다 영향이 작아 우선순위를 낮췄다 - 필요해지면 추가.
-            int lookback = appProperties.getAnalysis().getNewsLookbackDays();
-            List<NewsSentiment> recent = newsSentimentRepository
-                    .findByTickerSince(stock.getTicker(), today.minusDays(lookback));
-            if (recent.isEmpty()) return SentimentOutcome.of(0.0);
-            return SentimentOutcome.of(recent.stream().mapToDouble(NewsSentiment::getSentimentScore).average().orElse(0.0));
+            return lookbackAverage(stock.getTicker(), today, false);
         }
 
         return new SentimentOutcome(sum / count, fallbackUsed);
+    }
+
+    private SentimentOutcome lookbackAverage(String ticker, LocalDate today, boolean fallbackUsed) {
+        int lookback = appProperties.getAnalysis().getNewsLookbackDays();
+        double avg = newsSentimentRepository.findByTickerSince(ticker, today.minusDays(lookback)).stream()
+                .mapToDouble(NewsSentiment::getSentimentScore).average().orElse(0.0);
+        return new SentimentOutcome(avg, fallbackUsed);
     }
 
     /** 최근 lookback 뉴스 중 |감성점수|가 가장 큰 값(부호 포함), 없으면 null - 태그 NEWS_POS/NEG 입력. */

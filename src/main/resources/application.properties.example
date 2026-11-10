@@ -27,6 +27,8 @@ chok.openai.base-url=https://api.openai.com/v1/chat/completions
 chok.anthropic.api-key=CHANGE_ME
 chok.anthropic.model=claude-sonnet-4-5
 chok.anthropic.base-url=https://api.anthropic.com/v1/messages
+# chok.dart.* - OpenDART(금융감독원 전자공시) API 키, https://opendart.fss.or.kr 에서 발급
+chok.dart.api-key=CHANGE_ME
 
 # chok.news.* - 같은 사건을 다루는 헤드라인(언론사만 다름) 중복 제거
 # dedup-similarity-threshold: 문자 2-gram Jaccard 유사도가 이 값 이상이면 같은 사건으로 보고
@@ -61,9 +63,9 @@ chok.python-collector.base-dir=python-collector
 # chok.collector.* - price collection settings
 chok.collector.timeout-seconds=120
 
-# chok.scheduler.* - automatic collection + analysis, every 6 hours by default (00/06/12/18시)
+# chok.scheduler.* - automatic collection + analysis, twice a day by default (08:30, 18:30)
 chok.scheduler.enabled=true
-chok.scheduler.cron=0 0 */6 * * *
+chok.scheduler.cron=0 30 8,18 * * *
 # 앱이 상시 구동되지 않는 환경 대비: 시작 시 오늘자 데이터가 없으면 자동으로 따라잡기
 chok.scheduler.catch-up-on-startup=true
 

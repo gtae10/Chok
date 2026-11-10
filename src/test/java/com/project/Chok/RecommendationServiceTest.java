@@ -93,7 +93,7 @@ class RecommendationServiceTest {
         mockNormalStock("005930");
         mockNormalStock("000660");
 
-        int result = service.runFullAnalysis();
+        int result = service.runFullAnalysisDetailed(null).processed();
 
         assertThat(result).isEqualTo(2);
         // 같은 날 앞선 분석 뒤 유니버스에서 빠진 종목의 오늘 행을 지우고 나서 태그를 기록한다
@@ -154,10 +154,31 @@ class RecommendationServiceTest {
         // 두 번째 종목은 정상
         mockNormalStock("000660");
 
-        int result = service.runFullAnalysis();
+        int result = service.runFullAnalysisDetailed(null).processed();
 
         // 첫 번째는 실패, 두 번째는 성공 → 1개 처리
         assertThat(result).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("뉴스 수집이 실패해도 추천은 최근 평균(FALLBACK)으로 저장되고 뉴스 실패로 센다")
+    void news_fetch_failure_still_saves_recommendation() {
+        when(stockRepository.findCurrentUniverseOrderByMarketCapDesc())
+                .thenReturn(List.of(createStock("005930", "삼성전자")));
+        when(priceHistoryRepository.findByTickerOrderByTradeDateAsc(anyString())).thenReturn(List.of());
+        when(technicalAnalysisService.analyze(any())).thenReturn(TechnicalIndicatorResult.insufficient());
+        when(newsCollectorService.fetchRecentNews(anyString(), anyInt()))
+                .thenThrow(new IllegalStateException("HTTP 500"));
+        when(technicalScoreRepository.findByTickerAndCalcDate(anyString(), any())).thenReturn(Optional.empty());
+        when(recommendationRepository.findHistoryByTicker(anyString())).thenReturn(List.of());
+
+        RecommendationService.AnalysisResult result = service.runFullAnalysisDetailed(null);
+
+        assertThat(result.processed()).isEqualTo(1);
+        assertThat(result.newsFailed()).isEqualTo(1);
+        assertThat(result.succeeded()).isFalse(); // 1/1 = 100% 뉴스 실패
+        verify(recommendationRepository).save(argThat(rec -> "FALLBACK".equals(rec.getSentimentDataQuality())));
+        verify(newsSentimentRepository, never()).save(any());
     }
 
     /**
@@ -248,7 +269,7 @@ class RecommendationServiceTest {
 
         AnalysisStatus status = new AnalysisStatus();
         status.tryStart("manual");
-        service.runFullAnalysis(status);
+        service.runFullAnalysisDetailed(status);
 
         assertThat(status.getPriceDataWarning()).isNotNull();
         assertThat(status.getPriceDataWarning()).contains("시세 수집");
@@ -263,7 +284,7 @@ class RecommendationServiceTest {
 
         AnalysisStatus status = new AnalysisStatus();
         status.tryStart("manual");
-        service.runFullAnalysis(status);
+        service.runFullAnalysisDetailed(status);
 
         assertThat(status.getPriceDataWarning()).isNull();
     }

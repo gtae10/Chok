@@ -408,7 +408,8 @@ class SentimentAnalysisServiceTest {
         service().analyzeBatch("삼성전자", manyArticles);
 
         ArgumentCaptor<Integer> maxTokens = ArgumentCaptor.forClass(Integer.class);
-        verify(openAiProvider).chat(anyString(), anyString(), maxTokens.capture());
-        assertThat(maxTokens.getValue()).isEqualTo(3000);
+        // 50건은 20건씩 나눠 3번 호출된다
+        verify(openAiProvider, times(3)).chat(anyString(), anyString(), maxTokens.capture());
+        assertThat(maxTokens.getAllValues()).allMatch(t -> t <= 3000);
     }
 }

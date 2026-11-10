@@ -107,9 +107,14 @@ public class StartupCatchUpRunner implements ApplicationRunner {
                 dataCollectionService.runCollection();
                 log.info("시작 시 자동 보정: 시세 수집 완료, 분석 시작");
 
-                int processed = recommendationService.runFullAnalysis(analysisStatus);
-                analysisStatus.markDone(processed);
-                log.info("시작 시 자동 보정: 완료 ({}개 종목)", processed);
+                RecommendationService.AnalysisResult result = recommendationService.runFullAnalysisDetailed(analysisStatus);
+                if (result.succeeded()) {
+                    analysisStatus.markDone(result.processed());
+                    log.info("시작 시 자동 보정: 완료 - {}", result.summary());
+                } else {
+                    analysisStatus.markFailed(result.summary());
+                    log.error("시작 시 자동 보정: 실패로 판정 - {}", result.summary());
+                }
             } catch (Exception e) {
                 log.error("시작 시 자동 보정 중 오류", e);
                 analysisStatus.markFailed(e.getMessage());

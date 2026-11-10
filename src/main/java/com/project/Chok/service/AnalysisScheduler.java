@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * chok.scheduler.enabled=true 일 때, chok.scheduler.cron 스케줄에 맞춰
- * 시세 수집 -> 전체 분석을 자동으로 실행한다. 기본값은 6시간마다(00/06/12/18시).
+ * 시세 수집 -> 전체 분석을 자동으로 실행한다. 기본값은 하루 두 번(08:30, 18:30).
  * 수동으로 "분석 실행" 버튼을 이미 누른 상태라면 AnalysisStatus.tryStart()가
  * false를 반환하므로 스케줄러가 겹쳐 도는 일은 없다 (한쪽이 양보).
  */
@@ -35,15 +35,20 @@ public class AnalysisScheduler {
         this.appProperties = appProperties;
     }
 
-    @Scheduled(cron = "${chok.scheduler.cron:0 0 */6 * * *}")
+    @Scheduled(cron = "${chok.scheduler.cron:0 30 8,18 * * *}")
     public void runDaily() {
         if (!appProperties.getScheduler().isEnabled()) {
             return;
         }
 
+        runNow();
+    }
+
+    /** 시세 수집 -> 전체 분석을 지금 바로 한 번 돌린다. 끝까지 성공하면 true. */
+    public boolean runNow() {
         if (!analysisStatus.tryStart("scheduler")) {
             log.info("스케줄러: 이미 다른 분석이 진행 중이라 이번 회차는 건너뜀");
-            return;
+            return false;
         }
 
         try {
@@ -51,12 +56,19 @@ public class AnalysisScheduler {
             dataCollectionService.runCollection();
             log.info("스케줄러: 자동 시세 수집 완료, 분석 시작");
 
-            int processed = recommendationService.runFullAnalysis(analysisStatus);
-            analysisStatus.markDone(processed);
-            log.info("스케줄러: 자동 분석 완료 ({}개 종목)", processed);
+            RecommendationService.AnalysisResult result = recommendationService.runFullAnalysisDetailed(analysisStatus);
+            if (!result.succeeded()) {
+                log.error("스케줄러: 분석 실패로 판정 - {}", result.summary());
+                analysisStatus.markFailed(result.summary());
+                return false;
+            }
+            analysisStatus.markDone(result.processed());
+            log.info("스케줄러: 자동 분석 완료 - {}", result.summary());
+            return true;
         } catch (Exception e) {
             log.error("스케줄러: 자동 실행 중 오류", e);
             analysisStatus.markFailed(e.getMessage());
+            return false;
         }
     }
 

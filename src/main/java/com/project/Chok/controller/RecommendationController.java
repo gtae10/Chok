@@ -86,8 +86,9 @@ public class RecommendationController {
 
         Thread worker = new Thread(() -> {
             try {
-                int processed = recommendationService.runFullAnalysis(analysisStatus);
-                analysisStatus.markDone(processed);
+                RecommendationService.AnalysisResult result = recommendationService.runFullAnalysisDetailed(analysisStatus);
+                if (result.succeeded()) analysisStatus.markDone(result.processed());
+                else analysisStatus.markFailed(result.summary());
             } catch (Exception e) {
                 analysisStatus.markFailed(e.getMessage());
             }

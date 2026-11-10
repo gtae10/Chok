@@ -107,7 +107,19 @@ public class SentimentAnalysisService {
         if (articles == null || articles.isEmpty()) {
             return List.of();
         }
+        // 따라잡기로 최대 200건이 들어올 수 있다 - 한 번에 보내면 maxTokens 상한(3000)에 응답이 잘려
+        // 배치 전체가 파싱 실패하므로 BATCH_SIZE씩 나눠 호출한다
+        List<SentimentResult> results = new ArrayList<>(articles.size());
+        for (int from = 0; from < articles.size(); from += BATCH_SIZE) {
+            results.addAll(analyzeChunk(stockName, articles.subList(from, Math.min(from + BATCH_SIZE, articles.size()))));
+        }
+        return results;
+    }
 
+    // computeMaxTokens(20) = 2600 < 상한 3000
+    static final int BATCH_SIZE = 20;
+
+    private List<SentimentResult> analyzeChunk(String stockName, List<NewsArticle> articles) {
         LlmProvider provider = resolveProvider();
         if (provider == null) {
             return neutralList(articles.size(), "프로바이더 설정 오류");
@@ -209,7 +221,7 @@ public class SentimentAnalysisService {
      * max_tokens는 비용 절감 수단이 아니라 안전장치(응답이 잘려서 파싱 실패하는 것 방지)다.
      * 배치 크기에 비례해 여유를 두되 상하한을 걸어둔다.
      */
-    private static int computeMaxTokens(int articleCount) {
+    static int computeMaxTokens(int articleCount) {
         int estimated = 200 + articleCount * 120;
         return Math.max(300, Math.min(3000, estimated));
     }

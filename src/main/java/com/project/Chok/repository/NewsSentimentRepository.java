@@ -23,4 +23,7 @@ public interface NewsSentimentRepository extends JpaRepository<NewsSentiment, Lo
 
     @Query("SELECT COUNT(n) > 0 FROM NewsSentiment n WHERE n.ticker = :ticker AND n.headline = :headline AND n.newsDate = :newsDate")
     boolean existsByTickerAndHeadlineAndDate(@Param("ticker") String ticker, @Param("headline") String headline, @Param("newsDate") LocalDate newsDate);
+
+    @Query("SELECT MAX(n.newsDate) FROM NewsSentiment n WHERE n.ticker = :ticker")
+    LocalDate findLatestNewsDate(@Param("ticker") String ticker);
 }
