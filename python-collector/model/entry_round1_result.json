@@ -1,0 +1,494 @@
+{
+  "preregistered": {
+    "hypothesis": {
+      "BREAKOUT_PULLBACK": 1,
+      "SQUEEZE_BREAKOUT": 1,
+      "REGIME_BREAKOUT": 1,
+      "EARNINGS_DRIFT": 1
+    },
+    "entry": "T+1 close",
+    "horizons": [
+      5,
+      20,
+      50
+    ],
+    "criteria": {
+      "minWindows": 6,
+      "minSameSignShare": 0.7,
+      "minAbsExcess": {
+        "5": 0.005,
+        "20": 0.01,
+        "50": 0.02
+      }
+    },
+    "split": {
+      "devSignal": [
+        "2021-01-01",
+        "2024-06-30"
+      ],
+      "devPurge": "entry+h trading days >= 2024-07-01 removed",
+      "holdoutSignal": [
+        "2024-07-01",
+        "end"
+      ],
+      "gate": "holdout only for dev-passed pairs",
+      "final": "pass in both"
+    },
+    "pitYears": [
+      2021,
+      2026
+    ],
+    "universe": "daily marcap top 100 (signal day T)",
+    "candidates": {
+      "BREAKOUT_PULLBACK": "BREAKOUT_52W in T-20..T-1; close/max(close T-20..T)-1 <= -5%; close > MA50; no A-condition in prior 20 trading days",
+      "SQUEEZE_BREAKOUT": "vol20(T-20..T-1) <= 20% quantile of prior 252 vol20; close > max(close T-20..T-1); no B-condition in prior 20 trading days",
+      "REGIME_BREAKOUT": "BREAKOUT_52W and KS11 close > KS11 MA200 (T)",
+      "EARNINGS_DRIFT": "DART '영업(잠정)실적' non-correction, dedup (ticker, D); EAR(D-1 close -> D1 close) - universe mean >= +3%; T = D1"
+    }
+  },
+  "dev": {
+    "5": {
+      "BREAKOUT_PULLBACK": {
+        "events": 190,
+        "dates": 134,
+        "allDatesMean": 0.0036,
+        "windows": 64,
+        "windowMean": 0.0049,
+        "windowsExpectedSign": 30,
+        "verdict": "불통과"
+      },
+      "SQUEEZE_BREAKOUT": {
+        "events": 446,
+        "dates": 249,
+        "allDatesMean": 0.0017,
+        "windows": 80,
+        "windowMean": -0.0006,
+        "windowsExpectedSign": 35,
+        "verdict": "불통과"
+      },
+      "REGIME_BREAKOUT": {
+        "events": 1117,
+        "dates": 256,
+        "allDatesMean": 0.0173,
+        "windows": 58,
+        "windowMean": 0.0179,
+        "windowsExpectedSign": 35,
+        "verdict": "불통과"
+      },
+      "EARNINGS_DRIFT": {
+        "events": 322,
+        "dates": 183,
+        "allDatesMean": 0.0044,
+        "windows": 72,
+        "windowMean": 0.0036,
+        "windowsExpectedSign": 28,
+        "verdict": "불통과"
+      }
+    },
+    "20": {
+      "BREAKOUT_PULLBACK": {
+        "events": 183,
+        "dates": 130,
+        "allDatesMean": 0.0148,
+        "windows": 24,
+        "windowMean": -0.028,
+        "windowsExpectedSign": 7,
+        "verdict": "불통과"
+      },
+      "SQUEEZE_BREAKOUT": {
+        "events": 438,
+        "dates": 244,
+        "allDatesMean": -0.0014,
+        "windows": 25,
+        "windowMean": -0.0136,
+        "windowsExpectedSign": 11,
+        "verdict": "불통과"
+      },
+      "REGIME_BREAKOUT": {
+        "events": 1047,
+        "dates": 242,
+        "allDatesMean": 0.048,
+        "windows": 15,
+        "windowMean": 0.0333,
+        "windowsExpectedSign": 9,
+        "verdict": "불통과"
+      },
+      "EARNINGS_DRIFT": {
+        "events": 319,
+        "dates": 181,
+        "allDatesMean": -0.0026,
+        "windows": 29,
+        "windowMean": -0.0078,
+        "windowsExpectedSign": 15,
+        "verdict": "불통과"
+      }
+    },
+    "50": {
+      "BREAKOUT_PULLBACK": {
+        "events": 167,
+        "dates": 121,
+        "allDatesMean": 0.0392,
+        "windows": 11,
+        "windowMean": 0.0575,
+        "windowsExpectedSign": 6,
+        "verdict": "불통과"
+      },
+      "SQUEEZE_BREAKOUT": {
+        "events": 429,
+        "dates": 237,
+        "allDatesMean": 0.0128,
+        "windows": 10,
+        "windowMean": 0.0047,
+        "windowsExpectedSign": 8,
+        "verdict": "불통과"
+      },
+      "REGIME_BREAKOUT": {
+        "events": 944,
+        "dates": 216,
+        "allDatesMean": 0.1069,
+        "windows": 6,
+        "windowMean": 0.0429,
+        "windowsExpectedSign": 2,
+        "verdict": "불통과"
+      },
+      "EARNINGS_DRIFT": {
+        "events": 297,
+        "dates": 170,
+        "allDatesMean": -0.0148,
+        "windows": 13,
+        "windowMean": -0.0331,
+        "windowsExpectedSign": 5,
+        "verdict": "불통과"
+      }
+    }
+  },
+  "holdout": {},
+  "diagnostic": {
+    "entryRules_T0": {
+      "5": {
+        "PULLBACK": {
+          "events": 3581,
+          "dates": 616,
+          "allDatesMean": -0.0006,
+          "windows": 128,
+          "windowMean": -0.0001,
+          "windowsExpectedSign": 62,
+          "verdict": "불통과"
+        },
+        "OVERSOLD": {
+          "events": 3068,
+          "dates": 600,
+          "allDatesMean": -0.0011,
+          "windows": 135,
+          "windowMean": -0.0002,
+          "windowsExpectedSign": 57,
+          "verdict": "불통과"
+        },
+        "BREAKOUT_52W": {
+          "events": 1462,
+          "dates": 432,
+          "allDatesMean": 0.0103,
+          "windows": 103,
+          "windowMean": 0.01,
+          "windowsExpectedSign": 52,
+          "verdict": "불통과"
+        },
+        "VOL_SURGE_UP": {
+          "events": 986,
+          "dates": 496,
+          "allDatesMean": 0.0108,
+          "windows": 145,
+          "windowMean": 0.014,
+          "windowsExpectedSign": 68,
+          "verdict": "불통과"
+        }
+      },
+      "20": {
+        "PULLBACK": {
+          "events": 3409,
+          "dates": 601,
+          "allDatesMean": -0.0013,
+          "windows": 32,
+          "windowMean": 0.0125,
+          "windowsExpectedSign": 16,
+          "verdict": "불통과"
+        },
+        "OVERSOLD": {
+          "events": 3044,
+          "dates": 586,
+          "allDatesMean": 0.0085,
+          "windows": 39,
+          "windowMean": -0.0014,
+          "windowsExpectedSign": 13,
+          "verdict": "불통과"
+        },
+        "BREAKOUT_52W": {
+          "events": 1387,
+          "dates": 417,
+          "allDatesMean": 0.0299,
+          "windows": 28,
+          "windowMean": 0.057,
+          "windowsExpectedSign": 14,
+          "verdict": "불통과"
+        },
+        "VOL_SURGE_UP": {
+          "events": 943,
+          "dates": 481,
+          "allDatesMean": 0.0111,
+          "windows": 40,
+          "windowMean": -0.0134,
+          "windowsExpectedSign": 14,
+          "verdict": "불통과"
+        }
+      },
+      "50": {
+        "PULLBACK": {
+          "events": 3142,
+          "dates": 571,
+          "allDatesMean": -0.0068,
+          "windows": 13,
+          "windowMean": 0.0219,
+          "windowsExpectedSign": 7,
+          "verdict": "불통과"
+        },
+        "OVERSOLD": {
+          "events": 2885,
+          "dates": 558,
+          "allDatesMean": 0.016,
+          "windows": 16,
+          "windowMean": 0.0774,
+          "windowsExpectedSign": 7,
+          "verdict": "불통과"
+        },
+        "BREAKOUT_52W": {
+          "events": 1284,
+          "dates": 390,
+          "allDatesMean": 0.0681,
+          "windows": 12,
+          "windowMean": 0.0865,
+          "windowsExpectedSign": 9,
+          "verdict": "통과"
+        },
+        "VOL_SURGE_UP": {
+          "events": 906,
+          "dates": 460,
+          "allDatesMean": 0.0143,
+          "windows": 16,
+          "windowMean": -0.0704,
+          "windowsExpectedSign": 6,
+          "verdict": "불통과"
+        }
+      }
+    },
+    "entryRules_T1": {
+      "5": {
+        "PULLBACK": {
+          "events": 3575,
+          "dates": 615,
+          "allDatesMean": -0.0004,
+          "windows": 128,
+          "windowMean": 0.0001,
+          "windowsExpectedSign": 62,
+          "verdict": "불통과"
+        },
+        "OVERSOLD": {
+          "events": 3068,
+          "dates": 600,
+          "allDatesMean": 0.0009,
+          "windows": 135,
+          "windowMean": 0.0008,
+          "windowsExpectedSign": 67,
+          "verdict": "불통과"
+        },
+        "BREAKOUT_52W": {
+          "events": 1457,
+          "dates": 431,
+          "allDatesMean": 0.0119,
+          "windows": 103,
+          "windowMean": 0.0105,
+          "windowsExpectedSign": 56,
+          "verdict": "불통과"
+        },
+        "VOL_SURGE_UP": {
+          "events": 983,
+          "dates": 495,
+          "allDatesMean": 0.0118,
+          "windows": 145,
+          "windowMean": 0.0121,
+          "windowsExpectedSign": 72,
+          "verdict": "불통과"
+        }
+      },
+      "20": {
+        "PULLBACK": {
+          "events": 3399,
+          "dates": 600,
+          "allDatesMean": -0.0019,
+          "windows": 32,
+          "windowMean": 0.0049,
+          "windowsExpectedSign": 12,
+          "verdict": "불통과"
+        },
+        "OVERSOLD": {
+          "events": 3037,
+          "dates": 585,
+          "allDatesMean": 0.0091,
+          "windows": 39,
+          "windowMean": 0.0023,
+          "windowsExpectedSign": 17,
+          "verdict": "불통과"
+        },
+        "BREAKOUT_52W": {
+          "events": 1386,
+          "dates": 417,
+          "allDatesMean": 0.0291,
+          "windows": 28,
+          "windowMean": 0.0548,
+          "windowsExpectedSign": 14,
+          "verdict": "불통과"
+        },
+        "VOL_SURGE_UP": {
+          "events": 942,
+          "dates": 480,
+          "allDatesMean": 0.0111,
+          "windows": 40,
+          "windowMean": -0.0046,
+          "windowsExpectedSign": 16,
+          "verdict": "불통과"
+        }
+      },
+      "50": {
+        "PULLBACK": {
+          "events": 3117,
+          "dates": 570,
+          "allDatesMean": -0.0067,
+          "windows": 13,
+          "windowMean": 0.0222,
+          "windowsExpectedSign": 6,
+          "verdict": "불통과"
+        },
+        "OVERSOLD": {
+          "events": 2869,
+          "dates": 557,
+          "allDatesMean": 0.0172,
+          "windows": 16,
+          "windowMean": 0.0703,
+          "windowsExpectedSign": 6,
+          "verdict": "불통과"
+        },
+        "BREAKOUT_52W": {
+          "events": 1280,
+          "dates": 389,
+          "allDatesMean": 0.0651,
+          "windows": 12,
+          "windowMean": 0.0974,
+          "windowsExpectedSign": 9,
+          "verdict": "통과"
+        },
+        "VOL_SURGE_UP": {
+          "events": 906,
+          "dates": 460,
+          "allDatesMean": 0.0153,
+          "windows": 16,
+          "windowMean": -0.0609,
+          "windowsExpectedSign": 6,
+          "verdict": "불통과"
+        }
+      }
+    },
+    "regimeDown_T1": {
+      "5": {
+        "REGIME_BREAKOUT_DOWN": {
+          "events": 340,
+          "dates": 175,
+          "allDatesMean": 0.0038,
+          "windows": 51,
+          "windowMean": 0.0034,
+          "windowsExpectedSign": 27,
+          "verdict": "불통과"
+        }
+      },
+      "20": {
+        "REGIME_BREAKOUT_DOWN": {
+          "events": 339,
+          "dates": 175,
+          "allDatesMean": 0.003,
+          "windows": 17,
+          "windowMean": 0.0266,
+          "windowsExpectedSign": 8,
+          "verdict": "불통과"
+        }
+      },
+      "50": {
+        "REGIME_BREAKOUT_DOWN": {
+          "events": 336,
+          "dates": 173,
+          "allDatesMean": 0.013,
+          "windows": 8,
+          "windowMean": 0.0442,
+          "windowsExpectedSign": 4,
+          "verdict": "불통과"
+        }
+      }
+    },
+    "note": "개발 구간만, 판정 미포함"
+  },
+  "final": [],
+  "meta": {
+    "priceRange": [
+      "2021-01-04",
+      "2026-11-06"
+    ],
+    "counts": {
+      "BREAKOUT_PULLBACK": {
+        "signals": 562,
+        "holdoutSignals": 367,
+        "devAfterPurge": {
+          "5": 190,
+          "20": 184,
+          "50": 168
+        }
+      },
+      "SQUEEZE_BREAKOUT": {
+        "signals": 830,
+        "holdoutSignals": 380,
+        "devAfterPurge": {
+          "5": 446,
+          "20": 438,
+          "50": 430
+        }
+      },
+      "REGIME_BREAKOUT": {
+        "signals": 4064,
+        "holdoutSignals": 2910,
+        "devAfterPurge": {
+          "5": 1117,
+          "20": 1047,
+          "50": 945
+        }
+      },
+      "EARNINGS_DRIFT": {
+        "signals": 538,
+        "holdoutSignals": 213,
+        "devAfterPurge": {
+          "5": 322,
+          "20": 319,
+          "50": 297
+        }
+      }
+    },
+    "earnings": {
+      "disclosures": 3936,
+      "inUniverse": 2401,
+      "signals": 538,
+      "earMedian": -0.0028
+    },
+    "ks11": {
+      "ks11Days": 1682,
+      "ks11Last": "2026-11-10"
+    },
+    "regimeStopped": false,
+    "devPassedPairs": [],
+    "elapsedSec": 9.8
+  }
+}

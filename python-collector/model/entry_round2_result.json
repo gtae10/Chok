@@ -1,0 +1,357 @@
+{
+  "preregistered": {
+    "target": "KS11 absolute return, signal T close, buy T+1 close, sell entry+h close",
+    "horizons": [
+      20,
+      50
+    ],
+    "hypothesis": {
+      "KS_TREND": 1,
+      "BREADTH50": 1,
+      "BOTH": 1
+    },
+    "baseline": "mean h-day return of T+1 entries on all days in the same period (dev after purge)",
+    "criteria": {
+      "minWindows": 6,
+      "minSameSignShare": 0.7,
+      "minAbsExcess": {
+        "20": 0.01,
+        "50": 0.02
+      },
+      "minRegimes": {
+        "dev": 3,
+        "holdout": 2
+      },
+      "regimeMerge": "off gap < 10 trading days merged"
+    },
+    "candidates": {
+      "KS_TREND": "KS11 close > KS11 MA200 (incl. T)",
+      "BREADTH50": "share of PIT top-100 with close > own MA50 > 50%",
+      "BOTH": "KS_TREND and BREADTH50"
+    },
+    "split": {
+      "devSignal": [
+        "2021-01-01",
+        "2024-06-30"
+      ],
+      "devPurge": "entry+h >= 2024-07-01 removed",
+      "holdoutSignal": [
+        "2024-07-01",
+        "end"
+      ],
+      "gate": "holdout only for dev-passed pairs with >=2 holdout regimes"
+    },
+    "note": "round-1 diagnostic BREAKOUT_52W h50 not used for candidate selection"
+  },
+  "precheck": {
+    "KS_TREND": {
+      "20": {
+        "dev": {
+          "onDays": 448,
+          "offDays": 391,
+          "regimes": 4
+        },
+        "holdout": {
+          "onDays": 402,
+          "offDays": 149,
+          "regimes": 5
+        },
+        "status": "확인 가능"
+      },
+      "50": {
+        "dev": {
+          "onDays": 418,
+          "offDays": 391,
+          "regimes": 4
+        },
+        "holdout": {
+          "onDays": 372,
+          "offDays": 149,
+          "regimes": 5
+        },
+        "status": "확인 가능"
+      }
+    },
+    "BREADTH50": {
+      "20": {
+        "dev": {
+          "onDays": 356,
+          "offDays": 434,
+          "regimes": 15
+        },
+        "holdout": {
+          "onDays": 366,
+          "offDays": 185,
+          "regimes": 6
+        },
+        "status": "확인 가능"
+      },
+      "50": {
+        "dev": {
+          "onDays": 345,
+          "offDays": 415,
+          "regimes": 14
+        },
+        "holdout": {
+          "onDays": 348,
+          "offDays": 173,
+          "regimes": 6
+        },
+        "status": "확인 가능"
+      }
+    },
+    "BOTH": {
+      "20": {
+        "dev": {
+          "onDays": 242,
+          "offDays": 548,
+          "regimes": 9
+        },
+        "holdout": {
+          "onDays": 302,
+          "offDays": 249,
+          "regimes": 7
+        },
+        "status": "확인 가능"
+      },
+      "50": {
+        "dev": {
+          "onDays": 231,
+          "offDays": 529,
+          "regimes": 8
+        },
+        "holdout": {
+          "onDays": 284,
+          "offDays": 237,
+          "regimes": 7
+        },
+        "status": "확인 가능"
+      }
+    }
+  },
+  "dev": {
+    "20": {
+      "KS_TREND": {
+        "events": 448,
+        "dates": 448,
+        "allDatesMean": 0.0004,
+        "windows": 25,
+        "windowMean": 0.0007,
+        "windowsExpectedSign": 13,
+        "verdict": "불통과",
+        "regimes": 4,
+        "baseline": -0.0019
+      },
+      "BREADTH50": {
+        "events": 356,
+        "dates": 356,
+        "allDatesMean": -0.0056,
+        "windows": 29,
+        "windowMean": -0.0104,
+        "windowsExpectedSign": 12,
+        "verdict": "불통과",
+        "regimes": 15,
+        "baseline": -0.0019
+      },
+      "BOTH": {
+        "events": 242,
+        "dates": 242,
+        "allDatesMean": 0.0021,
+        "windows": 19,
+        "windowMean": -0.0014,
+        "windowsExpectedSign": 9,
+        "verdict": "불통과",
+        "regimes": 9,
+        "baseline": -0.0019
+      }
+    },
+    "50": {
+      "KS_TREND": {
+        "events": 418,
+        "dates": 418,
+        "allDatesMean": 0.0066,
+        "windows": 10,
+        "windowMean": 0.0115,
+        "windowsExpectedSign": 8,
+        "verdict": "불통과",
+        "regimes": 4,
+        "baseline": -0.0063
+      },
+      "BREADTH50": {
+        "events": 345,
+        "dates": 345,
+        "allDatesMean": 0.0026,
+        "windows": 14,
+        "windowMean": -0.0155,
+        "windowsExpectedSign": 5,
+        "verdict": "불통과",
+        "regimes": 12,
+        "baseline": -0.0063
+      },
+      "BOTH": {
+        "events": 231,
+        "dates": 231,
+        "allDatesMean": 0.016,
+        "windows": 9,
+        "windowMean": 0.004,
+        "windowsExpectedSign": 5,
+        "verdict": "불통과",
+        "regimes": 7,
+        "baseline": -0.0063
+      }
+    }
+  },
+  "holdout": {},
+  "diagnostic": {
+    "KS11": {
+      "alwaysHold": {
+        "cum": -0.0498,
+        "annVol": 0.1672,
+        "mdd": -0.3479
+      },
+      "KS_TREND": {
+        "strategy": {
+          "cum": 0.075,
+          "annVol": 0.1096,
+          "mdd": -0.1198
+        },
+        "timeInMarket": 0.543,
+        "h20": {
+          "baseline": -0.0019,
+          "onEntryMean": -0.0015,
+          "offEntryMean": -0.0023,
+          "offMinusBaseline": -0.0004
+        },
+        "h50": {
+          "baseline": -0.0063,
+          "onEntryMean": 0.0003,
+          "offEntryMean": -0.0134,
+          "offMinusBaseline": -0.0071
+        }
+      },
+      "BREADTH50": {
+        "strategy": {
+          "cum": -0.1303,
+          "annVol": 0.088,
+          "mdd": -0.2754
+        },
+        "timeInMarket": 0.428,
+        "h20": {
+          "baseline": -0.0019,
+          "onEntryMean": -0.0075,
+          "offEntryMean": 0.0025,
+          "offMinusBaseline": 0.0044
+        },
+        "h50": {
+          "baseline": -0.0063,
+          "onEntryMean": -0.0037,
+          "offEntryMean": -0.0117,
+          "offMinusBaseline": -0.0054
+        }
+      },
+      "BOTH": {
+        "strategy": {
+          "cum": 0.0146,
+          "annVol": 0.0676,
+          "mdd": -0.1487
+        },
+        "timeInMarket": 0.295,
+        "h20": {
+          "baseline": -0.0019,
+          "onEntryMean": 0.0002,
+          "offEntryMean": -0.0029,
+          "offMinusBaseline": -0.001
+        },
+        "h50": {
+          "baseline": -0.0063,
+          "onEntryMean": 0.0097,
+          "offEntryMean": -0.0158,
+          "offMinusBaseline": -0.0095
+        }
+      }
+    },
+    "basket": {
+      "alwaysHold": {
+        "cum": 0.0241,
+        "annVol": 0.1693,
+        "mdd": -0.327
+      },
+      "KS_TREND": {
+        "strategy": {
+          "cum": 0.1781,
+          "annVol": 0.108,
+          "mdd": -0.0916
+        },
+        "timeInMarket": 0.543,
+        "h20": {
+          "baseline": 0.0004,
+          "onEntryMean": 0.0008,
+          "offEntryMean": -0.0001,
+          "offMinusBaseline": -0.0004
+        },
+        "h50": {
+          "baseline": -0.0005,
+          "onEntryMean": 0.0098,
+          "offEntryMean": -0.0115,
+          "offMinusBaseline": -0.0111
+        }
+      },
+      "BREADTH50": {
+        "strategy": {
+          "cum": -0.0637,
+          "annVol": 0.0879,
+          "mdd": -0.2345
+        },
+        "timeInMarket": 0.428,
+        "h20": {
+          "baseline": 0.0004,
+          "onEntryMean": -0.0079,
+          "offEntryMean": 0.0071,
+          "offMinusBaseline": 0.0068
+        },
+        "h50": {
+          "baseline": -0.0005,
+          "onEntryMean": -0.0008,
+          "offEntryMean": -0.0043,
+          "offMinusBaseline": -0.0038
+        }
+      },
+      "BOTH": {
+        "strategy": {
+          "cum": 0.0456,
+          "annVol": 0.0678,
+          "mdd": -0.1171
+        },
+        "timeInMarket": 0.295,
+        "h20": {
+          "baseline": 0.0004,
+          "onEntryMean": -0.0012,
+          "offEntryMean": 0.0011,
+          "offMinusBaseline": 0.0007
+        },
+        "h50": {
+          "baseline": -0.0005,
+          "onEntryMean": 0.0161,
+          "offEntryMean": -0.011,
+          "offMinusBaseline": -0.0105
+        }
+      }
+    },
+    "note": "개발 구간만, 판정 미포함"
+  },
+  "final": [],
+  "meta": {
+    "priceRange": [
+      "2021-01-04",
+      "2026-11-06"
+    ],
+    "ks11MissingOnTradingDays": 0,
+    "devBaseline": {
+      "20": -0.001902664093131648,
+      "50": -0.006334038381361545
+    },
+    "devPassedPairs": [],
+    "waitingLive": [],
+    "elapsedSec": 5.1
+  }
+}
