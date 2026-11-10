@@ -74,7 +74,10 @@ function renderTable(items) {
     tbody.innerHTML = items.map(function(item) {
         return '<tr data-id="' + item.id + '" data-ticker="' + item.ticker + '">' +
             '<td>' + item.snapshotDate + '</td>' +
-            '<td>' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></td>' +
+            '<td>' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span>' +
+                (item.reselectDates && item.reselectDates.length
+                    ? '<span class="ticker-sub" title="다시 선정된 날: ' + item.reselectDates.join(", ") + '">재선정 ' + item.reselectDates.length + '회</span>'
+                    : '') + '</td>' +
             '<td>' + item.rank + '</td>' +
             '<td class="' + scoreTone(item.technicalScore) + '">' + fmt(item.technicalScore) + '</td>' +
             '<td>' + fmt(item.sentimentScore) + '</td>' +

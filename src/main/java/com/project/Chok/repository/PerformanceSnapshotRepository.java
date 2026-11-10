@@ -17,4 +17,9 @@ public interface PerformanceSnapshotRepository extends JpaRepository<Performance
 
     @Query("SELECT s FROM PerformanceSnapshot s ORDER BY s.snapshotDate DESC, s.rank ASC")
     List<PerformanceSnapshot> findAllOrderBySnapshotDateDescRankAsc();
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM PerformanceSnapshot s WHERE s.snapshotDate = :snapshotDate AND s.ticker NOT IN :tickers")
+    int deleteBySnapshotDateAndTickerNotIn(@Param("snapshotDate") LocalDate snapshotDate, @Param("tickers") List<String> tickers);
 }

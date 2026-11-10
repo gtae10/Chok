@@ -15,10 +15,15 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * "실전 성과 추적" - 분석 완료 시점마다 그날 종합점수 상위 10개 종목을 스냅샷으로 저장하고,
@@ -82,16 +87,31 @@ public class PerformanceTrackingService {
             savedCount++;
         }
 
+        // 같은 날 앞선 회차 뒤 상위 TOP_N에서 빠진 종목 행을 지운다 (안 지우면 날짜당 10행 초과·순위 중복)
+        int removed = performanceSnapshotRepository.deleteBySnapshotDateAndTickerNotIn(
+                date, top.stream().map(Recommendation::getTicker).toList());
+        if (removed > 0) log.info("상위 {}개에서 빠진 종목의 {} 스냅샷 {}건 삭제", TOP_N, date, removed);
+
         log.info("성과 스냅샷 저장 완료: {} 날짜, {}건", date, savedCount);
     }
 
     /** 전체 스냅샷 목록 + 각각의 현재 수익률/보유일수 + 집계 통계(승률, 평균 수익률)를 계산한다. */
     public PerformanceSummaryResponse getPerformanceSummary() {
         LocalDate today = LocalDate.now();
-        List<PerformanceSnapshot> snapshots = performanceSnapshotRepository.findAllOrderBySnapshotDateDescRankAsc();
+        List<Picked> picked = finalTopPerDate(performanceSnapshotRepository.findAllOrderBySnapshotDateDescRankAsc());
 
-        List<PerformanceItemResponse> items = snapshots.stream()
-                .map(s -> {
+        // 종목당 한 행: 가장 먼저 선정된 날짜의 행만 남기고, 뒤에 다시 선정된 날짜는 그 행에 붙인다
+        Map<String, List<String>> datesByTicker = new HashMap<>();
+        picked.stream()
+                .sorted(Comparator.comparing((Picked p) -> p.s().getSnapshotDate()))
+                .forEach(p -> datesByTicker.computeIfAbsent(p.s().getTicker(), k -> new ArrayList<>())
+                        .add(p.s().getSnapshotDate().toString()));
+
+        List<PerformanceItemResponse> items = picked.stream()
+                .filter(p -> datesByTicker.get(p.s().getTicker()).get(0).equals(p.s().getSnapshotDate().toString()))
+                .map(p -> {
+                    PerformanceSnapshot s = p.s();
+                    List<String> dates = datesByTicker.get(s.getTicker());
                     Integer currentPrice = priceHistoryRepository.findLatestByTicker(s.getTicker())
                             .map(PriceHistory::getClosePrice)
                             .orElse(null);
@@ -100,7 +120,8 @@ public class PerformanceTrackingService {
                     Integer entryPrice = priceHistoryRepository.findByTickerAndTradeDate(s.getTicker(), s.getSnapshotDate())
                             .map(PriceHistory::getClosePrice)
                             .orElse(s.getEntryPrice());
-                    return new PerformanceItemResponse(s, entryPrice, currentPrice, today, findPeakAfter(s));
+                    return new PerformanceItemResponse(s, p.rank(), dates.subList(1, dates.size()),
+                            entryPrice, currentPrice, today, findPeakAfter(s));
                 })
                 .toList();
 
@@ -115,6 +136,35 @@ public class PerformanceTrackingService {
                 : round2(returns.stream().mapToDouble(Double::doubleValue).average().orElse(0.0) * 100.0);
 
         return new PerformanceSummaryResponse(items.size(), winRate, avgReturnRate, items);
+    }
+
+    private record Picked(PerformanceSnapshot s, int rank) {}
+
+    /**
+     * 날짜별로 그날 recommendation 최종 결과 상위 TOP_N에 든 종목 행만 남기고 그 순서로 순위를 매긴다.
+     * (하루 여러 번 분석하면 앞선 회차에만 들었던 종목 행이 남아 있다.) 입력 순서(날짜 내림차순)를 유지.
+     * 그날 추천 행이 없으면 스냅샷 자신의 종합점수 상위 TOP_N으로 대신한다.
+     */
+    private List<Picked> finalTopPerDate(List<PerformanceSnapshot> snapshots) {
+        Map<LocalDate, List<PerformanceSnapshot>> byDate = snapshots.stream()
+                .collect(Collectors.groupingBy(PerformanceSnapshot::getSnapshotDate, LinkedHashMap::new, Collectors.toList()));
+        List<Picked> result = new ArrayList<>();
+        byDate.forEach((date, day) -> {
+            List<String> top = recommendationRepository.findByRecDateOrderByFinalScoreDesc(date).stream()
+                    .map(Recommendation::getTicker).limit(TOP_N).toList();
+            if (top.isEmpty()) {
+                top = day.stream()
+                        .sorted(Comparator.comparing(PerformanceSnapshot::getFinalScore,
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                        .map(PerformanceSnapshot::getTicker).limit(TOP_N).toList();
+            }
+            List<String> order = top;
+            day.stream()
+                    .filter(s -> order.contains(s.getTicker()))
+                    .sorted(Comparator.comparingInt(s -> order.indexOf(s.getTicker())))
+                    .forEach(s -> result.add(new Picked(s, order.indexOf(s.getTicker()) + 1)));
+        });
+        return result;
     }
 
     /**

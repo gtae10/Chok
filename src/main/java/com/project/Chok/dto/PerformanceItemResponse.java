@@ -4,6 +4,7 @@ import com.project.Chok.domain.PerformanceSnapshot;
 import com.project.Chok.domain.PriceHistory;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 public class PerformanceItemResponse {
 
@@ -24,14 +25,21 @@ public class PerformanceItemResponse {
     private String peakDate;
     private Long peakDays;
     private Double peakReturnRate;
+    // 첫 선정일 뒤 같은 종목이 다시 선정된 날짜들(YYYY-MM-DD, 오름차순). 횟수 = size
+    private List<String> reselectDates;
 
-    /** entryPrice: 선정일 확정 종가 (PerformanceTrackingService가 price_history에서 다시 읽어 넘긴다) */
-    public PerformanceItemResponse(PerformanceSnapshot s, Integer entryPrice, Integer currentPrice, LocalDate today, PriceHistory peak) {
+    /**
+     * entryPrice: 선정일 확정 종가 (PerformanceTrackingService가 price_history에서 다시 읽어 넘긴다)
+     * rank: 그날 최종 추천 순위 (저장된 rank는 하루 여러 번 분석하면 겹칠 수 있어 서비스가 다시 매긴다)
+     */
+    public PerformanceItemResponse(PerformanceSnapshot s, int rank, List<String> reselectDates,
+                                   Integer entryPrice, Integer currentPrice, LocalDate today, PriceHistory peak) {
         this.id = s.getId();
         this.ticker = s.getTicker();
         this.name = s.getName();
         this.snapshotDate = s.getSnapshotDate().toString();
-        this.rank = s.getRank();
+        this.rank = rank;
+        this.reselectDates = reselectDates;
         this.technicalScore = s.getTechnicalScore();
         this.sentimentScore = s.getSentimentScore();
         this.finalScore = s.getFinalScore();
@@ -71,4 +79,5 @@ public class PerformanceItemResponse {
     public String getPeakDate() { return peakDate; }
     public Long getPeakDays() { return peakDays; }
     public Double getPeakReturnRate() { return peakReturnRate; }
+    public List<String> getReselectDates() { return reselectDates; }
 }

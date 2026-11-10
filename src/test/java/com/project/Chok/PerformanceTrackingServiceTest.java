@@ -321,6 +321,47 @@ class PerformanceTrackingServiceTest {
         assertThat(item.getPeakReturnRate()).isNull();
     }
 
+    @Test
+    @DisplayName("날짜별 그날 최종 추천 상위에 든 종목만 남겨 순위를 다시 매기고, 종목당 첫 선정일 행 하나에 재선정 날짜를 붙인다")
+    void getPerformanceSummary_keeps_final_top_and_dedupes_by_first_selection() {
+        LocalDate d1 = LocalDate.of(2026, 9, 4);
+        LocalDate d2 = LocalDate.of(2026, 9, 15);
+        // d2: 앞선 회차에 4위로 저장된 X가 최종 결과에선 빠졌고, B는 저장 rank가 4로 겹쳐 있다
+        List<PerformanceSnapshot> all = List.of(
+                snapshot("A", "가", d2, 1, 1000), snapshot("X", "엑스", d2, 4, 1000),
+                snapshot("B", "나", d2, 4, 1000),
+                snapshot("A", "가", d1, 1, 1000), snapshot("C", "다", d1, 2, 1000));
+        when(performanceSnapshotRepository.findAllOrderBySnapshotDateDescRankAsc()).thenReturn(all);
+        when(recommendationRepository.findByRecDateOrderByFinalScoreDesc(d2))
+                .thenReturn(List.of(rec("B", "나", 90.0), rec("A", "가", 80.0), rec("Z", "제트", 70.0)));
+        when(recommendationRepository.findByRecDateOrderByFinalScoreDesc(d1))
+                .thenReturn(List.of(rec("A", "가", 90.0), rec("C", "다", 80.0)));
+        when(priceHistoryRepository.findLatestByTicker(any())).thenReturn(Optional.of(price(1100)));
+
+        PerformanceSummaryResponse summary = service.getPerformanceSummary();
+
+        // X는 d2 최종 결과에 없어 빠지고, A는 d1 행 하나만 남는다
+        assertThat(summary.getItems()).extracting(i -> i.getTicker() + "@" + i.getSnapshotDate() + "#" + i.getRank())
+                .containsExactly("B@2026-09-15#1", "A@2026-09-04#1", "C@2026-09-04#2");
+        assertThat(summary.getItems().get(1).getReselectDates()).containsExactly("2026-09-15");
+        assertThat(summary.getItems().get(0).getReselectDates()).isEmpty();
+        assertThat(summary.getTotalCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("스냅샷 저장 뒤 같은 날짜의 상위 목록에 없는 종목 행을 지운다")
+    void saveSnapshot_deletes_rows_dropped_from_top() {
+        LocalDate date = LocalDate.of(2026, 9, 4);
+        when(recommendationRepository.findByRecDateOrderByFinalScoreDesc(date))
+                .thenReturn(List.of(rec("A", "가", 90.0), rec("B", "나", 80.0)));
+        when(priceHistoryRepository.findByTickerAndTradeDate(any(), eq(date))).thenReturn(Optional.of(price(1000)));
+        when(performanceSnapshotRepository.findByTickerAndSnapshotDate(any(), eq(date))).thenReturn(Optional.empty());
+
+        service.saveSnapshot(date);
+
+        verify(performanceSnapshotRepository).deleteBySnapshotDateAndTickerNotIn(date, List.of("A", "B"));
+    }
+
     private PriceHistory priceOn(LocalDate d, int closePrice) {
         PriceHistory p = price(closePrice);
         p.setTradeDate(d);
