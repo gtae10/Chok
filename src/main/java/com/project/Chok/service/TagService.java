@@ -1,8 +1,10 @@
 package com.project.Chok.service;
 
+import com.project.Chok.domain.MarketIndicator;
 import com.project.Chok.domain.Recommendation;
 import com.project.Chok.domain.TagSnapshot;
 import com.project.Chok.domain.Stock;
+import com.project.Chok.repository.MarketIndicatorRepository;
 import com.project.Chok.repository.RecommendationRepository;
 import com.project.Chok.repository.StockRepository;
 import com.project.Chok.repository.TagSnapshotRepository;
@@ -11,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,13 +47,16 @@ public class TagService {
     private final RecommendationRepository recommendationRepository;
     private final TagSnapshotRepository tagSnapshotRepository;
     private final StockRepository stockRepository;
+    private final MarketIndicatorRepository marketIndicatorRepository;
 
     public TagService(RecommendationRepository recommendationRepository,
                       TagSnapshotRepository tagSnapshotRepository,
-                      StockRepository stockRepository) {
+                      StockRepository stockRepository,
+                      MarketIndicatorRepository marketIndicatorRepository) {
         this.recommendationRepository = recommendationRepository;
         this.tagSnapshotRepository = tagSnapshotRepository;
         this.stockRepository = stockRepository;
+        this.marketIndicatorRepository = marketIndicatorRepository;
     }
 
     /** 그날 전 종목(recs)을 기준으로 종목별 태그를 계산한다. 순위형 태그는 필터 전 전체로 경계를 잡는다. */
@@ -118,11 +122,11 @@ public class TagService {
     static final int MIN_WINDOWS = 6;
     static final int[] HORIZONS = {5, 20, 50};
 
-    /** from 다음 날부터 to까지의 평일 수. 공휴일은 세지 않는 근사라 "약"으로만 쓴다. */
-    public static int weekdaysBetween(LocalDate from, LocalDate to) {
+    /** from 다음 날부터 to까지의 거래일 수 (주말·KRX 휴장일 제외, RecommendationService.isTradingDay). */
+    public static int tradingDaysBetween(LocalDate from, LocalDate to) {
         int n = 0;
         for (LocalDate d = from.plusDays(1); !d.isAfter(to); d = d.plusDays(1)) {
-            if (d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY) n++;
+            if (RecommendationService.isTradingDay(d)) n++;
         }
         return n;
     }
@@ -153,10 +157,19 @@ public class TagService {
     public Map<String, Object> board() {
         LocalDate latest = tagSnapshotRepository.findLatestSnapDate();
         Map<String, Object> out = new LinkedHashMap<>();
+        // 후보는 태그 기록과 무관(KS_TREND는 시장 지표) - 기록이 없어도 내보내고, 계산 실패가 보드 전체를 깨지 않게 한다
+        List<MarketIndicator> kospi = marketIndicatorRepository.findByKospiCloseNotNullOrderByTradeDate();
+        out.put("calendarAsOf", kospi.isEmpty() ? null : kospi.get(kospi.size() - 1).getTradeDate().toString());
+        try {
+            out.put("candidates", candidates(kospi));
+        } catch (Exception e) {
+            log.error("검증 대기 후보 계산 실패", e);
+            out.put("candidates", null);
+        }
         if (latest == null) return out;
 
         LocalDate first = tagSnapshotRepository.findFirstSnapDate();
-        int elapsed = weekdaysBetween(first, latest);
+        int elapsed = tradingDaysBetween(first, latest);
         out.put("firstDate", first.toString());
         out.put("latestDate", latest.toString());
         out.put("recordDays", tagSnapshotRepository.countSnapDates());
@@ -178,6 +191,105 @@ public class TagService {
         LocalDate prevDate = tagSnapshotRepository.findSnapDateBefore(latest);
         out.put("changes", prevDate == null ? null : withNames(diff(latest, prevDate, today, tagsOn(prevDate))));
         return out;
+    }
+
+    // 검증 대기 후보 (PROJECT_PLAN 7장) - 매수 신호가 아니라 실전 기록이 판정 창 수를 채우는 중인 항목
+    public static final LocalDate KS_TREND_LIVE_START = LocalDate.of(2026, 11, 11);
+    static final int MA_DAYS = 200;
+
+    /** 후보별 실전 진행도. 거래일 달력 = market_indicators 날짜(KOSPI 종가 있는 날). */
+    private List<Map<String, Object>> candidates(List<MarketIndicator> kospi) {
+        List<LocalDate> days = kospi.stream().map(MarketIndicator::getTradeDate).toList();
+        List<Double> closes = kospi.stream().map(MarketIndicator::getKospiClose).toList();
+        // 거래일 달력에 없는 날(휴장일에 돌린 분석)의 스냅샷은 신호일로 세지 않는다
+        Set<LocalDate> calendar = new HashSet<>(days);
+        List<LocalDate> breakout = tagSnapshotRepository.findSnapDatesByTag(BREAKOUT_52W).stream()
+                .filter(calendar::contains).toList();
+        List<LocalDate> trend = new ArrayList<>();
+        for (int i = MA_DAYS - 1; i < days.size(); i++) {
+            if (!days.get(i).isBefore(KS_TREND_LIVE_START) && closes.get(i) > ma(closes, i)) trend.add(days.get(i));
+        }
+        return List.of(
+                // 태그는 신호일 종가 기준 성과(지연 0), KS_TREND는 T+1 종가 진입(지연 1) - 사전 등록(D16·D17)
+                candidate(BREAKOUT_52W, breakout.isEmpty() ? null : breakout.get(0), breakout, days, 0, HORIZONS),
+                candidate("KS_TREND", KS_TREND_LIVE_START, trend, days, 1, 20, 50));
+    }
+
+    private static Map<String, Object> candidate(String key, LocalDate liveStart, List<LocalDate> signals,
+                                                 List<LocalDate> days, int entryLag, int... horizons) {
+        LocalDate lastDay = days.isEmpty() ? LocalDate.now() : days.get(days.size() - 1);
+        List<Map<String, Object>> hs = new ArrayList<>();
+        for (int h : horizons) {
+            int windows = maturedWindows(signals, days, h, entryLag);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("days", h);
+            m.put("windows", windows);
+            m.put("etaDate", windows >= MIN_WINDOWS ? null : addTradingDays(lastDay, (MIN_WINDOWS - windows) * h).toString());
+            hs.add(m);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("key", key);
+        out.put("liveStart", liveStart == null ? null : liveStart.toString());
+        out.put("needWindows", MIN_WINDOWS);
+        out.put("horizons", hs);
+        return out;
+    }
+
+    /** 시장 상태: KOSPI 종가와 MA200(그날 포함 최근 200거래일 평균). 200일 미만이면 빈 맵. */
+    public Map<String, Object> marketState() {
+        List<MarketIndicator> kospi = marketIndicatorRepository.findByKospiCloseNotNullOrderByTradeDate();
+        return marketState(kospi.stream().map(MarketIndicator::getTradeDate).toList(),
+                kospi.stream().map(MarketIndicator::getKospiClose).toList());
+    }
+
+    public static Map<String, Object> marketState(List<LocalDate> dates, List<Double> closes) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        int last = closes.size() - 1;
+        if (closes.size() < MA_DAYS) return out;
+        double close = closes.get(last);
+        double ma200 = ma(closes, last);
+        out.put("asOf", dates.get(last).toString());
+        out.put("close", close);
+        out.put("ma200", ma200);
+        out.put("gapPct", Math.round((close / ma200 - 1) * 10000) / 100.0);
+        out.put("above", close > ma200);
+        return out;
+    }
+
+    private static double ma(List<Double> closes, int end) {
+        double sum = 0;
+        for (int i = end - MA_DAYS + 1; i <= end; i++) sum += closes.get(i);
+        return sum / MA_DAYS;
+    }
+
+    /**
+     * 판정에 쓸 수 있는 겹치지 않는 창 수 - evaluate_tags.py non_overlapping_dates와 같은 탐욕 선택.
+     * 신호일+entryLag(진입 지연, T+1 진입이면 1)+h거래일이 달력에 이미 있는(결과가 나온) 날만 센다.
+     */
+    public static int maturedWindows(List<LocalDate> signalDates, List<LocalDate> tradingDays, int h, int entryLag) {
+        Map<LocalDate, Integer> pos = new HashMap<>();
+        for (int i = 0; i < tradingDays.size(); i++) pos.put(tradingDays.get(i), i);
+        int picked = 0;
+        Integer lastPicked = null;
+        for (LocalDate d : new TreeSet<>(signalDates)) {
+            Integer i = pos.get(d);
+            if (i == null || i + entryLag + h >= tradingDays.size()) continue;
+            if (lastPicked == null || i - lastPicked >= h) {
+                picked++;
+                lastPicked = i;
+            }
+        }
+        return picked;
+    }
+
+    /** from 이후 n번째 거래일 (주말·KRX 휴장일 제외, 예상일 표시용). */
+    public static LocalDate addTradingDays(LocalDate from, int n) {
+        LocalDate d = from;
+        while (n > 0) {
+            d = d.plusDays(1);
+            if (RecommendationService.isTradingDay(d)) n--;
+        }
+        return d;
     }
 
     /** 변화 목록에 종목명을 붙인다 - 순위에서 빠진 종목은 오늘 추천 목록에 없어 화면이 이름을 알 수 없다. */

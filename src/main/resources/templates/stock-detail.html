@@ -87,6 +87,35 @@
         </div>
     </div>
 
+    <!-- 내 매수 규칙 계획표 (rule-plan.js). 사용자 규칙을 가격으로 바꿔 보여줄 뿐, 검증된 신호가 아니다 -->
+    <section id="rulePlan" class="chart-section rule-plan" aria-labelledby="rulePlanTitle" hidden>
+        <h2 id="rulePlanTitle">내 매수 규칙 계획표</h2>
+        <p class="chart-desc">사용자 규칙 · 검증된 신호 아님. 기본값(분할 0% / −5% / −10% 각 1/3, 손절 −15%, 목표 +20%)은 예시값이며 검증되지 않았습니다. 이 브라우저에만 저장됩니다.</p>
+        <p id="rulePlanMarket" class="rule-plan__market" tabindex="0" hidden></p>
+        <p id="rulePlanSummary" class="rule-plan__summary" aria-live="polite"></p>
+        <form id="rulePlanForm" class="rule-plan__form" novalidate onsubmit="return false">
+            <label>기준가(원)<input name="base" type="number" inputmode="decimal" min="1" step="any" required></label>
+            <label>1단계(%)<input name="step1" type="number" inputmode="decimal" min="-99" max="0" step="any" required></label>
+            <label>2단계(%)<input name="step2" type="number" inputmode="decimal" min="-99" max="0" step="any" required></label>
+            <label>3단계(%)<input name="step3" type="number" inputmode="decimal" min="-99" max="0" step="any" required></label>
+            <label>손절(%)<input name="stop" type="number" inputmode="decimal" min="-99" max="0" step="any" required></label>
+            <label>목표(%)<input name="target" type="number" inputmode="decimal" min="0" max="1000" step="any" required></label>
+        </form>
+        <p id="rulePlanError" class="rule-plan__error" role="alert" hidden></p>
+        <p id="rulePlanNote" class="rule-plan__error" role="status" hidden></p>
+        <div class="rule-plan__foot">
+            <span id="rulePlanBaseDate" class="rule-plan__date"></span>
+            <button id="rulePlanRebase" class="btn-ghost" type="button">기준가 다시 잡기</button>
+        </div>
+        <div class="rule-plan__wrap">
+            <table class="rule-plan__table">
+                <caption class="sr-only">단계별 가격과 현재가 도달 여부</caption>
+                <thead><tr><th scope="col">단계</th><th scope="col">가격</th><th scope="col">비중</th><th scope="col">현재가 기준</th></tr></thead>
+                <tbody id="rulePlanBody"></tbody>
+            </table>
+        </div>
+    </section>
+
     <div class="chart-section">
         <h2>추천 점수 추이</h2>
         <p class="chart-desc">
@@ -118,6 +147,7 @@
 
 <script th:src="@{/js/score-trend-chart.js}"></script>
 <script th:src="@{/js/tags.js}"></script>
+<script th:src="@{/js/rule-plan.js}"></script>
 <script th:src="@{/js/stock-detail.js}"></script>
 <script th:src="@{/js/feedback-widget.js}"></script>
 </body>

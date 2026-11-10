@@ -218,7 +218,8 @@ public class RecommendationService {
                 staleDays, latestPriceDate);
     }
 
-    private static boolean isTradingDay(LocalDate date) {
+    /** 주말·KRX 휴장일이 아니면 거래일. TagService의 거래일 계산도 이걸 쓴다. */
+    public static boolean isTradingDay(LocalDate date) {
         return switch (date.getDayOfWeek()) {
             case SATURDAY, SUNDAY -> false;
             default -> !KRX_HOLIDAYS.contains(date);

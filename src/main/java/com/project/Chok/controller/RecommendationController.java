@@ -159,6 +159,11 @@ public class RecommendationController {
         return ResponseEntity.ok(tagService.board());
     }
 
+    @GetMapping("/market/state")
+    public ResponseEntity<Map<String, Object>> marketState() {
+        return ResponseEntity.ok(tagService.marketState());
+    }
+
     @GetMapping("/stocks/{ticker}/tags")
     public ResponseEntity<List<String>> getTags(@PathVariable String ticker) {
         return ResponseEntity.ok(tagService.latestTagsFor(ticker));

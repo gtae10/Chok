@@ -28,6 +28,7 @@ async function loadStockDetail() {
         const res = await fetch("/api/stocks/" + ticker + "/prices");
         fullPrices = await res.json();
         showRangeView();
+        renderRulePlan(ticker, fullPrices);   // rule-plan.js — 마지막 확정 종가가 기본 기준가
     } catch(e) { console.error(e); }
 
     newsTicker = ticker;

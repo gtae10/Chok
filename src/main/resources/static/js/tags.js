@@ -71,6 +71,62 @@ function momentumTone(v) {
     return v > 1 ? "trend-pos" : v < -1 ? "trend-neg" : "trend-flat";
 }
 
+// "2026-11-07" → "11-07 (Fri)", full 이면 "2026-11-07 (Fri)". 요일은 영어만. UTC 로 읽어 시간대에 따라 하루 밀리지 않게
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function fmtDay(iso, full) {
+    if (!iso) return "";
+    const d = new Date(iso + "T00:00:00Z");
+    if (isNaN(d)) return iso;
+    return (full ? iso : iso.slice(5)) + " (" + WEEKDAYS[d.getUTCDay()] + ")";
+}
+
+// 공용 숫자 포맷: 1234.5 → "1,235", 수익률 → "+2.7%" / "-2.7%" (대시보드 기존 표기 그대로)
+function fmtNum(v) { return Math.round(v).toLocaleString("ko-KR"); }
+function fmtSignedPct(v) { return (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }
+
+// iso 날짜가 오늘(KST)보다 평일 3일 넘게 지났으면 지난 달력 일수, 아니면 0 (오래된 데이터 표시용)
+function staleDays(iso) {
+    const from = Date.parse(iso + "T00:00:00Z");
+    if (isNaN(from)) return 0;
+    const today = Date.parse(new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10) + "T00:00:00Z");
+    let weekdays = 0;
+    for (let t = from + 86400000; t <= today; t += 86400000) {
+        const w = new Date(t).getUTCDay();
+        if (w !== 0 && w !== 6) weekdays++;
+    }
+    return weekdays > 3 ? Math.round((today - from) / 86400000) : 0;
+}
+
+// 코스피 200일선 규칙 2회차 실험 결과 — 시장 줄 말풍선(브리핑·상세)과 실전 성과 후보 카드가 같이 쓴다
+const KS_TREND_NOTE = "2회차 실험(2021-01~2024-06 개발 기간 한정): 항상 보유 누적 −5.0%·최대낙폭 −34.8%, 200일선 위일 때만 보유 +7.5%·−12.0%(보유 54%). " +
+    "50일 창 평균이 기준선(항상 보유) 대비 +1.15%로 크기 기준(2%) 미달(일관성 8/10은 통과), 검증 미통과 · 확인 기간 미사용.";
+
+// 시장 상태 줄 (GET /api/market/state) — 브리핑 #marketLine, 상세 #rulePlanMarket 공용.
+// 실험 규칙 표시일 뿐 검증된 신호가 아니다. 데이터가 오래됐으면 가능/쉬기 판정을 빼고 날짜만 알린다
+async function loadMarketLine(el) {
+    if (!el) return;
+    let text;
+    try {
+        const res = await fetch("/api/market/state");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const m = await res.json();
+        if (!m || m.close == null) text = "시장 데이터 부족(200거래일 미만)";
+        else {
+            const old = staleDays(m.asOf);
+            text = "시장(코스피) " + fmtDay(m.asOf, true) + " 종가 " + fmtNum(m.close) + " · 200일선 " + fmtNum(m.ma200) + " " +
+                (m.above ? "위" : "아래") + " (" + fmtSignedPct(m.gapPct) + ")" +
+                (old ? " (데이터 " + old + "일 전 · 판정 생략)" : " → 200일선 규칙(실험)상 신규 매수 " + (m.above ? "가능" : "쉬기")) +
+                " · 검증된 신호 아님";
+            el.dataset.tip = KS_TREND_NOTE;   // 마우스·키보드 포커스·탭에서 말풍선
+        }
+    } catch (e) {
+        console.error(e);
+        text = "시장 상태를 불러오지 못했습니다";
+    }
+    el.textContent = text;
+    el.hidden = false;
+}
+
 // 태그에 마우스를 올리면 뜨는 쉬운 한 줄 설명 (tip). 자세한 정의(desc)는 용어 설명에 둔다
 function tagTip(key) {
     const m = TAG_META[key];
@@ -110,17 +166,20 @@ function renderGlossary() {
 
 renderGlossary();
 
-// 태그 설명 말풍선: 화면 기준(fixed)으로 띄워 표·가로 스크롤 안에서도 잘리지 않는다
+// 태그 설명 말풍선: 화면 기준(fixed)으로 띄워 표·가로 스크롤 안에서도 잘리지 않는다.
+// 마우스 말고 키보드 포커스(tabindex)·터치(탭하면 포커스)로도 뜬다
 (function () {
     const tip = document.createElement("div");
     tip.className = "tip";
+    tip.id = "chokTip";
     tip.hidden = true;
     tip.setAttribute("role", "tooltip");
     document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(tip); });
 
-    document.addEventListener("mouseover", function (e) {
-        const el = e.target.closest("[data-tip]");
+    function show(e) {
+        const el = e.target.closest && e.target.closest("[data-tip]");
         if (!el) { tip.hidden = true; return; }
+        el.setAttribute("aria-describedby", "chokTip");
         // 모달 <dialog> 는 top layer 라 body 에 붙은 말풍선이 그 뒤로 가려진다 → 열린 창 안이면 그 창에 붙인다
         const host = el.closest("dialog[open]") || document.body;
         if (tip.parentNode !== host) host.appendChild(tip);
@@ -131,6 +190,10 @@ renderGlossary();
         if (top < 8) top = r.bottom + 8;   // 위에 자리가 없으면 아래로
         tip.style.top = top + "px";
         tip.style.left = Math.max(8, Math.min(window.innerWidth - t.width - 8, r.left + r.width / 2 - t.width / 2)) + "px";
-    });
+    }
+    document.addEventListener("mouseover", show);
+    document.addEventListener("focusin", show);
+    document.addEventListener("focusout", function () { tip.hidden = true; });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") tip.hidden = true; });
     document.addEventListener("scroll", function () { tip.hidden = true; }, true);
 })();

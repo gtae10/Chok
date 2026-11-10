@@ -135,9 +135,11 @@ def fetch_market_indicators():
         return 0
 
     merged = pd.DataFrame(series)
+    merged = merged[merged.index < confirmed_until()]  # 가격 일봉과 같은 확정 종가 규칙(D6) - 장중 지수 저장 방지
     rows = [
         {"date": date.strftime("%Y-%m-%d"), **{
-            col: (float(row[col]) if pd.notna(row.get(col)) else None) for col in series
+            # 한 지수만 실패해도 upsert의 %(컬럼)s 자리가 비지 않게 전체 키를 채운다(없으면 None) - 그날 다른 지표까지 통째 누락 방지
+            col: (float(row[col]) if col in series and pd.notna(row.get(col)) else None) for col in MARKET_INDEX_SYMBOLS
         }}
         for date, row in merged.iterrows()
     ]

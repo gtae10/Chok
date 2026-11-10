@@ -228,7 +228,6 @@ function renderMomentum(item) {
         : '<span class="' + momentumTone(item.momentum12m) + '">' + fmtSignedPct(item.momentum12m) + '</span>';
 }
 
-function fmtSignedPct(v) { return (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
@@ -403,6 +402,8 @@ function pollAnalysisStatus(btn) {
 }
 
 loadRecommendations();
+
+loadMarketLine(document.getElementById("marketLine"));   // tags.js
 if (/^#[0-9A-Z]{6}$/.test(location.hash)) openPanel(location.hash.slice(1));
 
 (async function checkInitialAnalysisStatus() {

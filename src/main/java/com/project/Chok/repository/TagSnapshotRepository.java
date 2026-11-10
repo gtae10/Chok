@@ -34,6 +34,9 @@ public interface TagSnapshotRepository extends JpaRepository<TagSnapshot, Long> 
     @Query("SELECT t.tag, COUNT(t) FROM TagSnapshot t GROUP BY t.tag")
     List<Object[]> countByTag();
 
+    @Query("SELECT DISTINCT t.snapDate FROM TagSnapshot t WHERE t.tag = :tag ORDER BY t.snapDate")
+    List<LocalDate> findSnapDatesByTag(@Param("tag") String tag);
+
     @Modifying
     @Query("DELETE FROM TagSnapshot t WHERE t.snapDate = :date")
     void deleteBySnapDate(@Param("date") LocalDate date);

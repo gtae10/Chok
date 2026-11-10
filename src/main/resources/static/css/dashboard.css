@@ -532,12 +532,49 @@ button.change-chip:hover { background: var(--line); }
 .tip[hidden] { display: none; }
 .feedback-panel__send:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── 검증 안 된 규칙 표시: 시장 상태 줄·내 매수 규칙 계획표·검증 중 후보 ─────────────
+ * 시세 방향이 아니라 사용자 규칙이라 빨강·파랑·남색·--weak 를 쓰지 않는다. 본문색·--text-faint·굵기만. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.hero__market { margin-top: 14px; color: var(--text); font-size: 0.86rem; font-weight: 700; line-height: 1.6; }
+
+.rule-plan__market { margin-bottom: 10px; padding: 10px 14px; border-radius: var(--r-ctl); box-shadow: inset 0 0 0 1px var(--line); color: var(--text); font-size: 0.88rem; font-weight: 800; }
+.rule-plan__summary { color: var(--text); font-size: 0.95rem; font-weight: 800; margin-bottom: 14px; }
+.rule-plan__form { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.rule-plan__form label { display: flex; flex-direction: column; gap: 4px; color: var(--text-faint); font-size: 0.76rem; font-weight: 700; }
+.rule-plan__form input { width: 100%; min-width: 0; padding: 9px 10px; background: var(--surface-2); border: 1px solid transparent; border-radius: var(--r-ctl); color: var(--text); font: inherit; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.rule-plan__form input:focus { border-color: var(--text); outline: none; }
+.rule-plan__form input[aria-invalid="true"] { border-color: var(--text); border-style: dashed; }
+.rule-plan__error { margin-top: 8px; color: var(--text); font-size: 0.82rem; font-weight: 700; }
+.rule-plan__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.rule-plan__date { color: var(--text-faint); font-size: 0.78rem; }
+.rule-plan__foot .btn-ghost { background: var(--surface-2); }
+.rule-plan__wrap { overflow-x: auto; }
+.rule-plan__table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.rule-plan__table th, .rule-plan__table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rule-plan__table thead th { color: var(--text-faint); font-size: 0.76rem; font-weight: 700; border-bottom-width: 2px; }
+.rule-plan__table tbody th { font-weight: 700; }
+.rule-plan__hit { color: var(--text); font-weight: 800; }
+.rule-plan__miss { color: var(--text-faint); }
+
+.cand-head { margin: 22px 0 10px; font-size: 1.05rem; }
+.cand-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.cand-card { background: var(--surface-2); border-radius: 16px; padding: 16px 18px; }
+.cand-card__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cand-card__top b { font-size: 1rem; font-weight: 800; }
+.cand-card__badge { padding: 2px 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); color: var(--text-faint); font-size: 0.74rem; font-weight: 700; }
+.cand-card__start { margin: 6px 0 10px; color: var(--text-faint); font-size: 0.78rem; }
+.cand-card__rows { list-style: none; margin-bottom: 10px; }
+.cand-card__rows li { display: grid; grid-template-columns: 80px 110px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.82rem; }
+.cand-card__rows li span { color: var(--text-faint); }
+.cand-card__rows li b { font-weight: 800; }
+
 /* ── 반응형 ──────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
     .top5 { grid-template-columns: repeat(2, 1fr); }
     .top-card:nth-child(5) { grid-column: span 2; }
-    .progress-grid, .tag-cards { grid-template-columns: 1fr; }
+    .progress-grid, .tag-cards, .cand-cards { grid-template-columns: 1fr; }
+    .rule-plan__form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
     .layout { padding: 4px 12px 80px; }
@@ -558,6 +595,10 @@ button.change-chip:hover { background: var(--line); }
     .change-row { grid-template-columns: 1fr; gap: 6px; }
     .glossary { grid-template-columns: 1fr; gap: 2px; }
     .glossary dd { margin-bottom: 10px; }
+    .rule-plan__form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .rule-plan__table th, .rule-plan__table td { padding: 9px 6px; }
+    .cand-card__rows li { grid-template-columns: 1fr auto; }
+    .cand-card__rows li span:last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 480px) {
     .feedback-panel { right: 16px; left: 16px; width: auto; bottom: 84px; }

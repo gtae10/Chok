@@ -12,4 +12,7 @@ public interface MarketIndicatorRepository extends JpaRepository<MarketIndicator
 
     @Query("SELECT m FROM MarketIndicator m WHERE m.tradeDate <= :asOf ORDER BY m.tradeDate DESC")
     List<MarketIndicator> findRecentUpTo(@Param("asOf") LocalDate asOf);
+
+    /** KOSPI 종가가 있는 날 (오래된 순) - 시장 상태(MA200)·거래일 달력용 */
+    List<MarketIndicator> findByKospiCloseNotNullOrderByTradeDate();
 }
