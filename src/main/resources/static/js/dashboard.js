@@ -16,28 +16,48 @@ let currentSearch = "";
 let activeTags = new Set();    // 태그로 찾기 - 선택한 태그를 모두 가진 종목만 (AND)
 let currentSort = { key: "finalScore", dir: "desc" };
 
+// 즐겨찾기 - 로그인이 없는 단일 사용자 앱이라 브라우저 localStorage에 티커만 저장한다.
+// ponytail: 기기·브라우저 간 동기화 없음. 필요해지면 서버 테이블 + /api/favorites 로.
+let favs = new Set();
+try { favs = new Set(JSON.parse(localStorage.getItem("chok.favs") || "[]")); } catch (e) { /* 저장소 막힘 - 이번 세션만 */ }
+
+function toggleFav(ticker) {
+    if (favs.has(ticker)) favs.delete(ticker); else favs.add(ticker);
+    try { localStorage.setItem("chok.favs", JSON.stringify(Array.from(favs))); } catch (e) { /* 무시 */ }
+}
+
+function favStar(ticker) {
+    const on = favs.has(ticker);
+    return '<span class="fav' + (on ? ' is-on' : '') + '" role="button" aria-pressed="' + on + '" aria-label="즐겨찾기" data-fav="' + ticker + '">' +
+        (on ? '★' : '☆') + '</span>';
+}
+
 async function loadRecommendations() {
     const tbody = document.getElementById("stockTableBody");
     tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오는 중...</td></tr>';
     try {
         const res = await fetch("/api/recommendations");
+        if (!res.ok) throw new Error("HTTP " + res.status);
         allData = await res.json();
-        if (allData.length > 0 && allData[0].date) {
-            document.getElementById("lastUpdated").textContent = "기준일 " + allData[0].date;
-        }
+        // 브리핑 탭이 첫 화면이라 실패·없음도 거기 보여야 한다 (종목 탭 표는 숨어 있을 수 있음)
+        document.getElementById("lastUpdated").textContent = allData.length === 0
+            ? "오늘 분석 결과가 아직 없습니다"
+            : allData[0].date ? "기준일 " + allData[0].date : "";
         renderBriefing();
         renderTagExplorer();
         renderList();
         loadChanges();
     } catch (err) {
+        console.error(err);   // 렌더 버그가 네트워크 오류로 보이지 않게
         tbody.innerHTML = '<tr class="loading-row"><td colspan="9">데이터를 불러오지 못했습니다.</td></tr>';
+        document.getElementById("lastUpdated").textContent = "데이터를 불러오지 못했습니다. 잠시 뒤 새로고침해 주세요.";
     }
 }
 
 /* ── 브리핑: 분포 / 오늘 주목 / TOP 5 ─────────────────────────────── */
 
 function scoreBar(v) {
-    return '<span class="score-cell"><i style="--w:' + Math.max(0, Math.min(100, Number(v) || 0)) + '%"></i></span>';
+    return '<span class="score-cell ' + scoreTone(v) + '"><i style="--w:' + Math.max(0, Math.min(100, Number(v) || 0)) + '%"></i></span>';
 }
 
 function renderBriefing() {
@@ -55,8 +75,8 @@ function renderBriefing() {
         return '<button class="pick ' + cls + '" data-ticker="' + i.ticker + '">' +
             '<div class="pick__name">' + esc(i.name) + '</div>' +
             '<div class="pick__sub">' + i.ticker + ' · ' + i.market + '</div>' +
-            '<div class="pick__row"><span class="fact-tag">' + label + '</span>' +
-            '<span class="pick__score">' + fmt(i.finalScore) + '</span></div></button>';
+            '<div class="pick__row"><span class="fact-tag"' + tagTip(cls === 'pick--pos' ? 'NEWS_POS' : 'NEWS_NEG') + '>' + label + '</span>' +
+            '<span class="pick__score ' + scoreTone(i.finalScore) + '">' + fmt(i.finalScore) + '</span></div></button>';
     };
     const notable = pos.sort(byScore).map(function(i) { return card(i, "pick--pos", "재료성 호재"); })
         .concat(neg.sort(byScore).map(function(i) { return card(i, "pick--neg", "재료성 악재"); }));
@@ -68,7 +88,7 @@ function renderBriefing() {
             '<div class="top-card__rank">' + (idx + 1) + '</div>' +
             '<div class="top-card__name">' + esc(i.name) + '</div>' +
             '<div class="top-card__sub">' + i.ticker + ' · ' + i.market + '</div>' +
-            '<div class="top-card__score">' + fmt(i.finalScore) + '</div>' +
+            '<div class="top-card__score ' + scoreTone(i.finalScore) + '">' + fmt(i.finalScore) + '</div>' +
             scoreBar(i.finalScore) +
             '<span class="rec-badge ' + (REC_BADGE_CLASS[i.recommendation] || "") + '">' + (REC_LABEL[i.recommendation] || "-") + '</span></button>';
     }).join("");
@@ -98,7 +118,7 @@ function renderChanges(c) {
         const add = c.added.filter(function(x) { return x.tag === tag; });
         const del = c.removed.filter(function(x) { return x.tag === tag; });
         if (add.length + del.length === 0) return "";
-        return '<div class="change-row"><span class="fact-tag">' + TAG_META[tag].label + '</span>' +
+        return '<div class="change-row"><span class="fact-tag' + tagTone(tag) + '"' + tagTip(tag) + '>' + TAG_META[tag].label + '</span>' +
             '<div class="change-row__chips">' +
             add.map(function(x) { return chip(x, "+"); }).join("") +
             del.map(function(x) { return chip(x, "−"); }).join("") + '</div></div>';
@@ -114,7 +134,7 @@ function renderTagExplorer() {
     const counts = {};
     allData.forEach(function(i) { (i.tags || []).forEach(function(t) { counts[t] = (counts[t] || 0) + 1; }); });
     const chips = Object.keys(TAG_META).filter(function(t) { return counts[t]; }).map(function(t) {
-        return '<button class="tag-chip' + (activeTags.has(t) ? ' is-active' : '') + '" data-tag="' + t + '" title="' + TAG_META[t].desc + '">' +
+        return '<button class="tag-chip' + tagTone(t).replace('fact-tag', 'tag-chip') + (activeTags.has(t) ? ' is-active' : '') + '" data-tag="' + t + '"' + tagTip(t) + '>' +
             TAG_META[t].label + '<em>' + counts[t] + '</em></button>';
     });
     if (activeTags.size > 0) chips.push('<button class="tag-clear" id="tagClear">선택 해제</button>');
@@ -125,6 +145,7 @@ function renderTagExplorer() {
 
 function matchesRec(item) {
     if (!recFilter) return true;
+    if (recFilter === "FAV") return favs.has(item.ticker);
     if (recFilter.indexOf("group:") === 0) return REC_GROUP[item.recommendation] === recFilter.slice(6);
     return item.recommendation === recFilter;
 }
@@ -177,11 +198,11 @@ function renderList() {
     tbody.innerHTML = data.map(function(item, idx) {
         return '<tr data-ticker="' + item.ticker + '">' +
             '<td><span>' + (idx + 1) + '</span></td>' +
-            '<td>' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></td>' +
+            '<td>' + favStar(item.ticker) + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></td>' +
             '<td>' + item.market + '</td>' +
-            '<td>' + fmt(item.technicalScore) + '</td>' +
+            '<td class="' + scoreTone(item.technicalScore) + '">' + fmt(item.technicalScore) + '</td>' +
             '<td>' + fmt(item.sentimentScore) + '</td>' +
-            '<td class="score-cell"><b>' + fmt(item.finalScore) + '</b><i style="--w:' + Math.max(0, Math.min(100, Number(item.finalScore) || 0)) + '%"></i></td>' +
+            '<td class="score-cell ' + scoreTone(item.finalScore) + '"><b>' + fmt(item.finalScore) + '</b><i style="--w:' + Math.max(0, Math.min(100, Number(item.finalScore) || 0)) + '%"></i></td>' +
             '<td>' + renderTags(item.tags) + '</td>' +
             '<td>' + renderMomentum(item) + '</td>' +
             '<td>' + recBadge(item) + renderNuance(item.recommendationNuance) + '</td>' +
@@ -193,8 +214,8 @@ function renderList() {
         return '<button class="stock-card" data-ticker="' + item.ticker + '">' +
             '<div class="stock-card__top">' +
                 '<span class="stock-card__rank">' + (idx + 1) + '</span>' +
-                '<span class="stock-card__name">' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></span>' +
-                '<span class="stock-card__score"><b>' + fmt(item.finalScore) + '</b>' + recBadge(item) + '</span>' +
+                '<span class="stock-card__name">' + favStar(item.ticker) + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></span>' +
+                '<span class="stock-card__score"><b class="' + scoreTone(item.finalScore) + '">' + fmt(item.finalScore) + '</b>' + recBadge(item) + '</span>' +
             '</div>' + tags +
             '<div class="stock-card__meta">12-1 모멘텀 ' + renderMomentum(item) + ' · ' + item.market + '</div>' +
             '</button>';
@@ -203,7 +224,8 @@ function renderList() {
 
 // 참고 지표 - 점수에는 안 들어감. "상위 20%" 여부는 태그 열(MOMENTUM_TOP20)에 나온다.
 function renderMomentum(item) {
-    return item.momentum12m == null ? "-" : fmtSignedPct(item.momentum12m);
+    return item.momentum12m == null ? "-"
+        : '<span class="' + momentumTone(item.momentum12m) + '">' + fmtSignedPct(item.momentum12m) + '</span>';
 }
 
 function fmtSignedPct(v) { return (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }
@@ -215,13 +237,17 @@ function showStatus(msg, isError) {
     const el = document.getElementById("statusMsg");
     el.textContent = msg;
     el.classList.toggle("status-msg--error", !!isError);
+    el.setAttribute("role", isError ? "alert" : "status");   // 오류는 화면 읽기 프로그램이 바로 읽는다
     el.hidden = false;
     setTimeout(function() { el.hidden = true; }, 4000);
 }
 
 /* ── 우측 슬라이드 패널 ──────────────────────────────────────────── */
 
+let hashBeforePanel = "";   // 패널을 열기 전 주소 해시(#stocks 등) — 닫을 때 되돌린다
+
 function openPanel(ticker) {
+    if (!document.body.classList.contains("panel-open")) hashBeforePanel = /^#[0-9A-Z]{6}$/.test(location.hash) ? "" : location.hash;
     document.getElementById("panelFrame").src = "/stocks/" + ticker + "?embed=1";
     document.getElementById("panelFull").href = "/stocks/" + ticker;
     document.getElementById("panel").setAttribute("aria-hidden", "false");
@@ -230,9 +256,10 @@ function openPanel(ticker) {
 }
 
 function closePanel() {
+    if (!document.body.classList.contains("panel-open")) return;   // Esc 는 패널이 닫혀 있어도 온다
     document.body.classList.remove("panel-open");
     document.getElementById("panel").setAttribute("aria-hidden", "true");
-    history.replaceState(null, "", location.pathname);
+    history.replaceState(null, "", location.pathname + location.search + hashBeforePanel);
     // 닫히는 애니메이션이 끝난 뒤 비운다 - 다음에 열 때 이전 종목이 번쩍 보이지 않게
     setTimeout(function() {
         if (!document.body.classList.contains("panel-open")) document.getElementById("panelFrame").removeAttribute("src");
@@ -245,6 +272,9 @@ document.addEventListener("keydown", function(e) { if (e.key === "Escape") close
 
 // 카드·표 행 어디서든 data-ticker를 가진 요소를 누르면 패널을 연다 (이벤트 위임)
 document.addEventListener("click", function(e) {
+    const star = e.target.closest("[data-fav]");   // 별은 행/카드 안에 있으니 패널 열기보다 먼저 처리
+    if (star) { toggleFav(star.dataset.fav); renderList(); return; }
+
     const t = e.target.closest("[data-ticker]");
     if (t) { openPanel(t.dataset.ticker); return; }
 

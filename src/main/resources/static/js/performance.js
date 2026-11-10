@@ -76,9 +76,9 @@ function renderTable(items) {
             '<td>' + item.snapshotDate + '</td>' +
             '<td>' + esc(item.name) + '<span class="ticker-sub">' + item.ticker + '</span></td>' +
             '<td>' + item.rank + '</td>' +
-            '<td>' + fmt(item.technicalScore) + '</td>' +
+            '<td class="' + scoreTone(item.technicalScore) + '">' + fmt(item.technicalScore) + '</td>' +
             '<td>' + fmt(item.sentimentScore) + '</td>' +
-            '<td>' + fmt(item.finalScore) + '</td>' +
+            '<td class="' + scoreTone(item.finalScore) + '">' + fmt(item.finalScore) + '</td>' +
             '<td>' + fmtPrice(item.entryPrice) + '</td>' +
             '<td>' + fmtPrice(item.currentPrice) + '</td>' +
             '<td>' + renderReturnRate(item.returnRate) + '</td>' +

@@ -282,11 +282,14 @@ function renderHeader(item) {
     }
     document.getElementById("stockReason").textContent = item.reason || "";
     document.getElementById("techScoreVal").textContent = fmt(item.technicalScore);
+    document.getElementById("techScoreVal").classList.add(scoreTone(item.technicalScore));
     document.getElementById("sentimentScoreVal").textContent = fmt(item.sentimentScore);
     document.getElementById("finalScoreVal").textContent = fmt(item.finalScore);
+    document.getElementById("finalScoreVal").classList.add(scoreTone(item.finalScore));
 
     document.getElementById("momentumVal").textContent = item.momentum12m == null
         ? "--" : (item.momentum12m > 0 ? "+" : "") + fmt(item.momentum12m) + "%";
+    if (item.momentum12m != null) document.getElementById("momentumVal").classList.add(momentumTone(item.momentum12m));
 }
 
 function fmt(v) { return v == null ? "-" : Number(v).toFixed(1); }

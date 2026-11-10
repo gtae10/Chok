@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>종목 상세 - 촉</title>
+    <link rel="preconnect" href="https://hangeul.pstatic.net" crossorigin>
+    <script th:src="@{/js/theme.js}"></script>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
     <script>if (location.search.indexOf("embed=1") >= 0) document.documentElement.classList.add("is-embed");</script>
 </head>
@@ -14,6 +16,7 @@
         <a th:href="@{/}" class="brand">촉<em>Chok</em></a>
         <div class="topbar__meta">
             <a th:href="@{/}" class="btn-ghost">← 목록으로</a>
+            <button class="theme-toggle" type="button" data-theme-toggle aria-label="테마 바꾸기"></button>
         </div>
     </div>
 </header>

@@ -33,7 +33,7 @@
     const cards = Object.keys(TAG_META).map(function(k) {
         const m = TAG_META[k], t = byTag[k] || { todayCount: 0, totalRows: 0 };
         return '<div class="tag-card">' +
-            '<div class="tag-card__top"><span class="fact-tag">' + m.label + '</span></div>' +
+            '<div class="tag-card__top"><span class="fact-tag' + tagTone(k) + '"' + tagTip(k) + '>' + m.label + '</span></div>' +
             '<div class="tag-card__nums"><div><b>' + t.todayCount + '</b><span>오늘 종목 수</span></div>' +
             '<div><b>' + t.totalRows + '</b><span>누적 부여 건수</span></div></div>' +
             '<p class="tag-card__def">' + m.desc + '</p>' +

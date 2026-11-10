@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>실전 성과 추적 - 촉</title>
+    <link rel="preconnect" href="https://hangeul.pstatic.net" crossorigin>
+    <script th:src="@{/js/theme.js}"></script>
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
 </head>
 <body>
@@ -12,9 +14,14 @@
     <div class="topbar__inner topbar__inner--wide">
         <a th:href="@{/}" class="brand">촉<em>Chok</em></a>
         <div class="topbar__meta">
-            <a th:href="@{/}" class="btn-ghost">← 목록으로</a>
+            <button class="theme-toggle" type="button" data-theme-toggle aria-label="테마 바꾸기"></button>
         </div>
     </div>
+    <nav class="tabs" aria-label="화면 구역">
+        <a th:href="@{/}+'#briefing'">브리핑</a>
+        <a th:href="@{/}+'#stocks'">종목</a>
+        <a th:href="@{/performance}" aria-current="page">실전 성과</a>
+    </nav>
 </header>
 
 <main class="layout layout--wide">
@@ -28,12 +35,12 @@
         <div id="tagBoard"></div>
     </section>
 
-    <div class="detail-head" style="border-bottom: none; padding-bottom: 0;">
+    <div class="detail-head">
         <h1 style="font-size: 1.5rem;">상위 종목 실전 성과 추적</h1>
         <p class="detail-head__reason">선정일의 종합점수 상위 종목을 지금 현재가 기준으로 추적합니다. 새 종목 편입은 멈춘 상태이고, 고점은 선정 뒤 종가가 가장 높았던 날입니다.</p>
     </div>
 
-    <div class="score-cards" style="grid-template-columns: repeat(3, 1fr); margin-top: 20px;">
+    <div class="score-cards" style="grid-template-columns: repeat(3, 1fr);">
         <div class="score-card">
             <span class="score-card__label">총 추적 건수</span>
             <span id="totalCountVal" class="score-card__value">--</span>
@@ -42,13 +49,13 @@
             <span class="score-card__label">전체 승률</span>
             <span id="winRateVal" class="score-card__value">--</span>
         </div>
-        <div class="score-card score-card--final">
+        <div class="score-card">
             <span class="score-card__label">평균 수익률</span>
             <span id="avgReturnVal" class="score-card__value">--</span>
         </div>
     </div>
 
-    <div class="table-wrap" style="margin-top: 24px;">
+    <div class="table-wrap section">
         <table class="stock-table stock-table--wide">
             <thead>
             <tr>
