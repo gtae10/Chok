@@ -1,0 +1,921 @@
+{
+  "createdAt": "2026-11-11T08:53:59.427668+00:00",
+  "config": {
+    "model": "LogisticRegression(max_iter=1000) + StandardScaler (train_model._fit_eval)",
+    "features": [
+      "priceVsMa5",
+      "ma5VsMa20",
+      "ma20VsMa60",
+      "rsiNorm",
+      "macdHistNorm",
+      "bbPercentB",
+      "logVolumeRatio",
+      "momentum90"
+    ],
+    "labelMode": "relative",
+    "label": "fwd_return_h > 그날 유니버스 중앙값 (train_model.restrict_to_universe)",
+    "excessReturn": "h일 수익률 - 그날 유니버스(PIT 시총 상위 N) 동일가중 평균 (evaluate_tags.excess_returns)",
+    "universe": "PIT 일별 KOSPI+KOSDAQ 시총 상위 100, 상장폐지 포함 (marcap)",
+    "folds": "make_time_folds(N_FOLDS=10) expanding window, purge target_date < train_end",
+    "horizons": [
+      5,
+      20,
+      50
+    ],
+    "roundTripCost": 0.003,
+    "costAssumption": "매 리밸런싱 전량 교체",
+    "topK": 10,
+    "quantiles": 5,
+    "benchmark": "유니버스 동일가중",
+    "nShuffles": 100,
+    "seed": 42
+  },
+  "data": {
+    "rows": 132969,
+    "tickers": 195,
+    "start": "2021-05-14",
+    "end": "2026-11-09"
+  },
+  "horizons": {
+    "5": {
+      "horizon": 5,
+      "samples": 132431,
+      "oosPredictions": 120791,
+      "evaluatedRows": 120786,
+      "period": {
+        "datasetStart": "2021-05-14",
+        "datasetEnd": "2026-11-02",
+        "oosStart": "2021-11-10",
+        "oosEnd": "2026-11-02"
+      },
+      "oosDates": 1217,
+      "rebalanceDates": 244,
+      "folds": [
+        {
+          "fold": 1,
+          "trainSize": 11165,
+          "testSize": 11819,
+          "auc": 0.5342143482817368,
+          "trainBaseRate": 0.496551724137931,
+          "trainMaxDate": "2021-11-02",
+          "trainMaxTargetDate": "2021-11-09",
+          "testStart": "2021-11-10",
+          "testEnd": "2022-05-09"
+        },
+        {
+          "fold": 2,
+          "trainSize": 22964,
+          "testSize": 12077,
+          "auc": 0.5138309288641882,
+          "trainBaseRate": 0.4962985542588399,
+          "trainMaxDate": "2022-04-29",
+          "trainMaxTargetDate": "2022-05-09",
+          "testStart": "2022-05-10",
+          "testEnd": "2022-11-03"
+        },
+        {
+          "fold": 3,
+          "trainSize": 35036,
+          "testSize": 12170,
+          "auc": 0.49759880087908526,
+          "trainBaseRate": 0.4971743349697454,
+          "trainMaxDate": "2022-10-27",
+          "trainMaxTargetDate": "2022-11-03",
+          "testStart": "2022-11-04",
+          "testEnd": "2023-04-28"
+        },
+        {
+          "fold": 4,
+          "trainSize": 47202,
+          "testSize": 12194,
+          "auc": 0.4823034750655038,
+          "trainBaseRate": 0.4977543324435405,
+          "trainMaxDate": "2023-04-21",
+          "trainMaxTargetDate": "2023-04-28",
+          "testStart": "2023-05-02",
+          "testEnd": "2023-10-31"
+        },
+        {
+          "fold": 5,
+          "trainSize": 59395,
+          "testSize": 11941,
+          "auc": 0.5100533039858903,
+          "trainBaseRate": 0.498156410472262,
+          "trainMaxDate": "2023-10-24",
+          "trainMaxTargetDate": "2023-10-31",
+          "testStart": "2023-11-01",
+          "testEnd": "2024-04-26"
+        },
+        {
+          "fold": 6,
+          "trainSize": 71341,
+          "testSize": 12085,
+          "auc": 0.49934799906788924,
+          "trainBaseRate": 0.49815674016344036,
+          "trainMaxDate": "2024-04-19",
+          "trainMaxTargetDate": "2024-04-26",
+          "testStart": "2024-04-29",
+          "testEnd": "2024-10-30"
+        },
+        {
+          "fold": 7,
+          "trainSize": 83427,
+          "testSize": 12135,
+          "auc": 0.519195431023945,
+          "trainBaseRate": 0.4980282162848958,
+          "trainMaxDate": "2024-10-23",
+          "trainMaxTargetDate": "2024-10-30",
+          "testStart": "2024-10-31",
+          "testEnd": "2025-04-30"
+        },
+        {
+          "fold": 8,
+          "trainSize": 95566,
+          "testSize": 12065,
+          "auc": 0.47426131258089255,
+          "trainBaseRate": 0.49795952535420546,
+          "trainMaxDate": "2025-04-23",
+          "trainMaxTargetDate": "2025-04-30",
+          "testStart": "2025-05-02",
+          "testEnd": "2025-10-31"
+        },
+        {
+          "fold": 9,
+          "trainSize": 107626,
+          "testSize": 12105,
+          "auc": 0.4907536659573394,
+          "trainBaseRate": 0.49804879861743445,
+          "trainMaxDate": "2025-10-24",
+          "trainMaxTargetDate": "2025-10-31",
+          "testStart": "2025-11-03",
+          "testEnd": "2026-04-30"
+        },
+        {
+          "fold": 10,
+          "trainSize": 119731,
+          "testSize": 12200,
+          "auc": 0.5195380542864821,
+          "trainBaseRate": 0.4978911058957162,
+          "trainMaxDate": "2026-04-23",
+          "trainMaxTargetDate": "2026-04-30",
+          "testStart": "2026-05-04",
+          "testEnd": "2026-11-02"
+        }
+      ],
+      "metrics": {
+        "aucPooled": 0.5047598111311926,
+        "aucFoldMean": 0.5041037681337577,
+        "rankIcAllDates": {
+          "n": 1217,
+          "mean": 0.013189737409243328,
+          "std": 0.19857897396358143,
+          "t": 2.3171181341631333
+        },
+        "rankIcNonOverlap": {
+          "n": 244,
+          "mean": 0.008788576974841575,
+          "std": 0.19548274140692,
+          "t": 0.702271514870491
+        },
+        "quintileMeanExcessNonOverlap": {
+          "1": 1.1358494428926888e-05,
+          "2": -0.0002109504701722382,
+          "3": 0.0014680207505820076,
+          "4": -0.0004985033721640121,
+          "5": -0.0009442541444224863
+        },
+        "spreadQ5minusQ1NonOverlap": {
+          "n": 244,
+          "mean": -0.0009556126388514135,
+          "std": 0.037627199469662864,
+          "t": -0.39671160267450156
+        },
+        "spreadQ5minusQ1AllDates": {
+          "n": 1217,
+          "mean": -0.0007476580473631531,
+          "std": 0.04009954038437839,
+          "t": -0.6504424941435241
+        },
+        "brier": 0.25026650052139177,
+        "brierBaseRate": 0.24999786329613946,
+        "strategyTopQuintile": {
+          "periods": 244,
+          "years": 4.84,
+          "cumReturn": -0.4930677372471276,
+          "benchCumReturn": 0.43517243445549436,
+          "cumExcess": -0.6467795432921599,
+          "annualExcess": -0.19342355332672068,
+          "meanPeriodExcess": -0.003944254144422487,
+          "hitRate": 0.38114754098360654,
+          "maxDrawdownRelative": -0.66606880046239,
+          "maxDrawdownAbsolute": -0.5037017304332145
+        },
+        "strategyTop10": {
+          "periods": 244,
+          "years": 4.84,
+          "cumReturn": -0.6097825360513769,
+          "benchCumReturn": 0.43517243445549436,
+          "cumExcess": -0.7281041256225967,
+          "annualExcess": -0.23586219191803393,
+          "meanPeriodExcess": -0.004681939453903255,
+          "hitRate": 0.4139344262295082,
+          "maxDrawdownRelative": -0.7498866297267242,
+          "maxDrawdownAbsolute": -0.6166934704355348
+        }
+      },
+      "shuffledOnce": {
+        "aucPooled": 0.5007646758843542,
+        "aucFoldMean": 0.5008174426841585,
+        "rankIcAllDates": {
+          "n": 1217,
+          "mean": 0.0021977966226455706,
+          "std": 0.1024017231904462,
+          "t": 0.7487305019670933
+        },
+        "rankIcNonOverlap": {
+          "n": 244,
+          "mean": 0.002735107676138605,
+          "std": 0.10377533836856453,
+          "t": 0.4116946121681304
+        },
+        "quintileMeanExcessNonOverlap": {
+          "1": 6.3864086949615424e-06,
+          "2": 4.084717965940919e-05,
+          "3": 0.0011613961121959275,
+          "4": -0.00205052990228117,
+          "5": 0.000698299016378196
+        },
+        "spreadQ5minusQ1NonOverlap": {
+          "n": 244,
+          "mean": 0.000691912607683235,
+          "std": 0.01877610132294465,
+          "t": 0.5756264441660145
+        },
+        "spreadQ5minusQ1AllDates": {
+          "n": 1217,
+          "mean": 0.0004634816068310886,
+          "std": 0.01912127270827839,
+          "t": 0.8455922571260973
+        },
+        "brier": 0.2505578913806212,
+        "brierBaseRate": 0.24999786329613946,
+        "strategyTopQuintile": {
+          "periods": 244,
+          "years": 4.84,
+          "cumReturn": -0.19679237602692545,
+          "benchCumReturn": 0.43517243445549436,
+          "cumExcess": -0.44034068332854215,
+          "annualExcess": -0.11298331625522584,
+          "meanPeriodExcess": -0.0023017009836218045,
+          "hitRate": 0.3975409836065574,
+          "maxDrawdownRelative": -0.4465129549734268,
+          "maxDrawdownAbsolute": -0.4525818897068523
+        },
+        "strategyTop10": {
+          "periods": 244,
+          "years": 4.84,
+          "cumReturn": -0.13533838158847245,
+          "benchCumReturn": 0.43517243445549436,
+          "cumExcess": -0.39752074548478844,
+          "annualExcess": -0.09937205806083094,
+          "meanPeriodExcess": -0.0018809855265140365,
+          "hitRate": 0.4098360655737705,
+          "maxDrawdownRelative": -0.4012572622733983,
+          "maxDrawdownAbsolute": -0.4021791320532143
+        }
+      },
+      "shuffleNull": {
+        "nShuffles": 100,
+        "metrics": {
+          "aucPooled": {
+            "actual": 0.5047598111311926,
+            "nullMean": 0.5000805366995446,
+            "nullStd": 0.0013844337402988763,
+            "null2.5%": 0.4976283425401555,
+            "null97.5%": 0.5031943301350749,
+            "shareNullGeActual": 0.0
+          },
+          "rankIcNonOverlapMean": {
+            "actual": 0.008788576974841575,
+            "nullMean": 0.0006739423304776449,
+            "nullStd": 0.006376493641176461,
+            "null2.5%": -0.010972590579036177,
+            "null97.5%": 0.012037107448566554,
+            "shareNullGeActual": 0.08
+          },
+          "spreadNonOverlapMean": {
+            "actual": -0.0009556126388514135,
+            "nullMean": 5.8893622354755364e-05,
+            "nullStd": 0.0013158715600636733,
+            "null2.5%": -0.0024324147268092646,
+            "null97.5%": 0.0027896453480926054,
+            "shareNullGeActual": 0.78
+          },
+          "top10AnnualExcess": {
+            "actual": -0.23586219191803393,
+            "nullMean": -0.15076300214653968,
+            "nullStd": 0.05272616016024799,
+            "null2.5%": -0.24840884283376893,
+            "null97.5%": -0.04165683173236052,
+            "shareNullGeActual": 0.96
+          },
+          "topQuintileAnnualExcess": {
+            "actual": -0.19342355332672068,
+            "nullMean": -0.14330554653492675,
+            "nullStd": 0.03550826741101614,
+            "null2.5%": -0.2101025110594361,
+            "null97.5%": -0.0677489449359129,
+            "shareNullGeActual": 0.91
+          }
+        }
+      }
+    },
+    "20": {
+      "horizon": 20,
+      "samples": 130809,
+      "oosPredictions": 119264,
+      "evaluatedRows": 119244,
+      "period": {
+        "datasetStart": "2021-05-14",
+        "datasetEnd": "2026-10-12",
+        "oosStart": "2021-11-09",
+        "oosEnd": "2026-10-12"
+      },
+      "oosDates": 1203,
+      "rebalanceDates": 61,
+      "folds": [
+        {
+          "fold": 1,
+          "trainSize": 9629,
+          "testSize": 11602,
+          "auc": 0.5435530657405254,
+          "trainBaseRate": 0.4960016616471077,
+          "trainMaxDate": "2021-10-08",
+          "trainMaxTargetDate": "2021-11-08",
+          "testStart": "2021-11-09",
+          "testEnd": "2022-05-03"
+        },
+        {
+          "fold": 2,
+          "trainSize": 21171,
+          "testSize": 11959,
+          "auc": 0.5193121755274488,
+          "trainBaseRate": 0.49666997307637806,
+          "trainMaxDate": "2022-04-05",
+          "trainMaxTargetDate": "2022-05-03",
+          "testStart": "2022-05-04",
+          "testEnd": "2022-10-28"
+        },
+        {
+          "fold": 3,
+          "trainSize": 33121,
+          "testSize": 12011,
+          "auc": 0.5070574153658052,
+          "trainBaseRate": 0.49723740225234747,
+          "trainMaxDate": "2022-09-28",
+          "trainMaxTargetDate": "2022-10-28",
+          "testStart": "2022-10-31",
+          "testEnd": "2023-04-21"
+        },
+        {
+          "fold": 4,
+          "trainSize": 45120,
+          "testSize": 11993,
+          "auc": 0.4866809055008621,
+          "trainBaseRate": 0.49765070921985816,
+          "trainMaxDate": "2023-03-24",
+          "trainMaxTargetDate": "2023-04-21",
+          "testStart": "2023-04-24",
+          "testEnd": "2023-10-20"
+        },
+        {
+          "fold": 5,
+          "trainSize": 57096,
+          "testSize": 11841,
+          "auc": 0.5050553835251345,
+          "trainBaseRate": 0.49798584839568444,
+          "trainMaxDate": "2023-09-15",
+          "trainMaxTargetDate": "2023-10-20",
+          "testStart": "2023-10-23",
+          "testEnd": "2024-04-16"
+        },
+        {
+          "fold": 6,
+          "trainSize": 68960,
+          "testSize": 11886,
+          "auc": 0.4985486220120187,
+          "trainBaseRate": 0.49798433874709974,
+          "trainMaxDate": "2024-03-18",
+          "trainMaxTargetDate": "2024-04-16",
+          "testStart": "2024-04-17",
+          "testEnd": "2024-10-16"
+        },
+        {
+          "fold": 7,
+          "trainSize": 80842,
+          "testSize": 12045,
+          "auc": 0.5281594165937179,
+          "trainBaseRate": 0.49782291383191907,
+          "trainMaxDate": "2024-09-10",
+          "trainMaxTargetDate": "2024-10-16",
+          "testStart": "2024-10-17",
+          "testEnd": "2025-04-15"
+        },
+        {
+          "fold": 8,
+          "trainSize": 92902,
+          "testSize": 11939,
+          "auc": 0.4903924027117297,
+          "trainBaseRate": 0.4979117780026264,
+          "trainMaxDate": "2025-03-18",
+          "trainMaxTargetDate": "2025-04-15",
+          "testStart": "2025-04-16",
+          "testEnd": "2025-10-15"
+        },
+        {
+          "fold": 9,
+          "trainSize": 104821,
+          "testSize": 11890,
+          "auc": 0.4852437896887293,
+          "trainBaseRate": 0.4979536543249921,
+          "trainMaxDate": "2025-09-10",
+          "trainMaxTargetDate": "2025-10-15",
+          "testStart": "2025-10-16",
+          "testEnd": "2026-04-10"
+        },
+        {
+          "fold": 10,
+          "trainSize": 116728,
+          "testSize": 12098,
+          "auc": 0.5249575571734663,
+          "trainBaseRate": 0.49789253649509974,
+          "trainMaxDate": "2026-03-13",
+          "trainMaxTargetDate": "2026-04-10",
+          "testStart": "2026-04-13",
+          "testEnd": "2026-10-12"
+        }
+      ],
+      "metrics": {
+        "aucPooled": 0.5086431343469784,
+        "aucFoldMean": 0.508860444119801,
+        "rankIcAllDates": {
+          "n": 1203,
+          "mean": 0.024471641627209977,
+          "std": 0.18981687921660848,
+          "t": 4.471580862941747
+        },
+        "rankIcNonOverlap": {
+          "n": 61,
+          "mean": 0.020597962484972948,
+          "std": 0.1748611247817593,
+          "t": 0.9200171280116296
+        },
+        "quintileMeanExcessNonOverlap": {
+          "1": -0.004894757060582885,
+          "2": 0.004068754819126365,
+          "3": 0.004392439098265218,
+          "4": -0.003156864433572795,
+          "5": -0.0012301888184560318
+        },
+        "spreadQ5minusQ1NonOverlap": {
+          "n": 61,
+          "mean": 0.0036645682421268524,
+          "std": 0.07590612398893126,
+          "t": 0.3770603927765123
+        },
+        "spreadQ5minusQ1AllDates": {
+          "n": 1203,
+          "mean": -0.0027832528101124367,
+          "std": 0.07687955738557092,
+          "t": -1.2556673319056462
+        },
+        "brier": 0.25045560434335695,
+        "brierBaseRate": 0.24999754875005206,
+        "strategyTopQuintile": {
+          "periods": 61,
+          "years": 4.84,
+          "cumReturn": 0.12062861929486934,
+          "benchCumReturn": 0.503563895417569,
+          "cumExcess": -0.2546850701122688,
+          "annualExcess": -0.058910672567542455,
+          "meanPeriodExcess": -0.00423018881845603,
+          "hitRate": 0.47540983606557374,
+          "maxDrawdownRelative": -0.40897752448258295,
+          "maxDrawdownAbsolute": -0.3299831852221923
+        },
+        "strategyTop10": {
+          "periods": 61,
+          "years": 4.84,
+          "cumReturn": -0.1993271665630182,
+          "benchCumReturn": 0.503563895417569,
+          "cumExcess": -0.46748333351365867,
+          "annualExcess": -0.12204530713857942,
+          "meanPeriodExcess": -0.008694146228813312,
+          "hitRate": 0.4098360655737705,
+          "maxDrawdownRelative": -0.6082499145074436,
+          "maxDrawdownAbsolute": -0.39075303316536547
+        }
+      },
+      "shuffledOnce": {
+        "aucPooled": 0.4998067133871818,
+        "aucFoldMean": 0.5000752358071372,
+        "rankIcAllDates": {
+          "n": 1203,
+          "mean": -0.0005573336847863502,
+          "std": 0.09884925429320165,
+          "t": -0.19555760442120074
+        },
+        "rankIcNonOverlap": {
+          "n": 61,
+          "mean": 0.0018743533061705256,
+          "std": 0.10483181884448811,
+          "t": 0.13964431279943032
+        },
+        "quintileMeanExcessNonOverlap": {
+          "1": -0.0013979277852795926,
+          "2": -0.0022366744245748667,
+          "3": -0.006647669357873225,
+          "4": 0.0057951638876404836,
+          "5": 0.003627194882029523
+        },
+        "spreadQ5minusQ1NonOverlap": {
+          "n": 61,
+          "mean": 0.005025122667309116,
+          "std": 0.04607553056478142,
+          "t": 0.8518070698841098
+        },
+        "spreadQ5minusQ1AllDates": {
+          "n": 1203,
+          "mean": -4.086953612854654e-05,
+          "std": 0.037488852800224855,
+          "t": -0.037812062877057524
+        },
+        "brier": 0.2515913917619518,
+        "brierBaseRate": 0.24999754875005206,
+        "strategyTopQuintile": {
+          "periods": 61,
+          "years": 4.84,
+          "cumReturn": 0.4661710435030968,
+          "benchCumReturn": 0.503563895417569,
+          "cumExcess": -0.024869479792933857,
+          "annualExcess": -0.00518842405804254,
+          "meanPeriodExcess": 0.0006271948820295217,
+          "hitRate": 0.4262295081967213,
+          "maxDrawdownRelative": -0.16151471121022287,
+          "maxDrawdownAbsolute": -0.3398604267440888
+        },
+        "strategyTop10": {
+          "periods": 61,
+          "years": 4.84,
+          "cumReturn": 0.6445061972825485,
+          "benchCumReturn": 0.503563895417569,
+          "cumExcess": 0.09373881768146419,
+          "annualExcess": 0.018680274102140793,
+          "meanPeriodExcess": 0.0028279443777067897,
+          "hitRate": 0.45901639344262296,
+          "maxDrawdownRelative": -0.2404311189443339,
+          "maxDrawdownAbsolute": -0.3160867941862585
+        }
+      },
+      "shuffleNull": {
+        "nShuffles": 100,
+        "metrics": {
+          "aucPooled": {
+            "actual": 0.5086431343469784,
+            "nullMean": 0.5003450299220166,
+            "nullStd": 0.0012027848249763207,
+            "null2.5%": 0.4982078735214601,
+            "null97.5%": 0.5026628456574287,
+            "shareNullGeActual": 0.0
+          },
+          "rankIcNonOverlapMean": {
+            "actual": 0.020597962484972948,
+            "nullMean": -0.00029397442864344606,
+            "nullStd": 0.011697392304076648,
+            "null2.5%": -0.02360888607904959,
+            "null97.5%": 0.021199135553412973,
+            "shareNullGeActual": 0.05
+          },
+          "spreadNonOverlapMean": {
+            "actual": 0.0036645682421268524,
+            "nullMean": -7.722280554166942e-05,
+            "nullStd": 0.004151099590046732,
+            "null2.5%": -0.009442415665201704,
+            "null97.5%": 0.007778451155321075,
+            "shareNullGeActual": 0.17
+          },
+          "top10AnnualExcess": {
+            "actual": -0.12204530713857942,
+            "nullMean": -0.04481892566904123,
+            "nullStd": 0.06457163914523384,
+            "null2.5%": -0.1683356000652235,
+            "null97.5%": 0.07954486512333209,
+            "shareNullGeActual": 0.91
+          },
+          "topQuintileAnnualExcess": {
+            "actual": -0.058910672567542455,
+            "nullMean": -0.041991713135631284,
+            "nullStd": 0.03767874665882591,
+            "null2.5%": -0.12067430887314656,
+            "null97.5%": 0.021208604380841496,
+            "shareNullGeActual": 0.69
+          }
+        }
+      }
+    },
+    "50": {
+      "horizon": 50,
+      "samples": 127524,
+      "oosPredictions": 116277,
+      "evaluatedRows": 116206,
+      "period": {
+        "datasetStart": "2021-05-14",
+        "datasetEnd": "2026-08-25",
+        "oosStart": "2021-11-04",
+        "oosEnd": "2026-08-25"
+      },
+      "oosDates": 1176,
+      "rebalanceDates": 24,
+      "folds": [
+        {
+          "fold": 1,
+          "trainSize": 6487,
+          "testSize": 11375,
+          "auc": 0.4935195702677381,
+          "trainBaseRate": 0.4960690611993217,
+          "trainMaxDate": "2021-08-18",
+          "trainMaxTargetDate": "2021-11-03",
+          "testStart": "2021-11-04",
+          "testEnd": "2022-04-26"
+        },
+        {
+          "fold": 2,
+          "trainSize": 17732,
+          "testSize": 11588,
+          "auc": 0.5021609882395066,
+          "trainBaseRate": 0.496447101285811,
+          "trainMaxDate": "2022-02-11",
+          "trainMaxTargetDate": "2022-04-26",
+          "testStart": "2022-04-27",
+          "testEnd": "2022-10-18"
+        },
+        {
+          "fold": 3,
+          "trainSize": 29291,
+          "testSize": 11638,
+          "auc": 0.5047014119209823,
+          "trainBaseRate": 0.4967737530299409,
+          "trainMaxDate": "2022-08-02",
+          "trainMaxTargetDate": "2022-10-18",
+          "testStart": "2022-10-19",
+          "testEnd": "2023-04-06"
+        },
+        {
+          "fold": 4,
+          "trainSize": 40838,
+          "testSize": 11684,
+          "auc": 0.5117745957238587,
+          "trainBaseRate": 0.4967187423478133,
+          "trainMaxDate": "2023-01-25",
+          "trainMaxTargetDate": "2023-04-06",
+          "testStart": "2023-04-07",
+          "testEnd": "2023-09-25"
+        },
+        {
+          "fold": 5,
+          "trainSize": 52461,
+          "testSize": 11640,
+          "auc": 0.504065954180444,
+          "trainBaseRate": 0.4969215226549246,
+          "trainMaxDate": "2023-07-14",
+          "trainMaxTargetDate": "2023-09-25",
+          "testStart": "2023-09-26",
+          "testEnd": "2024-03-22"
+        },
+        {
+          "fold": 6,
+          "trainSize": 64213,
+          "testSize": 11574,
+          "auc": 0.48872064305030294,
+          "trainBaseRate": 0.49742264027533367,
+          "trainMaxDate": "2024-01-09",
+          "trainMaxTargetDate": "2024-03-22",
+          "testStart": "2024-03-25",
+          "testEnd": "2024-09-11"
+        },
+        {
+          "fold": 7,
+          "trainSize": 75797,
+          "testSize": 11763,
+          "auc": 0.5046543151738117,
+          "trainBaseRate": 0.49738116284285655,
+          "trainMaxDate": "2024-07-02",
+          "trainMaxTargetDate": "2024-09-11",
+          "testStart": "2024-09-12",
+          "testEnd": "2025-03-14"
+        },
+        {
+          "fold": 8,
+          "trainSize": 87515,
+          "testSize": 11587,
+          "auc": 0.49734416617507726,
+          "trainBaseRate": 0.49753756498885904,
+          "trainMaxDate": "2024-12-24",
+          "trainMaxTargetDate": "2025-03-14",
+          "testStart": "2025-03-17",
+          "testEnd": "2025-09-03"
+        },
+        {
+          "fold": 9,
+          "trainSize": 99075,
+          "testSize": 11684,
+          "auc": 0.48385027565324523,
+          "trainBaseRate": 0.4976230128690386,
+          "trainMaxDate": "2025-06-24",
+          "trainMaxTargetDate": "2025-09-03",
+          "testStart": "2025-09-04",
+          "testEnd": "2026-03-04"
+        },
+        {
+          "fold": 10,
+          "trainSize": 110809,
+          "testSize": 11744,
+          "auc": 0.5313782276264204,
+          "trainBaseRate": 0.497712279688473,
+          "trainMaxDate": "2025-12-15",
+          "trainMaxTargetDate": "2026-03-04",
+          "testStart": "2026-03-05",
+          "testEnd": "2026-08-25"
+        }
+      ],
+      "metrics": {
+        "aucPooled": 0.5061464476571181,
+        "aucFoldMean": 0.502312172512743,
+        "rankIcAllDates": {
+          "n": 1176,
+          "mean": 0.0009376085629302932,
+          "std": 0.16354920483478563,
+          "t": 0.1965969558793554
+        },
+        "rankIcNonOverlap": {
+          "n": 24,
+          "mean": -0.025528273062528733,
+          "std": 0.1448067677758661,
+          "t": -0.8636508359114672
+        },
+        "quintileMeanExcessNonOverlap": {
+          "1": 0.022278804452088435,
+          "2": 0.003932943655412327,
+          "3": 0.006217486236853447,
+          "4": -0.013038348633000135,
+          "5": -0.017622216782280285
+        },
+        "spreadQ5minusQ1NonOverlap": {
+          "n": 24,
+          "mean": -0.039901021234368714,
+          "std": 0.08649707772652859,
+          "t": -2.2598946648618172
+        },
+        "spreadQ5minusQ1AllDates": {
+          "n": 1176,
+          "mean": -0.021228529042264365,
+          "std": 0.11519673848795324,
+          "t": -6.319509628163203
+        },
+        "brier": 0.2505833121606631,
+        "brierBaseRate": 0.24999543286613313,
+        "strategyTopQuintile": {
+          "periods": 24,
+          "years": 4.76,
+          "cumReturn": 0.06864701287753716,
+          "benchCumReturn": 0.660532092364631,
+          "cumExcess": -0.35644302341922074,
+          "annualExcess": -0.08840219546306372,
+          "meanPeriodExcess": -0.020622216782280288,
+          "hitRate": 0.25,
+          "maxDrawdownRelative": -0.4195116117650026,
+          "maxDrawdownAbsolute": -0.37594058516849826
+        },
+        "strategyTop10": {
+          "periods": 24,
+          "years": 4.76,
+          "cumReturn": -0.285424427778461,
+          "benchCumReturn": 0.660532092364631,
+          "cumExcess": -0.569670724518206,
+          "annualExcess": -0.16228134381294435,
+          "meanPeriodExcess": -0.03474572466570386,
+          "hitRate": 0.20833333333333334,
+          "maxDrawdownRelative": -0.569670724518206,
+          "maxDrawdownAbsolute": -0.5207816203453102
+        }
+      },
+      "shuffledOnce": {
+        "aucPooled": 0.4994833160850515,
+        "aucFoldMean": 0.49935317941838564,
+        "rankIcAllDates": {
+          "n": 1176,
+          "mean": -0.002144149468192138,
+          "std": 0.09988624222523261,
+          "t": -0.7361275003701626
+        },
+        "rankIcNonOverlap": {
+          "n": 24,
+          "mean": 0.01862605988278971,
+          "std": 0.08928625748190905,
+          "t": 1.02197905742892
+        },
+        "quintileMeanExcessNonOverlap": {
+          "1": -0.001228309119590189,
+          "2": -0.009280218965660234,
+          "3": -0.0045951292486987394,
+          "4": 0.010819601939019043,
+          "5": 0.006242398683391734
+        },
+        "spreadQ5minusQ1NonOverlap": {
+          "n": 24,
+          "mean": 0.007470707802981921,
+          "std": 0.05612660017992645,
+          "t": 0.6520766294794821
+        },
+        "spreadQ5minusQ1AllDates": {
+          "n": 1176,
+          "mean": -0.0008257389854329892,
+          "std": 0.06700963131628543,
+          "t": -0.4225802753163072
+        },
+        "brier": 0.2511781533825945,
+        "brierBaseRate": 0.24999543286613313,
+        "strategyTopQuintile": {
+          "periods": 24,
+          "years": 4.76,
+          "cumReturn": 0.7376472175958706,
+          "benchCumReturn": 0.660532092364631,
+          "cumExcess": 0.046440008950038525,
+          "annualExcess": 0.00957830768693868,
+          "meanPeriodExcess": 0.0032423986833917296,
+          "hitRate": 0.5833333333333334,
+          "maxDrawdownRelative": -0.13698195133655866,
+          "maxDrawdownAbsolute": -0.2315829684261408
+        },
+        "strategyTop10": {
+          "periods": 24,
+          "years": 4.76,
+          "cumReturn": 0.6522831390177892,
+          "benchCumReturn": 0.660532092364631,
+          "cumExcess": -0.00496765668352428,
+          "annualExcess": -0.0010452610000385443,
+          "meanPeriodExcess": -0.00043944350442100727,
+          "hitRate": 0.5,
+          "maxDrawdownRelative": -0.18524770450714745,
+          "maxDrawdownAbsolute": -0.20508641942627004
+        }
+      },
+      "shuffleNull": {
+        "nShuffles": 100,
+        "metrics": {
+          "aucPooled": {
+            "actual": 0.5061464476571181,
+            "nullMean": 0.500410133889379,
+            "nullStd": 0.0013268188197187163,
+            "null2.5%": 0.49786775443875514,
+            "null97.5%": 0.5029854850558585,
+            "shareNullGeActual": 0.0
+          },
+          "rankIcNonOverlapMean": {
+            "actual": -0.025528273062528733,
+            "nullMean": 0.0031785382418335595,
+            "nullStd": 0.020407764313777946,
+            "null2.5%": -0.03884706016764343,
+            "null97.5%": 0.03918624030613332,
+            "shareNullGeActual": 0.91
+          },
+          "spreadNonOverlapMean": {
+            "actual": -0.039901021234368714,
+            "nullMean": 0.002288965946870641,
+            "nullStd": 0.013608787501987222,
+            "null2.5%": -0.02494514871074309,
+            "null97.5%": 0.02629876589971657,
+            "shareNullGeActual": 1.0
+          },
+          "top10AnnualExcess": {
+            "actual": -0.16228134381294435,
+            "nullMean": -0.018864457452519374,
+            "nullStd": 0.05449577669526965,
+            "null2.5%": -0.12554748062876628,
+            "null97.5%": 0.08780723575339837,
+            "shareNullGeActual": 1.0
+          },
+          "topQuintileAnnualExcess": {
+            "actual": -0.08840219546306372,
+            "nullMean": -0.011408943036345907,
+            "nullStd": 0.0409479500788022,
+            "null2.5%": -0.08082816209582522,
+            "null97.5%": 0.05544420039776744,
+            "shareNullGeActual": 0.99
+          }
+        }
+      }
+    }
+  },
+  "elapsedSec": 63.0
+}
