@@ -51,5 +51,5 @@ if __name__ == "__main__":
     assert len(b) == 1 and b.iloc[0]["book_equity"] == 2500 and b.iloc[0]["is_financial"] and not b.iloc[0]["amended"]
     assert not p.duplicated(["ticker", "avail_date"]).any()
     assert list(p.columns) == ["ticker", "avail_date", "period_end", "book_equity", "ni_ttm", "op_income_ttm",
-                               "total_assets", "revenue_ttm", "is_financial", "amended"]
+                               "total_assets", "revenue_ttm", "is_financial", "amended", "bsns_year", "quarter", "currency"]
     print("fundamentals_dart self-check passed")

@@ -5,15 +5,17 @@ B단계에서 가장 일관됐던 신호 4개를 "그날 알 수 있던 값"으�
 나중에 과거 데이터로 다시 계산하면 DART 정정값처럼 그때 몰랐던 값이 섞이므로, 기록 자체가 검증 대상이다.
 정의·방향은 고정(D19). 바꾸면 새 실험이고 기록을 처음부터 다시 쌓는다.
 
-  bp          자본총계(avail_date <= T 최신 보고서) / 시가총액(T)          (+) 높을수록 좋음
+  bp          지배주주 자본(avail_date <= T 최신 보고서, 외화는 T 환율로 원화) / 시가총액(T)  (+)
   short_ratio 공매도 잔고 비중, T 기준 2거래일 전 값 (KRX T+2 공개)       (-)
   inst20      기관 순매수 거래대금 최근 20거래일 합 / 시가총액(T)         (-)
   vol60       일간 수익률 60일 표준편차                                   (-)
 
 같은 (날짜, 종목, 신호)는 처음 기록한 값을 유지한다(INSERT IGNORE) - 그때 알던 값이 남도록.
+우선주·인프라펀드처럼 DART 정기보고서가 없는 종목은 bp가 없다(D18과 같음).
 실행: collect.py 가 시세 수집 뒤 부른다. 단독: PYTHONUTF8=1 .venv/Scripts/python.exe forward_signals.py
 """
 import datetime
+import json
 import logging
 import os
 
@@ -31,11 +33,38 @@ VOL_DAYS = 60
 MIN_NAMES = 20  # 이보다 적게 계산되면 그날 횡단면 순위가 무의미 → ERROR
 
 
+PARENT_ID = "ifrs-full_EquityAttributableToOwnersOfParent"
+REPRT_BY_Q = {1: "11013", 2: "11012", 3: "11014", 4: "11011"}
+
+
+def latest_reports(panel: pd.DataFrame, asof) -> pd.DataFrame:
+    """종목별로 T에 알 수 있던 최신 보고서 1행. D18 add_fundamentals 와 같은 규칙:
+    avail_date <= T, 더 새 분기 뒤에 온 지난 분기 정정은 버린다."""
+    p = panel.sort_values(["ticker", "avail_date", "period_end"])
+    p = p[p["period_end"] >= p.groupby("ticker")["period_end"].cummax()]
+    return p[p["avail_date"] <= pd.Timestamp(asof)].groupby("ticker").tail(1)
+
+
+def parent_equity(j: dict) -> float:
+    """fnlttSinglAcntAll 응답 → 지배주주 자본. 비지배지분이 없으면(별도 등) 자본총계, 알 수 없으면 NaN."""
+    from fundamentals_dart import to_amount
+    bs = {x.get("account_id"): x for x in j.get("list") or [] if x.get("sj_div") == "BS"}
+    if PARENT_ID in bs:
+        return to_amount(bs[PARENT_ID]["thstrm_amount"])
+    named = [x for x in bs.values() if "지배기업" in x["account_nm"] and "비지배" not in x["account_nm"]]
+    if named:
+        return to_amount(named[0]["thstrm_amount"])
+    if "ifrs-full_NoncontrollingInterests" not in bs and "ifrs-full_Equity" in bs:
+        return to_amount(bs["ifrs-full_Equity"]["thstrm_amount"])
+    return np.nan
+
+
 def compute(asof, tickers, marcap: dict, closes: pd.DataFrame, shorts: pd.DataFrame,
-            inst_sum: dict, panel) -> list:
+            inst_sum: dict, equity: dict, fx: dict) -> list:
     """네트워크·DB 없이 그날 신호를 계산한다 (테스트도 이걸 쓴다).
     closes: ticker, trade_date, close_price / shorts: ticker, trade_date, short_ratio
-    inst_sum: {ticker: 최근 20거래일 기관 순매수 합} / panel: fundamentals_dart 패널 또는 None.
+    inst_sum: {ticker: 최근 20거래일 기관 순매수 합} / equity: {ticker: (지배주주 자본, 통화)}
+    fx: {통화: 원화 환율} (KRW는 1, 환율 없는 통화는 bp를 내지 않는다).
     반환: (trade_date, ticker, signal, value) 목록, NaN은 뺀다."""
     asof = pd.Timestamp(asof)
     days = pd.DatetimeIndex(sorted(closes.loc[closes["trade_date"] <= asof, "trade_date"].unique()))
@@ -51,12 +80,10 @@ def compute(asof, tickers, marcap: dict, closes: pd.DataFrame, shorts: pd.DataFr
             vals["short_ratio"][t] = float(s["short_ratio"].iloc[0])
         if t in inst_sum and mc > 0:
             vals["inst20"][t] = inst_sum[t] / mc
-    if panel is not None and len(panel):
-        from experiment_cross_section import add_fundamentals  # B단계와 같은 시점 규칙(정정·분기 순서)
-        ds = pd.DataFrame({"ticker": list(tickers), "trade_date": asof,
-                           "Marcap": [marcap.get(t) or np.nan for t in tickers]})
-        m = add_fundamentals(ds, panel)
-        vals["bp"] = dict(zip(m["ticker"], m["bp"].where(m["Marcap"] > 0)))
+        amount, cur = equity.get(t, (np.nan, "KRW"))
+        rate = 1.0 if cur == "KRW" else fx.get(cur, np.nan)
+        if mc > 0:
+            vals["bp"][t] = amount * rate / mc
     d = asof.date()
     return [(d, t, s, float(v)) for s, by in vals.items() for t, v in by.items() if np.isfinite(v)]
 
@@ -103,21 +130,60 @@ def fetch_inst_sum(tickers, days: pd.DatetimeIndex) -> dict:
     return out
 
 
-def load_panel(tickers):
-    from experiment_dart_events import api_key
-    from fundamentals_dart import DartStop, fetch_all, load_fundamentals_panel
+def load_equity(tickers, asof) -> dict:
+    """{ticker: (지배주주 자본, 통화)} - T에 알 수 있던 최신 보고서의 fnlttSinglAcntAll(연결, 없으면 별도).
+    응답은 data/dart/fsall_{ticker}_{연도}_{보고서}.json 에 캐시 - 새 보고서가 나올 때만 호출한다."""
+    from experiment_dart_events import CACHE_DIR, api_key, corp_codes
+    from fundamentals_dart import DartStop, _get, fetch_all, load_fundamentals_panel
     try:
         key = api_key()
     except SystemExit:  # 키 없음
         key = ""
+        log.warning("DART 키가 없어 캐시된 재무로만 bp 계산")
     if key:
         try:
             log.info("DART 재무 갱신: %s", fetch_all(tickers, key))
         except DartStop as e:
             log.error("DART 중단(%s) - 캐시된 재무로 bp 계산", e)
-    else:
-        log.warning("DART 키가 없어 새 재무를 받지 않고 캐시로 bp 계산")
-    return load_fundamentals_panel(fetch=False)
+            key = ""
+    panel = load_fundamentals_panel(fetch=False)
+    latest = latest_reports(panel[panel["ticker"].isin(set(tickers))], asof)
+    codes = corp_codes(key) if key else {}
+    out, stats = {}, {"calls": 0, "fails": 0}
+    for r in latest.itertuples():
+        path = os.path.join(CACHE_DIR, f"fsall_{r.ticker}_{r.bsns_year}_{REPRT_BY_Q[r.quarter]}.json")
+        j = None
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                j = json.load(f)
+        elif key and r.ticker in codes:
+            try:
+                for fs_div in ("CFS", "OFS"):
+                    j = _get("fnlttSinglAcntAll.json", {"crtfc_key": key, "corp_code": codes[r.ticker],
+                             "bsns_year": str(r.bsns_year), "reprt_code": REPRT_BY_Q[r.quarter], "fs_div": fs_div}, stats)
+                    if j is None or j["status"] == "000":
+                        break
+            except DartStop as e:
+                log.error("DART 중단(%s) - 남은 종목은 bp 없이 기록", e)
+                key = ""
+            if j and j["status"] == "000":
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(j, f, ensure_ascii=False)
+        if j and j.get("status") == "000":
+            out[r.ticker] = (parent_equity(j), r.currency)
+    log.info("지배주주 자본 %d/%d 종목 (DART 호출 %d, 실패 %d)", len(out), len(tickers), stats["calls"], stats["fails"])
+    return out
+
+
+def load_fx(asof) -> dict:
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""SELECT usd_krw_close FROM market_indicators
+                       WHERE trade_date <= %s AND usd_krw_close IS NOT NULL
+                       ORDER BY trade_date DESC LIMIT 1""", (asof.date(),))
+        row = cur.fetchone()
+        cur.close()
+    return {"USD": float(row[0])} if row else {}
 
 
 def insert_rows(rows):
@@ -141,16 +207,18 @@ def record(stocks):
     asof = closes["trade_date"].max()
     days = pd.DatetimeIndex(sorted(closes["trade_date"].unique()))
     try:
-        panel = load_panel(tickers)
+        equity, fx = load_equity(tickers, asof), load_fx(asof)
     except Exception:
-        log.exception("재무 패널 로드 실패 - bp 없이 기록")
-        panel = None
+        log.exception("재무 로드 실패 - bp 없이 기록")
+        equity, fx = {}, {}
     rows = compute(asof, tickers, marcap, closes, load_shorts(days[-min(10, len(days))]),
-                   fetch_inst_sum(tickers, days), panel)
+                   fetch_inst_sum(tickers, days), equity, fx)
     insert_rows(rows)
     counts = {s: sum(r[2] == s for r in rows) for s in SIGNALS}
-    level = logging.ERROR if min(counts.values()) < MIN_NAMES else logging.INFO
-    log.log(level, "신호 기록 %s 기준: %s (종목 %d)", asof.date(), counts, len(tickers))
+    # 공매도는 KRX T+2 공개라 저녁 실행에선 비는 게 정상(다음 날 아침 채움). 오래 비면 collect가 따로 ERROR
+    short_note = " - 공매도는 다음 실행에서 채움" if counts["short_ratio"] < MIN_NAMES else ""
+    level = logging.ERROR if min(v for s, v in counts.items() if s != "short_ratio") < MIN_NAMES else logging.INFO
+    log.log(level, "신호 기록 %s 기준: %s (종목 %d)%s", asof.date(), counts, len(tickers), short_note)
     return len(rows)
 
 

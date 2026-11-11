@@ -55,7 +55,7 @@ STOP_STATUSES = {"010", "011", "012", "020", "901"}  # 키 문제·일일 한도
 SLEEP = 0.1
 KRX_DESC_PATH = os.path.join(CACHE_DIR, "krx_desc.csv")
 COLUMNS = ["ticker", "avail_date", "period_end", "book_equity", "ni_ttm", "op_income_ttm",
-           "total_assets", "revenue_ttm", "is_financial", "amended"]
+           "total_assets", "revenue_ttm", "is_financial", "amended", "bsns_year", "quarter", "currency"]
 
 
 class DartStop(Exception):
@@ -152,7 +152,7 @@ def parse_report(j: dict):
             break
     else:
         return None
-    out = {"rcept_no": rows[0]["rcept_no"], "period_end": pd.NaT}
+    out = {"rcept_no": rows[0]["rcept_no"], "period_end": pd.NaT, "currency": rows[0].get("currency") or "KRW"}
     for name, acct in ACCOUNTS.items():
         hits = [x for x in rows if x["account_nm"].split("(")[0].replace(" ", "") == acct]
         hits = [x for x in hits if "지배" in x["account_nm"]] or hits
@@ -242,7 +242,8 @@ def build_panel(fs_by_ticker: dict, filings_by_ticker: dict, dates: pd.DatetimeI
                         "period_end": r["period_end"] if pd.notna(r["period_end"]) else _quarter_end(y, q),
                         "book_equity": r["book_equity"][0], "total_assets": r["total_assets"][0],
                         **{f"{f}_ttm": tt.at[(y, q), f] for f in FLOWS},
-                        "is_financial": t in fin, "amended": bool(amended)})
+                        "is_financial": t in fin, "amended": bool(amended),
+                        "bsns_year": y, "quarter": q, "currency": r["currency"]})
     df = pd.DataFrame(out, columns=COLUMNS)
     df["avail_date"] = pd.to_datetime(df["avail_date"])
     df["period_end"] = pd.to_datetime(df["period_end"])
