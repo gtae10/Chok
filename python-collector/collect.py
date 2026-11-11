@@ -282,6 +282,12 @@ def run():
         except Exception:
             logger.exception("공매도 잔고 수집 실패 (종목 시세는 정상 수집됨)")
 
+        try:
+            from forward_signals import record
+            record(top_stocks)
+        except Exception:
+            logger.exception("G단계 신호 기록 실패 (종목 시세는 정상 수집됨)")
+
         elapsed = (datetime.datetime.now() - start).seconds
         logger.info(f"=== 시세 수집 완료: {processed}/{total} 종목 ({elapsed}초) ===")
         return processed
