@@ -91,7 +91,8 @@ public class ChatFeedbackService {
     private static final int CONTEXT_MAX = 50;
     private static final Map<String, String> TAG_LABEL = Map.of(
             "MOMENTUM_TOP20", "모멘텀상위20%", "LOW_VOL20", "저변동성", "ISSUANCE_UP", "주식수증가",
-            "BUYBACK", "주식수감소", "NEWS_POS", "재료성호재", "NEWS_NEG", "재료성악재", "BREAKOUT_52W", "52주신고가돌파");
+            "BUYBACK", "주식수감소", "NEWS_POS", "재료성호재", "NEWS_NEG", "재료성악재", "BREAKOUT_52W", "52주신고가돌파",
+            "DART_BUYBACK", "자사주취득소각공시", "DART_DILUTION", "증자CB공시");
 
     private final Map<String, LlmProvider> providers;
     private final AppProperties appProperties;

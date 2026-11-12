@@ -515,6 +515,9 @@ public class RecommendationService {
         entity.setVol60(vol60);
         entity.setHigh52wGap(high52wGap);
         entity.setIssuance252(issuance252);
+        entity.setDartBuybackDt(stock.getDartBuybackDt());
+        entity.setDartDilutionDt(stock.getDartDilutionDt());
+        entity.setDartCheckedDt(stock.getDartCheckedDt());
         entity.setMaterialNewsScore(materialNewsScore);
         entity.setRecommendation(recommendation);
         entity.setRecommendationNuance(recommendationNuance);

@@ -21,6 +21,7 @@ evaluate_tags.py — 태그별 시장 대비 성과 집계 (C1). 태그 정의·
 """
 import argparse
 import datetime
+import glob
 import json
 import logging
 import os
@@ -41,6 +42,7 @@ RESULT_PATH = os.path.join("model", "tag_evaluation_result.json")
 EXPECTED_SIGN = {  # 사전 가설 - 반대 방향으로 나오면 크기와 무관하게 불통과
     "MOMENTUM_TOP20": +1, "LOW_VOL20": +1, "ISSUANCE_UP": -1,
     "BUYBACK": +1, "NEWS_POS": +1, "NEWS_NEG": -1, "BREAKOUT_52W": +1,
+    "DART_BUYBACK": +1, "DART_DILUTION": -1,  # 2026-11-12 추가 (PROJECT_PLAN D21)
 }
 MIN_WINDOWS = 6               # 겹치지 않는 창 최소 개수
 MIN_SAME_SIGN_SHARE = 0.7     # 가설 방향과 같은 부호인 창 비율
@@ -49,6 +51,7 @@ MIN_ABS_EXCESS = {5: 0.005, 20: 0.01, 50: 0.02}  # 창 평균 초과수익 크�
 # ── 태그 규칙: TagService.compute(Java)와 같은 규칙. 한쪽을 바꾸면 TagService.VERSION과 함께 둘 다 ──
 TOP_SHARE = 0.2
 ISSUANCE_THRESHOLD = 0.02
+DART_WINDOW_DAYS = 20  # 접수일 다음 거래일 = 1일째 ~ 20일째
 
 
 def top_share_mask(values: pd.Series, share: float) -> pd.Series:
@@ -62,13 +65,16 @@ def top_share_mask(values: pd.Series, share: float) -> pd.Series:
 
 
 def tags_for_day(day: pd.DataFrame) -> pd.DataFrame:
-    """day: 한 날짜의 유니버스 (ticker, momentum12m, vol60, issuance252, gap52) -> (ticker, tag) 행."""
+    """day: 한 날짜의 유니버스 (ticker, momentum12m, vol60, issuance252, gap52, dart_buyback_days,
+    dart_dilution_days = 최근 공시 접수일 이후 거래일 수, 없으면 NaN) -> (ticker, tag) 행."""
     masks = {
         "MOMENTUM_TOP20": top_share_mask(day["momentum12m"], TOP_SHARE),
         "LOW_VOL20": top_share_mask(-day["vol60"], TOP_SHARE),
         "ISSUANCE_UP": day["issuance252"] >= ISSUANCE_THRESHOLD,
         "BUYBACK": day["issuance252"] <= -ISSUANCE_THRESHOLD,
         "BREAKOUT_52W": day["gap52"] >= 0,
+        "DART_BUYBACK": day["dart_buyback_days"].between(1, DART_WINDOW_DAYS),
+        "DART_DILUTION": day["dart_dilution_days"].between(1, DART_WINDOW_DAYS),
     }
     return pd.concat([pd.DataFrame({"ticker": day.loc[m.fillna(False), "ticker"], "tag": tag})
                       for tag, m in masks.items()], ignore_index=True)
@@ -123,6 +129,33 @@ def summarize(tag_rows: pd.DataFrame, excess: pd.DataFrame, trading_days: pd.Ind
     return out
 
 
+def add_dart_days(day_df: pd.DataFrame, dates: pd.Index):
+    """종목·날짜별 '묶음의 가장 최근 공시 접수일 이후 거래일 수' 열 (TagService.tradingDaysBetween과 같은 셈).
+    experiment_dart_events가 남긴 data/dart/list_*.json 캐시만 쓴다 (API 호출 0회).
+    ponytail: 캐시는 2026-11-07 수집분까지라 그 뒤 날짜와 캐시 없는 종목은 '사건 없음'으로 잡힌다 -
+    백테스트 최근 구간을 늘리려면 캐시를 다시 받아야 한다."""
+    from collect import tag_event
+    from experiment_dart_events import CACHE_DIR
+    first = {}  # (ticker, 묶음) -> 접수일 다음 거래일의 위치들
+    for path in glob.glob(os.path.join(CACHE_DIR, "list_*.json")):
+        ticker = os.path.basename(path)[len("list_"):-len(".json")]
+        with open(path, encoding="utf-8") as f:
+            for row in json.load(f):
+                b = tag_event(row["report_nm"])
+                if b:
+                    first.setdefault((ticker, b), []).append(dates.searchsorted(pd.Timestamp(row["rcept_dt"]), "right"))
+    p = dates.get_indexer(day_df["trade_date"])
+    for b in ("buyback", "dilution"):
+        out = np.full(len(day_df), np.nan)
+        for t, idx in day_df.groupby("ticker").indices.items():
+            ev = np.sort(first.get((t, b), []))
+            if len(ev):
+                k = np.searchsorted(ev, p[idx], "right") - 1  # 그날까지 '다음 거래일'이 온 가장 최근 사건
+                out[idx] = np.where(k >= 0, p[idx] - ev[np.maximum(k, 0)] + 1, np.nan)
+        day_df[f"dart_{b}_days"] = out
+    return day_df
+
+
 def backtest() -> dict:
     price_df, universe_df = load_pit_price_history(extra_cols=("Marcap",))
     price_df = price_df.sort_values(["ticker", "trade_date"])
@@ -135,10 +168,10 @@ def backtest() -> dict:
     price_df["issuance252"] = np.log(shares / shares.groupby(price_df["ticker"]).shift(252))
     price_df = price_df.replace([np.inf, -np.inf], np.nan)
 
-    day_df = price_df.merge(universe_df, on=["ticker", "trade_date"], how="inner")
+    close = price_df.pivot(index="trade_date", columns="ticker", values="close_price").sort_index()
+    day_df = add_dart_days(price_df.merge(universe_df, on=["ticker", "trade_date"], how="inner"), close.index)
     tag_rows = pd.concat([tags_for_day(d).assign(trade_date=date) for date, d in day_df.groupby("trade_date")],
                          ignore_index=True)
-    close = price_df.pivot(index="trade_date", columns="ticker", values="close_price").sort_index()
     universe = universe_df.groupby("trade_date")["ticker"].apply(set).to_dict()
     log.info("backtest: %s ~ %s, 태그 %d건", close.index.min().date(), close.index.max().date(), len(tag_rows))
     return {h: summarize(tag_rows, excess_returns(close, universe, h), close.index, h) for h in HORIZONS}

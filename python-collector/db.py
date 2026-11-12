@@ -138,6 +138,16 @@ def update_issuance_rows(values):
                         [(v, t) for t, v in values.items()])
         cur.close()
 
+@retry_on_deadlock
+def update_dart_rows(rows):
+    """rows: [(dart_buyback_dt, dart_dilution_dt, dart_checked_dt, ticker)]. 조회에 실패한 종목은 rows에 없어 이전 값을 유지한다."""
+    if not rows:
+        return
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.executemany("UPDATE stocks SET dart_buyback_dt=%s, dart_dilution_dt=%s, dart_checked_dt=%s WHERE ticker=%s", rows)
+        cur.close()
+
 def _test_retry_on_deadlock():
     calls = {"n": 0}
 

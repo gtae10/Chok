@@ -82,6 +82,14 @@ public class Recommendation {
     @Column(name = "issuance_252")
     private Double issuance252; // 분석 시점의 Stock.issuance252
 
+    // 분석 시점의 Stock.dart_* (태그 DART_BUYBACK/DART_DILUTION)
+    @Column(name = "dart_buyback_dt")
+    private LocalDate dartBuybackDt;
+    @Column(name = "dart_dilution_dt")
+    private LocalDate dartDilutionDt;
+    @Column(name = "dart_checked_dt")
+    private LocalDate dartCheckedDt;
+
     @Column(name = "material_news_score")
     private Double materialNewsScore; // 최근 lookback 뉴스 중 |감성점수|가 가장 큰 값(부호 포함)
 
@@ -161,6 +169,13 @@ public class Recommendation {
     public void setVol60(Double vol60) { this.vol60 = vol60; }
     public Double getIssuance252() { return issuance252; }
     public void setIssuance252(Double issuance252) { this.issuance252 = issuance252; }
+
+    public LocalDate getDartBuybackDt() { return dartBuybackDt; }
+    public void setDartBuybackDt(LocalDate dartBuybackDt) { this.dartBuybackDt = dartBuybackDt; }
+    public LocalDate getDartDilutionDt() { return dartDilutionDt; }
+    public void setDartDilutionDt(LocalDate dartDilutionDt) { this.dartDilutionDt = dartDilutionDt; }
+    public LocalDate getDartCheckedDt() { return dartCheckedDt; }
+    public void setDartCheckedDt(LocalDate dartCheckedDt) { this.dartCheckedDt = dartCheckedDt; }
     public Double getMaterialNewsScore() { return materialNewsScore; }
     public void setMaterialNewsScore(Double materialNewsScore) { this.materialNewsScore = materialNewsScore; }
 

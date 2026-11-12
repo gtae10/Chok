@@ -8,7 +8,7 @@ import FinanceDataReader as fdr
 import numpy as np
 import pandas as pd
 import config
-from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows, update_issuance_rows, upsert_short_rows, max_short_trade_date
+from db import upsert_stock, insert_price_rows, upsert_market_indicator_rows, update_issuance_rows, update_dart_rows, upsert_short_rows, max_short_trade_date
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -181,6 +181,75 @@ def update_issuance(tickers):
     logger.info(f"순발행 갱신: {len(values)}/{len(tickers)} 종목 (marcap 기준일 {marcap['Date'].max():%Y-%m-%d})")
 
 
+DART_LOOKBACK_DAYS = 60  # 달력일. 태그 창 20거래일을 넉넉히 덮는다
+DART_BUNDLES = {"buyback": {"buyback", "cancel"}, "dilution": {"rights_offering", "convertible"}}  # PROJECT_PLAN D21
+
+
+def tag_event(report_nm: str):
+    """공시 제목 -> 태그 묶음 "buyback"(DART_BUYBACK) / "dilution"(DART_DILUTION) / None.
+    정정 공시는 classify가 거르고(최초만), 자회사 공시("자회사의 주요경영사항")는 그 종목의 사건이 아니라 뺀다."""
+    from experiment_dart_events import classify
+    if "자회사" in report_nm:
+        return None
+    ev = classify(report_nm)
+    return next((b for b, evs in DART_BUNDLES.items() if ev in evs), None)
+
+
+def _dart_latest(key, corp_code, bgn, today, stats):
+    """한 종목의 B·I 공시를 bgn~today 조회해 묶음별 최신 접수일(오늘 접수분 제외)을 돌려준다. 실패하면 None.
+    오늘 접수분을 빼는 이유: 태그는 다음 거래일부터 붙고, 오늘 것으로 덮으면 그 전 사건이 하루 사라진다."""
+    from experiment_dart_events import PBLNTF_TYPES
+    from fundamentals_dart import _get
+    found = {}
+    for ty in PBLNTF_TYPES:
+        page = 1
+        while True:
+            j = _get("list.json", {"crtfc_key": key, "corp_code": corp_code, "bgn_de": bgn, "end_de": today,
+                                   "pblntf_ty": ty, "page_no": page, "page_count": 100}, stats)
+            if j is None:
+                return None
+            for x in j.get("list", []):  # 013(조회 결과 없음)이면 list가 없다
+                b, d = tag_event(x["report_nm"]), x["rcept_dt"]
+                if b and d < today:
+                    found[b] = max(found.get(b, d), d)
+            if page >= int(j.get("total_page", 1)):
+                break
+            page += 1
+    return found
+
+
+def update_dart_events(tickers):
+    """종목마다 최근 DART_LOOKBACK_DAYS일 공시를 조회해 stocks.dart_*_dt(묶음별 최신 접수일)와 dart_checked_dt(오늘)를 갱신.
+    사건이 없으면 날짜 null = 확인했고 없음. 조회 실패 종목은 갱신하지 않아 checked_dt가 오늘이 아니게 남고,
+    TagService는 그 종목을 미확인으로 보고 태그를 판정하지 않는다."""
+    from experiment_dart_events import api_key, corp_codes
+    from fundamentals_dart import DartStop
+    try:
+        key = api_key()
+    except SystemExit:  # 키가 없으면 SystemExit - except Exception에 안 잡혀 수집 전체가 죽으므로 여기서 잡는다
+        logger.warning("DART API 키(DART_API_KEY 또는 chok.dart.api-key)가 없어 공시 갱신을 건너뜁니다.")
+        return 0
+    codes = corp_codes(key)
+    missing = [t for t in tickers if t not in codes]
+    if missing:  # 우선주는 원래 없음. 신규 상장이면 data/dart/CORPCODE.xml 을 지워 다시 받는다
+        logger.warning(f"DART 고유번호 없음 {len(missing)}종목(미확인으로 남음): {missing[:10]}")
+    today = datetime.datetime.now(KST).date()
+    bgn = (today - datetime.timedelta(days=DART_LOOKBACK_DAYS)).strftime("%Y%m%d")
+    iso = lambda d: d and f"{d[:4]}-{d[4:6]}-{d[6:]}"
+    stats, rows = {"calls": 0, "fails": 0}, []
+    try:
+        for t in tickers:
+            found = _dart_latest(key, codes[t], bgn, today.strftime("%Y%m%d"), stats) if t in codes else None
+            if found is not None:
+                rows.append((iso(found.get("buyback")), iso(found.get("dilution")), today.isoformat(), t))
+    except DartStop as e:
+        logger.warning(f"DART 키·한도 문제로 공시 갱신 중단 ({e}) - 이미 조회한 {len(rows)}종목만 저장, 나머지는 미확인")
+    finally:  # 예상 밖 예외에도 이미 조회한 종목은 저장한다 (예외는 그대로 올라감)
+        update_dart_rows(rows)
+    logger.info(f"DART 공시 갱신 {len(rows)}/{len(tickers)} (API 호출 {stats['calls']}회, 실패 {stats['fails']}회)")
+    return len(rows)
+
+
 SHORT_MAX_BACKFILL_DAYS = 60  # 달력일. 마지막 저장일 다음날부터 메우되, 아무리 오래 비어도 이만큼만 거슬러 간다
 SHORT_STALE_DAYS = 7  # 최신 저장일이 이보다 오래되면 KRX 로그인/pykrx 문제로 보고 ERROR
 
@@ -281,6 +350,11 @@ def run():
             fetch_short_balance([s["ticker"] for s in top_stocks])
         except Exception:
             logger.exception("공매도 잔고 수집 실패 (종목 시세는 정상 수집됨)")
+
+        try:
+            update_dart_events([s["ticker"] for s in top_stocks])
+        except Exception:
+            logger.exception("DART 공시 갱신 실패 (종목 시세는 정상 수집됨, 이전 값 유지 = 오늘은 미확인)")
 
         try:
             from forward_signals import record

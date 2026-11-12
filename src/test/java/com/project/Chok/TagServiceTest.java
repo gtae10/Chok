@@ -64,6 +64,40 @@ class TagServiceTest {
         assertThat(tags.get("NONE")).isEmpty();
     }
 
+    private static Recommendation dart(String ticker, LocalDate filed, LocalDate recDate, LocalDate checked) {
+        Recommendation r = rec(ticker, null, null, null, null);
+        r.setRecDate(recDate);
+        r.setDartCheckedDt(checked);
+        r.setDartBuybackDt(filed);
+        r.setDartDilutionDt(filed);
+        return r;
+    }
+
+    @Test
+    @DisplayName("DART 공시 태그는 접수일 다음 거래일부터 20거래일, 그날 조회에 성공한 종목만")
+    void tagsDartDisclosureWindow() {
+        LocalDate filed = LocalDate.of(2026, 11, 2);
+        LocalDate d1 = TagService.addTradingDays(filed, 1);
+        LocalDate d20 = TagService.addTradingDays(filed, 20);
+        LocalDate d21 = TagService.addTradingDays(filed, 21);
+        Map<String, List<String>> tags = TagService.compute(List.of(
+                dart("D1", filed, d1, d1),
+                dart("D20", filed, d20, d20),
+                dart("SAME", filed, filed, filed),          // 접수일 당일은 아직 안 붙음
+                dart("D21", filed, d21, d21),
+                dart("UNCHECKED", filed, d1, filed),        // 오늘 조회 실패 = 미확인 -> 판정 안 함
+                dart("NONE", null, d1, d1),
+                // 금요일(11/13) 접수 -> 토요일(11/14) 분석: 날짜는 다음 날이지만 거래일로는 0일째라 안 붙음
+                dart("SAT", LocalDate.of(2026, 11, 13), LocalDate.of(2026, 11, 14), LocalDate.of(2026, 11, 14))));
+        assertThat(tags.get("D1")).containsExactly(TagService.DART_BUYBACK, TagService.DART_DILUTION);
+        assertThat(tags.get("D20")).containsExactly(TagService.DART_BUYBACK, TagService.DART_DILUTION);
+        assertThat(tags.get("SAME")).isEmpty();
+        assertThat(tags.get("D21")).isEmpty();
+        assertThat(tags.get("UNCHECKED")).isEmpty();
+        assertThat(tags.get("NONE")).isEmpty();
+        assertThat(tags.get("SAT")).isEmpty();
+    }
+
     @Test
     @DisplayName("평일 수는 다음 날부터 to까지, 주말은 건너뛴다")
     void countsWeekdaysBetween() {

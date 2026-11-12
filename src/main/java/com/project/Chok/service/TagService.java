@@ -41,12 +41,16 @@ public class TagService {
     public static final String NEWS_NEG = "NEWS_NEG";
     // 2026-10-02 추가(PROJECT_PLAN D14b). 이 태그의 실전 기록은 추가일부터 시작한다.
     public static final String BREAKOUT_52W = "BREAKOUT_52W";
+    // 2026-11-12 추가(PROJECT_PLAN D21). 실전 기록은 각 태그의 첫 스냅샷부터.
+    public static final String DART_BUYBACK = "DART_BUYBACK";
+    public static final String DART_DILUTION = "DART_DILUTION";
 
     static final double TOP_SHARE = 0.2;
     static final double ISSUANCE_THRESHOLD = 0.02;       // log 기준 약 ±2% 주식수 변화
     // 0.6(감성 프롬프트의 재무 임팩트 경계)은 첫날 100종목 중 56개가 호재로 걸려 구분력이 없었다.
     // 0.8 = 개별 뉴스 1,718건 중 상위 0.6% (2026-09-30 실측, PROJECT_PLAN D13)
     static final double MATERIAL_NEWS_THRESHOLD = 0.8;
+    static final int DART_WINDOW_DAYS = 20; // 접수일 다음 거래일부터 20거래일
 
     private final RecommendationRepository recommendationRepository;
     private final TagSnapshotRepository tagSnapshotRepository;
@@ -84,9 +88,22 @@ public class TagService {
             if (r.getMaterialNewsScore() != null && r.getMaterialNewsScore() >= MATERIAL_NEWS_THRESHOLD) t.add(NEWS_POS);
             if (r.getMaterialNewsScore() != null && r.getMaterialNewsScore() <= -MATERIAL_NEWS_THRESHOLD) t.add(NEWS_NEG);
             if (r.getHigh52wGap() != null && r.getHigh52wGap() >= 0) t.add(BREAKOUT_52W);
+            if (recentDisclosure(r.getDartBuybackDt(), r)) t.add(DART_BUYBACK);
+            if (recentDisclosure(r.getDartDilutionDt(), r)) t.add(DART_DILUTION);
             tags.put(r.getTicker(), t);
         }
         return tags;
+    }
+
+    /**
+     * 접수일 dt가 분석일 기준 1~20거래일 전인가 (접수일 당일은 아님 - D18 avail_date와 같은 시점 규칙).
+     * 그날 DART 조회에 성공한 종목(dartCheckedDt == recDate)만 판정한다 - 미확인은 "없음"이 아니다.
+     */
+    static boolean recentDisclosure(LocalDate dt, Recommendation r) {
+        if (dt == null || !r.getRecDate().equals(r.getDartCheckedDt()) || !dt.isBefore(r.getRecDate())) return false;
+        // 거래일 수로 센다: 주말·휴장일 분석이면 접수 다음 날이어도 0일째일 수 있다(그날은 안 붙음)
+        int n = tradingDaysBetween(dt, r.getRecDate());
+        return n >= 1 && n <= DART_WINDOW_DAYS;
     }
 
     /**
@@ -110,6 +127,10 @@ public class TagService {
         compute(recs).forEach((ticker, tags) ->
                 tags.forEach(tag -> rows.add(new TagSnapshot(date, ticker, tag, VERSION))));
         tagSnapshotRepository.saveAll(rows);
+        // 그날 DART 조회가 통째로 실패하면 공시 태그가 전부 '없음'처럼 기록된다 - 판정 때 가려낼 수 있게 남긴다
+        if (!recs.isEmpty() && recs.stream().noneMatch(r -> date.equals(r.getDartCheckedDt()))) {
+            log.warn("태그 스냅샷 {}: DART 공시 확인 종목 0개 - 공시 태그는 미확인(없음 아님)", date);
+        }
         log.info("태그 스냅샷 저장: {} 날짜, {}종목, {}건", date, recs.size(), rows.size());
         return rows.size();
     }

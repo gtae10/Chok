@@ -93,7 +93,7 @@ C를 통과한 것만 A로 올린다.
 | **B1** | 상승확률 화면 제거 + 사실 태그 v1 표시 | 작음 | **구현 (2026-09-30)** |
 | **C1** | 태그 스냅샷 기록 + 태그별 백테스트/실전 성과 집계 | 중간 | **구현 (2026-09-30), 실전 기록 대기** |
 | 대기 | 실전 기록 누적. 5일 판정 약 2026-12 말(10월 기록 공백으로 연기, D20), 20일 약 2027-04 초(10월 공백 반영, 52주 신고가 후보 20일 예상 2027-04-09와 같은 규모), 50일 약 2027-12 (5.3) | 몇 달 | 진행 중 |
-| **B2** | DART 공시·재무 태그(유상증자·자사주 등), 재무 요약을 AI 리포트에 추가. AI Berkshire식 관점 분석은 이 단계의 선택 기능 | 중간 | 보류 (API 키 필요) |
+| **B2** | DART 공시·재무 태그(유상증자·자사주 등), 재무 요약을 AI 리포트에 추가. AI Berkshire식 관점 분석은 이 단계의 선택 기능 | 중간 | **구현 (2026-11-12)** — 공시 사실 태그 2개(`DART_BUYBACK`·`DART_DILUTION`, D21). 재무 요약·AI 리포트는 미착수 |
 | **C2** | 성과 화면(태그별 실전 성과를 대시보드에서 보기), 태그 v2 후보 | 중간 | 일부 구현(실전 성과 표시, 2026-11-12) |
 | **A** | C를 통과한 태그만 조합한 예측. 표시는 "시장 대비 우위 확률"로, 실제 적중률과 맞는지(보정) 확인 | 중간 | C 결과 대기 |
 
@@ -125,6 +125,8 @@ C를 통과한 것만 A로 올린다.
 | `ISSUANCE_UP` | 주식수 증가 | 순발행 log(N_t / N_t−252) ≥ +0.02 | `issuance_252` · `collect.compute_issuance` | 가능 | − |
 | `BUYBACK` | 주식수 감소 | 순발행 ≤ −0.02 | 〃 | 가능 | + |
 | `BREAKOUT_52W` | 52주 신고가 돌파 | 오늘 종가 ≥ 직전 252영업일(오늘 제외) 최고 종가 (2026-10-02 추가, D14b) | `high_52w_gap` · `TechnicalAnalysisService.high52wGap` | 가능 | + |
+| `DART_BUYBACK` | 자사주 취득·소각 공시 | 자기주식 취득(신탁 포함)·주식 소각 결정 공시 접수일 다음 거래일부터 20거래일 (2026-11-12 추가, D21) | `dart_buyback_dt`·`dart_checked_dt` · `collect.update_dart_events` | 가능 (공시 캐시 2026-11-07까지) | + |
+| `DART_DILUTION` | 증자·CB 공시 | 유상증자·CB·BW·EB 발행 결정 공시 접수일 다음 거래일부터 20거래일 (2026-11-12 추가, D21) | `dart_dilution_dt`·`dart_checked_dt` · 〃 | 가능 (〃) | − |
 | `NEWS_POS` | 재료성 호재 | 최근 lookback(3일) 뉴스 중 \|감성점수\| 최대값이 ≥ +0.8 | `material_news_score` · `RecommendationService.strongestRecentNewsScore` | **불가** (과거 뉴스 소급 불가) | + |
 | `NEWS_NEG` | 재료성 악재 | 위 값이 ≤ −0.8 | 〃 | **불가** | − |
 
@@ -139,6 +141,14 @@ C를 통과한 것만 A로 올린다.
   100종목 중 호재 56·악재 22개가 걸려 구분력이 없었다. 최근 3일 뉴스 여러 건의 최대값을 쓰므로 개별 기준보다 자주 걸린다.
   실측 분포: 경계 0.7 → 32/10, **0.8 → 8/2**, 0.9 → 0/0. 0.8은 개별 뉴스 1,718건 중 상위 0.6%. 순위형(상위 10%)은 재료 뉴스가 없는 날에도
   억지로 태그가 붙어 "재료성"의 뜻과 맞지 않아 택하지 않았다
+- **DART 공시 태그(D21)**: OpenDART `list.json`(pblntf_ty B 주요사항보고·I 거래소공시) 공시 중 제목이 `experiment_dart_events.EVENTS`의
+  키워드에 맞는 것. `DART_BUYBACK` = {buyback 자기주식취득결정·자기주식취득신탁계약체결결정, cancel 주식소각결정},
+  `DART_DILUTION` = {rights_offering 유상증자결정, convertible 전환사채권·신주인수권부사채권·교환사채권발행결정}.
+  EB는 자사주를 내주는 것이라 엄밀히는 새 주식 발행(희석)이 아니다 — 포함한 것은 사용자 결정이고 이 정의의 한계로 둔다.
+  정정 공시(제목이 `[`로 시작)는 제외해 최초 공시만, 제목에 "자회사"가 들어간 공시(자회사의 주요경영사항)도 제외.
+  **시점**: 접수일 당일엔 안 붙고 `tradingDaysBetween(접수일, T)`가 1~20인 날 붙는다(D18 avail_date와 같은 규칙 — 공시 시각을 모름).
+  수집기는 종목마다 최근 60달력일을 조회해 묶음별 최신 접수일(오늘 접수분 제외)과 `dart_checked_dt`(조회 성공일, KST)를 저장한다.
+  **미확인 ≠ 없음**: `dart_checked_dt ≠ 분석일`(키 없음·한도·조회 실패)이면 그 종목은 이 두 태그를 판정하지 않는다
 - **사전 가설 근거**: 모멘텀·저변동성·순발행은 문헌상 반복 보고된 효과. 순발행은 이 프로젝트의 PIT 실험에서도 10개 폴드 모두 음(README 14번)
 
 > **구현 현황 (2026-09-30)** — `tag_snapshots`와 `recommendations`의 새 열은 Spring 재시작 시 `ddl-auto=update`로 생긴다.
@@ -208,6 +218,7 @@ C를 통과한 것만 A로 올린다.
    ├─ 시총 상위 100 → stocks (base_date = 오늘)
    ├─ 5년 일봉 → price_history      ※ 16:00 KST 전이면 오늘 행 제외 (confirmed_until, D6)
    ├─ marcap(올해+작년) → 순발행 → stocks.issuance_252
+   ├─ DART 공시 → stocks.dart_buyback_dt · dart_dilution_dt · dart_checked_dt (최근 60일, D21)
    └─ forward_signals.record → signal_snapshots (bp·short_ratio·inst20·vol60, 처음 값 유지, D19) + 최근 10거래일 누락 경고(D20)
 
 [RecommendationService.runFullAnalysis]  (최근 수집 기준 상위 100만)
@@ -237,7 +248,7 @@ C를 통과한 것만 A로 올린다.
 | `service/TechnicalAnalysisService.java` | `momentum12m`, `volatility60` |
 | `service/RecommendationService.java` | 태그 입력값 저장, 분석 끝에 스냅샷 |
 | `static/js/tags.js` | 태그 라벨·정의(툴팁)·근거, 화면 하단 "지표·태그 설명" — 대시보드·상세 공용 |
-| `python-collector/collect.py` | `confirmed_until`, `compute_issuance`, `update_issuance` |
+| `python-collector/collect.py` | `confirmed_until`, `compute_issuance`, `update_issuance`, `tag_event`, `update_dart_events` |
 | `python-collector/evaluate_tags.py` | 태그 성과 집계·판정, `ksTrendLive` |
 | `python-collector/forward_signals.py` | 전향 검증 신호 기록(`signal_snapshots`), 누락 경고 |
 | `domain/SignalSnapshot.java` | `signal_snapshots` (trade_date, ticker, signal_name, recorded_at) |
@@ -272,6 +283,8 @@ C를 통과한 것만 A로 올린다.
 | D18 | 2026-11-11 | B단계 1회차 **cross-sectional 실험 사전 등록** (실행 전 고정, 결과는 실행 후 같은 행에 덧붙임) | `experiment_cross_section.py` → `model/cross_section_round1_result.json`. **타깃**: 신호 T 종가, 유니버스 = T 시점 marcap 시총 상위 100(PIT 2020~), 진입 T+1 종가 → 청산 T+1+N 종가, r = P(T+1+N)/P(T+1) − 1, e = r − 그날 유니버스 동일가중 평균, 날짜 안 1·99분위 winsorize 후 z-score = y. N=20 판정, 5·60은 보고만. **후보(방향 고정, 단독 순위, 학습 없음)**: H1 B/P = 자본/T 시총(+), H2 E/P = 순이익TTM/시총(+), H3 영업이익TTM/총자산(+, 금융업 NaN), H4 업종 모멘텀 = 같은 업종(KRX-DESC Industry, 없으면 KRX-DELISTING, 스냅샷 `data/krx_desc.csv`) **자기 제외** 유니버스 종목 mom12_1 평균(+, 업종 내 유니버스 종목 3 미만 NaN), H5 overnight = 직전 252거래일(T 포함, 유효 ≥200일) gap 평균×252, gap = Open/(Close−Changes) − 1(Open=0 NaN)(+). 재무는 avail_date(최초 접수 다음 거래일) ≤ T 인 최신값(merge_asof). **확인용(보고만, holdout 판정 없음)**: C1 순발행(−), C2 공매도 비중 T+2 지연(−), C3 기관 20일 순매수/시총(−), C4 mom12_1(+). 진단: vol60. **지표**: 날짜별 Spearman IC(부호 맞춤, 날짜당 ≥20종목), make_time_folds 10폴드 IC, 겹치지 않는 N일 창 IC 평균·t, 5분위 Q5−Q1 평균 초과수익(창), 0.3% 왕복 × 실제 회전율 차감 스프레드, 커버리지. **분할**: 개발 신호 2021-01-01~2024-06-30(청산 ≥ 2024-07-01 제거), holdout 신호 2024-07-01~끝. **개발 통과(N=20, 각각)**: IC 부호 = 가설, \|IC\| ≥ 0.02, 같은 부호 폴드 ≥ 7/10, Q5−Q1(비용 전) 같은 부호 ≥ 1.0%. Bonferroni(×5) p는 정보. **holdout**: 개발 통과만 1회(코드 게이트): IC 부호 같음, IC ≥ 개발 IC × 0.5, Q5−Q1(비용 전) > 0. **합성**: 개발 통과 ≥ 2개면 부호 맞춘 순위 동일가중 — holdout IC가 C4 단독보다 높아야 채택. 후보 9개(H1~H5 + C1~C4). **결과(1차 실행 2026-11-11, PIT 2021-01-04~2026-11-09, 날짜당 100종목, 개발 N=20)**: H1~H3 **데이터 대기**(재무 패널이 신호 종목 8%만 수집된 상태 — 80% 이상일 때 재실행), H4 업종 모멘텀 IC −0.014·폴드 6/10·Q5−Q1 −0.09%(커버리지 51%) **불통과**, H5 overnight IC −0.055·폴드 2/10·창 t −1.89·Q5−Q1 −0.12% **불통과(가설과 반대 방향)**. holdout 미사용. 확인용(부호 맞춤, 보고만): C1 +0.023(Q5−Q1 −0.63%), C2 공매도 +0.064(9/10, +0.83%), C3 기관 +0.048(9/10, +1.04%), C4 mom12_1 −0.010(+0.74%). 진단 vol60(+) IC −0.099·Q5−Q1 −0.96% — 연속 타깃에서는 IC와 스프레드 부호가 같아짐. **H1~H3 후속 실행(같은 날, 재무 패널 209종목·신호 종목 98%)**, 개발 N=20: H1 B/P IC +0.075·폴드 8/10·창 t +2.74·Q5−Q1 **+0.996%**(기준 1.0%에 0.004%p 미달)·비용 후 +0.92% **불통과**, H2 E/P IC +0.032·6/10·Q5−Q1 −1.08% 불통과, H3 영업이익/총자산 IC −0.005·6/10·−0.66% 불통과. 정정(amended) 제외 민감도(진단): H1 +0.074/+0.94%, H2 +0.031/−0.82%, H3 −0.009/−1.04% — 결론 같음. **사고 기록**: 첫 후속 실행에서 개발 판정이 4자리 반올림 값(0.009961→0.0100)을 읽어 H1을 통과로 처리하고 **holdout을 1회 열었다**(IC +0.055, Q5−Q1 +1.90%). 등록 기준상 H1은 개발 불통과이므로 이 holdout은 **판정 무효**(`holdoutInvalid`로만 보관), 반올림 버그는 고쳤다. holdout 2024-07~ 구간은 B/P 정보에 대해 이제 오염됐다 — B/P를 2회차로 다시 보려면 새 holdout이 필요. **최종: 9개 중 개발 통과 0, 채택 없음, 합성 없음** |
 | D19 | 2026-11-11 | **G단계 전향 검증 사전 등록** (B단계에서 일관됐던 신호 4개를 고정해 앞으로의 데이터로만 판정) | **기록**: `forward_signals.py` → `signal_snapshots`(collect.py 실행마다, 하루 2회). 같은 (날짜, 종목, 신호)는 **처음 값 유지**(INSERT IGNORE) + `recorded_at` — 나중에 다시 계산하면 DART 정정값 같은 그때 몰랐던 값이 섞이므로 기록 자체를 검증 대상으로 쓴다. **신호·방향(고정, 바꾸면 새 실험·기록 새로 시작)**: bp = **지배주주 자본**(avail_date ≤ T 최신 보고서, D18과 같은 시점 규칙; DART `fnlttSinglAcntAll` 연결 `EquityAttributableToOwnersOfParent`, 비지배지분이 없으면 자본총계; 외화 공시는 T 이전 최신 원/달러 환율로 환산)/T 시총(+), short_ratio = 2거래일 전 공매도 잔고 비중(−), inst20 = 기관합계 순매수 거래대금 최근 20거래일 합/T 시총(−, pykrx `get_market_trading_value_by_date`), vol60 = 일간 수익률 60일 표준편차(−). **D18과 다른 점**: bp 분자 — D18은 비지배지분 포함 자본총계를 썼고 USD 공시 2종목(두산밥캣·코오롱티슈진)을 환산하지 않았다 (예: SK 3.33→1.05, HD현대 3.59→1.26, 두산밥캣 ≈0→1.37). 기록 시작 전(2026-11-11)에 고쳤고, D18은 오염된 기간이라 다시 돌리지 않는다(시도 수만 늘어남) — D18의 B/P 근거는 이 결함을 포함한 값이다. 우선주·인프라펀드는 정기보고서가 없어 bp 없음. 유니버스 = 그날 FDR 시총 상위 100, 시총 = 수집 시점 FDR Marcap, 가격 = price_history. 공매도는 KRX T+2 공개라 저녁 실행에서 비고 다음 날 아침 실행에서 채워진다. **타깃**: D18과 같음(T+1 종가 → T+21 종가, 유니버스 평균 초과, 날짜 안 1·99분위 winsorize z). **쓰는 행**: `recorded_at` < T+1 15:30 KST(진입 종가 전)인 기록만. **지표**: 겹치지 않는 20거래일 창마다 신호별 Spearman IC(부호 맞춤, ≥20종목)와 Q5−Q1 초과수익, 0.3% 왕복 × 회전율 차감. **1차 점검(6창, 약 2027-05)**: 계속/중단만 — 창 IC 평균 ≤ 0인 신호는 기록만 유지하고 후보에서 뺀다. **판정(12창, 약 2027-11)**: 신호별로 창 IC 평균 ≥ 0.02, IC > 0인 창 ≥ 8/12, Q5−Q1(비용 전) 평균 ≥ 1.0%, 비용 후 > 0 — 모두 만족하면 '실전 사용 후보'. Bonferroni(×4)는 정보. ▶ 한계: 12창은 검정력이 낮다(창 IC 표준편차 0.15면 t=2에 평균 0.087 필요) — 통과는 증거가 아니라 다음 단계 진입 조건. B/P는 D18 holdout 오염으로 이것이 유일한 깨끗한 검증. 평가 스크립트는 1차 점검 때 이 기준대로 작성한다 |
 | D20 | 2026-11-12 | 전향 기록 누락 경고, 상승확률 모델 AUC 저장 기준, KS_TREND 실전 판정 집계·태그 보드 실전 성과 표시 | **(1) 누락 경고**: `forward_signals.check_gaps` — 최근 10거래일 `signal_snapshots`에서 평가에 쓸 수 있는 행(`recorded_at` < 다음 거래일 15:30, D19)이 20종목 미만인 (날짜, 신호)를 WARNING. 이유: short_ratio는 T+1의 16:00 전 실행에서만 채워지는데, 그 실행이 16:00 이후로 밀리면 asof가 넘어가 T 값이 영영 빈다(2026-11-12 첫 실행이 08:30 예약이 아니라 16:38에 돎). 예약 작업 WakeToRun 설정은 사용자 결정 대기. **(2) AUC 저장 기준**: `train_model` holdout AUC < 0.55(Java `minAucForHighlight`와 같은 값)면 모델을 저장하지 않고 기존 파일 유지, 기본 배포 기간이 저장 안 되면 ERROR — F2·Q4 닫힘. 현재 저장 모델은 모두 AUC 0.49~0.51이라 재학습해도 갱신되지 않는다. **(3) KS_TREND 실전 판정**: `evaluate_tags.py`가 D17 등록 그대로(`experiment_entry_round2`의 judge·국면 재사용) 집계 → 결과 키 `ksTrendLive`. `--live-only`는 기존 결과와 병합(이전엔 DB 실패 시 backtest가 빠진 파일로 덮어씀 — 2026-11-12 실제 발생, git restore로 복구), 깨진 결과 파일이면 멈춤, 원자적 저장(.tmp → replace), live 성공 시각 `liveAt` 기록. **(4) 화면**: `/api/tags/board`에 `evaluatedAt`(=liveAt)·`liveEvaluation`·`ksTrendLive`, 태그 보드에 태그·기간별 창 평균 초과수익·일관성·판정(방향 색 없음, D3). **결과(2026-11-12 22:36 집계)**: 실전 5일 판정 **불가 — 창 1/6**. 태그 기록일이 2026-09-30~11-12 사이 13일뿐(거래일 약 31일 중)이라 5일 수익이 완성된 기록일이 태그당 4일, 겹치지 않는 창 1개. 10월 대부분이 기록되지 않았다(무인 하루 두 번 실행은 2026-11-06부터). 창 1개의 값은 판정에 쓰지 않는다. 지금부터 매일 기록되면 5일 6창은 약 2026-12 말. KS_TREND는 시작 2026-11-11이라 창 0개(정상). 함께 확인: DB `NOW()`가 KST와 일치(`@@time_zone`=SYSTEM, 로컬 MySQL), KS11 종가 1,246행. 참고: 실제 DB는 로컬 MySQL(`application.properties`)이고 `.env`의 `DB_HOST`는 꺼진 Aiven 클라우드 DB를 가리킨다 — 수동 실행 때 `.env`를 불러오면 접속 실패 |
+| D21 | 2026-11-12 | B2: **DART 공시 사실 태그 2개 추가** — `DART_BUYBACK`(자사주 취득·소각 공시, 가설 +), `DART_DILUTION`(증자·CB 공시, 가설 −). 기록 전에 고정 | **정의**: 4장(OpenDART list.json B·I, 키워드 = `experiment_dart_events.EVENTS`의 {buyback, cancel} / {rights_offering, convertible}, 정정·자회사 공시 제외, 접수일 다음 거래일부터 20거래일, 접수일 당일 제외 — D18 avail_date와 같은 시점 규칙). **가설 근거는 문헌**: 자사주 취득 뒤 장기 초과수익(Ikenberry·Lakonishok·Vermaelen 1995), 신규 발행 뒤 장기 부진(Loughran·Ritter 1995). **우리 실험**(`experiment_dart_events.py` → `model/dart_events_experiment_result.json`, 2026-11-07, PIT 시총 상위 100, D1 시가 진입, 유니버스 평균 초과): rights_offering n=260 post5 −0.50%(t −1.24)·post20 −0.64%(t −0.82), buyback n=239 post5 +0.24%·post20 +0.53%(t 0.67), **cancel n=221 post20 −0.68%(t −0.82) — 가설과 반대 방향**, convertible n=46 post20 +0.26%(t 0.12), 대조군(무작위) post5 +0.16%(t 1.14). **모두 유의하지 않다.** 소각을 취득과 묶은 것은 문헌 근거에 따른 사용자 결정이고, 우리 실험에서 소각이 반대였다는 사실을 여기 그대로 남긴다. 실험에서 채택 기준을 통과한 유일한 종류인 dividend(post5 −0.56%, t −3.03)는 사후에 고르는 것이 되므로 **일부러 고르지 않았다**. **다중 비교**: 공시 10종류 × 2기간(post5·post20)을 본 뒤 2개를 골랐다. 태그는 이제 9개 × 3기간 = 27칸이 판정 대상 — Bonferroni(×27)는 정보로만 적는다. **판정**: 5장 v1 그대로(겹치지 않는 창 ≥6, 가설 방향, |창 평균| ≥0.5/1.0/2.0%, 일관성 ≥70%). **실전 기록 시작일** = 각 태그의 첫 스냅샷. `tag_version`은 v1 유지(D14b BREAKOUT_52W 추가 선례 — 기존 태그 정의는 그대로고 새 태그만 늘었다). **미확인 ≠ 없음**: 그날 DART 조회에 성공한 종목(`dart_checked_dt` = 분석일)만 판정, 실패·키 없음이면 태그를 붙이지 않는다(실전 집계에선 그 종목·그날이 태그 없는 유니버스 종목으로 섞이는 한계는 남는다 — 갱신 로그 'DART 공시 갱신 n/100'으로 확인). **실험과 다른 점**: 실험 캐시엔 자회사 공시가 묶음에 따라 7~12% 섞여 있었고 태그에선 뺐다. 백테스트(`evaluate_tags.py`)는 실험 캐시 `data/dart/list_*.json`을 다시 쓰므로(API 호출 0회) 2026-11-07 이후는 사건 없음으로 잡힌다 |
+| D22 | 2026-11-12 | 뉴스 따라잡기로 더 받은 기사는 **보관만**, 감성 평균·재료성 태그(NEWS_POS/NEG) 입력에는 평소 실행의 표본만 | PC가 꺼졌던 다음 날 따라잡기(`fetchNewsSince`, 최대 10페이지)로 기사를 평소의 6배 넘게 분석해(2026-11-12 실측 310건 vs 48건, 100종목 합) 재료성 태그가 그런 날 더 자주 붙었다 — 실전 기록의 측정이 날마다 달라지는 문제. 따라잡기 응답의 앞 `newsPerStock`건(평소 `fetchRecentNews`와 같은 기준, 관련성 필터 전)만 `backfilled=false`, 나머지는 `news_sentiment.backfilled=true`로 저장하고 집계 쿼리(`findScoredByTickerSince`)에서 뺀다. 화면 뉴스 목록에는 보관 기사도 그대로 보인다. 태그 정의(4장)의 문장은 그대로지만 입력 표본이 바뀌었으므로 **NEWS_POS/NEG의 2026-11-12 이전 실전 기록은 따라잡기 날 표본이 더 컸다**는 점을 판정 때 함께 적는다. 사용자 결정(2026-11-12) |
 
 ---
 
@@ -298,7 +311,7 @@ C를 통과한 것만 A로 올린다.
 | Q2 | 순발행은 태그 대신 **순위(연속값)** 로 보여줘야 하나? | 5.4 — 효과가 극단이 아니라 순위 전반에 있음 |
 | Q3 | 기술점수 등급(STRONG_BUY~STRONG_SELL)도 C로 검증할까? | README 백테스트에선 무작위와 차이 없음. 태그 v2 후보(`TECH_BUY` 등)로 기록하면 실전 판정 가능 |
 | ~~Q4~~ | ~~상승확률 모델 저장에 AUC 기준을 걸까?~~ | **닫힘 (2026-11-12, D20)** — holdout AUC < 0.55면 저장 안 함 |
-| Q5 | B2(DART)는 언제? | API 키 필요. 유상증자·자사주 공시로 R6의 사유 구분도 가능 |
+| ~~Q5~~ | B2(DART)는 언제? | **닫힘 (2026-11-12, D21)** — 공시 사실 태그 2개로 구현. 재무 요약·AI 리포트는 남음 |
 
 ---
 
