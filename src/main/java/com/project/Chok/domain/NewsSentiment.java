@@ -36,6 +36,9 @@ public class NewsSentiment {
     @Column(name = "analyzed_at")
     private LocalDateTime analyzedAt;
 
+    // 따라잡기로 메운 기사 중 평소 실행이라면 안 봤을 것 - 보관만 하고 점수·태그 집계에서 뺀다 (기존 행은 null = 포함)
+    private Boolean backfilled;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -62,4 +65,7 @@ public class NewsSentiment {
 
     public LocalDateTime getAnalyzedAt() { return analyzedAt; }
     public void setAnalyzedAt(LocalDateTime analyzedAt) { this.analyzedAt = analyzedAt; }
+
+    public Boolean getBackfilled() { return backfilled; }
+    public void setBackfilled(Boolean backfilled) { this.backfilled = backfilled; }
 }

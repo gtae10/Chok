@@ -181,6 +181,45 @@ class RecommendationServiceTest {
         verify(newsSentimentRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("따라잡기로 newsPerStock보다 많이 받으면 최신 N건만 집계, 나머지는 backfilled로 보관만")
+    void catch_up_extra_news_is_stored_as_backfilled_and_not_scored() {
+        LocalDate today = LocalDate.now();
+        Stock stock = createStock("005930", "삼성전자");
+        when(priceHistoryRepository.findByTickerOrderByTradeDateAsc(anyString())).thenReturn(List.of());
+        when(technicalAnalysisService.analyze(any())).thenReturn(TechnicalIndicatorResult.insufficient());
+        when(newsSentimentRepository.findLatestNewsDate("005930")).thenReturn(today.minusDays(5));
+        List<NewsArticle> fetched = java.util.stream.IntStream.range(0, 7)
+                .mapToObj(i -> new NewsArticle("삼성전자 뉴스 " + i, "http://t/" + i, today))
+                .toList();
+        when(newsCollectorService.fetchNewsSince(eq("005930"), any(), anyInt())).thenReturn(fetched);
+        when(newsDeduplicationService.filterSimilarDuplicates(anyString(), anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        // 최신 5건은 약한 뉴스, 따라잡기로 더 받은 2건은 강한 재료(0.9) - 평소였다면 안 봤을 기사
+        when(sentimentAnalysisService.analyzeBatch(anyString(), anyList())).thenReturn(List.of(
+                new SentimentResult(0.1, "NEUTRAL", ""), new SentimentResult(0.1, "NEUTRAL", ""),
+                new SentimentResult(0.1, "NEUTRAL", ""), new SentimentResult(0.1, "NEUTRAL", ""),
+                new SentimentResult(0.1, "NEUTRAL", ""),
+                new SentimentResult(0.9, "POSITIVE", ""), new SentimentResult(0.9, "POSITIVE", "")));
+        ArgumentCaptor<NewsSentiment> saved = ArgumentCaptor.forClass(NewsSentiment.class);
+        when(newsSentimentRepository.save(saved.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+        // 집계 쿼리는 backfilled를 빼고 돌려준다 (JPQL 조건) - 저장된 행에서 같은 조건으로 흉내낸다
+        when(newsSentimentRepository.findScoredByTickerSince(anyString(), any())).thenAnswer(invocation ->
+                saved.getAllValues().stream().filter(n -> !Boolean.TRUE.equals(n.getBackfilled())).toList());
+        when(technicalScoreRepository.findByTickerAndCalcDate(anyString(), any())).thenReturn(Optional.empty());
+        when(recommendationRepository.findHistoryByTicker(anyString())).thenReturn(List.of());
+
+        service.analyzeStock(stock, today);
+
+        assertThat(saved.getAllValues()).extracting(NewsSentiment::getBackfilled)
+                .containsExactly(false, false, false, false, false, true, true);
+        verify(newsSentimentRepository, never()).findByTickerSince(anyString(), any());
+        ArgumentCaptor<Recommendation> rec = ArgumentCaptor.forClass(Recommendation.class);
+        verify(recommendationRepository).save(rec.capture());
+        assertThat(rec.getValue().getMaterialNewsScore()).isEqualTo(0.1);
+        assertThat(rec.getValue().getSentimentScore()).isCloseTo(0.1, org.assertj.core.api.Assertions.within(1e-9));
+    }
+
     /**
      * weightTechnical=1.0, weightSentiment=0.0으로 맞춰서 techScore가 그대로 finalScore가
      * 되게 한 뒤, 저장된 Recommendation을 반환한다. 등급/뉘앙스 경계값 테스트 전용.

@@ -14,6 +14,10 @@ public interface NewsSentimentRepository extends JpaRepository<NewsSentiment, Lo
     @Query("SELECT n FROM NewsSentiment n WHERE n.ticker = :ticker AND n.newsDate >= :fromDate ORDER BY n.newsDate DESC")
     List<NewsSentiment> findByTickerSince(@Param("ticker") String ticker, @Param("fromDate") LocalDate fromDate);
 
+    // 감성 평균·재료성 태그 집계용 - 따라잡기 보관 기사(backfilled)는 빼서 표본 크기를 평소와 같게 유지
+    @Query("SELECT n FROM NewsSentiment n WHERE n.ticker = :ticker AND n.newsDate >= :fromDate AND (n.backfilled IS NULL OR n.backfilled = false)")
+    List<NewsSentiment> findScoredByTickerSince(@Param("ticker") String ticker, @Param("fromDate") LocalDate fromDate);
+
     // 페이지네이션 버전 - 뉴스가 많이 쌓인 인기 종목이라도 한 번에 너무 많이 안 불러오게
     @Query("SELECT n FROM NewsSentiment n WHERE n.ticker = :ticker AND n.newsDate >= :fromDate ORDER BY n.newsDate DESC")
     List<NewsSentiment> findByTickerSince(@Param("ticker") String ticker, @Param("fromDate") LocalDate fromDate, Pageable pageable);

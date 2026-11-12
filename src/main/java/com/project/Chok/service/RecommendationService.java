@@ -334,6 +334,10 @@ public class RecommendationService {
         if (articles.size() < fetched.size()) {
             log.info("종목과 무관한 뉴스 제외: 종목={}, {}건 → {}건", stock.getTicker(), fetched.size(), articles.size());
         }
+        // 평소 실행이 봤을 표본 = 네이버 응답 순서(최신순) 앞 maxNews건 (fetchRecentNews와 같은 기준, 관련성 필터는 그 뒤).
+        // 따라잡기로 더 받은 기사는 보관만 하고(backfilled) 평균·재료성 태그에는 안 넣어 날마다 표본 크기가 같게 한다.
+        // NewsArticle은 equals가 없어 contains는 같은 객체인지로 본다 (dedup도 같은 객체를 돌려준다)
+        List<NewsArticle> usualSample = fetched.subList(0, Math.min(maxNews, fetched.size()));
 
         if (articles.isEmpty()) return SentimentOutcome.of(0.0);
 
@@ -379,10 +383,12 @@ public class RecommendationService {
                 entity.setSentimentLabel(sentiment.getLabel());
                 entity.setSummary(sentiment.getSummary());
                 entity.setAnalyzedAt(LocalDateTime.now());
+                boolean backfilled = !usualSample.contains(article);
+                entity.setBackfilled(backfilled);
                 // 오류 폴백(파싱 실패·API 오류)은 저장하지 않는다 - 저장하면 exists 체크에 걸려 다시 분석되지 않는다
                 if (!sentiment.isFallback()) newsSentimentRepository.save(entity);
 
-                if (!article.getDate().isBefore(windowStart)) {
+                if (!backfilled && !article.getDate().isBefore(windowStart)) {
                     sum += sentiment.getScore();
                     count++;
                     fallbackUsed = fallbackUsed || sentiment.isFallback();
@@ -403,7 +409,7 @@ public class RecommendationService {
 
     private SentimentOutcome lookbackAverage(String ticker, LocalDate today, boolean fallbackUsed) {
         int lookback = appProperties.getAnalysis().getNewsLookbackDays();
-        double avg = newsSentimentRepository.findByTickerSince(ticker, today.minusDays(lookback)).stream()
+        double avg = newsSentimentRepository.findScoredByTickerSince(ticker, today.minusDays(lookback)).stream()
                 .mapToDouble(NewsSentiment::getSentimentScore).average().orElse(0.0);
         return new SentimentOutcome(avg, fallbackUsed);
     }
@@ -411,7 +417,7 @@ public class RecommendationService {
     /** 최근 lookback 뉴스 중 |감성점수|가 가장 큰 값(부호 포함), 없으면 null - 태그 NEWS_POS/NEG 입력. */
     private Double strongestRecentNewsScore(String ticker, LocalDate today) {
         int lookback = appProperties.getAnalysis().getNewsLookbackDays();
-        return newsSentimentRepository.findByTickerSince(ticker, today.minusDays(lookback)).stream()
+        return newsSentimentRepository.findScoredByTickerSince(ticker, today.minusDays(lookback)).stream()
                 .map(NewsSentiment::getSentimentScore)
                 .filter(java.util.Objects::nonNull)
                 .max(java.util.Comparator.comparingDouble(Math::abs))
