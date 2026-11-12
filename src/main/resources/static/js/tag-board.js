@@ -6,8 +6,61 @@ const CANDIDATE_META = {
     KS_TREND: { name: "시장(코스피) 200일선 위", note: KS_TREND_NOTE }   // tags.js
 };
 
+// ── 실전 성과 (/api/tags/board 의 evaluatedAt·liveEvaluation·ksTrendLive, 계산은 evaluate_tags.py) ──
+// 태그는 사실 표시라 수익률 +/−에 색을 쓰지 않는다(PROJECT_PLAN D3). 판정도 글자로만: 통과 = 남색 테두리, 나머지 = 회색 글자.
+const VERDICT_WAIT = { "창 부족": 1, "판정 불가": 1, "기록 없음": 1 };   // 실패가 아니라 '아직'
+
+function esc(v) { return String(v).replace(/[&<>"]/g, function(c) { return "&#" + c.charCodeAt(0) + ";"; }); }
+
+// evaluatedAt = live 집계 성공 시각, 오프셋 포함 ISO ("2026-11-12T21:40:05+09:00") → "11/12 21:40" (KST). 못 읽으면 null
+function fmtKst(iso) {
+    const t = Date.parse(iso);
+    if (!iso || isNaN(t)) return null;
+    const k = new Date(t + 9 * 3600000).toISOString();
+    return k.slice(5, 7) + "/" + k.slice(8, 10) + " " + k.slice(11, 16);
+}
+
+function evaluatedLabel(iso) {
+    const k = fmtKst(iso);
+    return k ? "실전 집계: " + k : "아직 집계 전";
+}
+
+// 한 기간 한 줄: [기간] [창 평균 · 일관성] [판정]. s = {windows, windowMean, windowsExpectedSign, verdict, events?, regimes?}
+function liveRow(days, s, needWindows, meanLabel) {
+    s = s || { events: 0, verdict: "기록 없음" };
+    const w = s.windows || 0;
+    let nums;
+    if (s.verdict === "기록 없음" || (!w && s.windowMean == null)) nums = "아직 완성된 창 없음";
+    else nums = meanLabel + " " + (s.windowMean == null ? "-" : fmtSignedPct(s.windowMean * 100)) +
+        " · 일관성 " + (s.windowsExpectedSign || 0) + "/" + w + (s.regimes != null ? " · 국면 " + s.regimes : "");
+    let v;
+    if (s.verdict === "통과") v = '<span class="verdict verdict--pass">통과</span>';
+    else if (VERDICT_WAIT[s.verdict]) v = '<span class="verdict verdict--wait">아직 · 창 ' + w + '/' + needWindows + '</span>';
+    else v = '<span class="verdict">' + esc(s.verdict || "-") + '</span>';
+    return '<li><span>' + days + '일 뒤</span><span>' + nums + '</span>' + v + '</li>';
+}
+
+// 태그 카드 안 실전 성과 3줄 (5·20·50일). live 가 비었으면(집계 전) 빈 문자열
+function tagLiveRows(live, tag, needWindows) {
+    if (!live || !Object.keys(live).length) return "";
+    const any = ["5", "20", "50"].some(function(h) { return live[h] && live[h][tag] && live[h][tag].windows; });
+    if (!any) return '<p class="live-none">실전 성과: 아직 완성된 창 없음 (판정에 창 ' + needWindows + '개 필요)</p>';
+    return '<ul class="live-rows" aria-label="실전 성과">' + ["5", "20", "50"].map(function(h) {
+        return liveRow(h, live[h] && live[h][tag], needWindows, "창 평균 초과");
+    }).join("") + '</ul>';
+}
+
+// 코스피 200일선 후보 카드 안 실전 성과 (20·50일, 기준선 = 같은 기간 항상 보유)
+function ksLiveRows(ks, needWindows) {
+    if (!ks || !ks.horizons) return "";
+    const rows = ["20", "50"].map(function(h) { return liveRow(h, ks.horizons[h], needWindows, "기준선 대비"); }).join("");
+    return '<p class="cand-card__start">실전 성과 · 신호 ' + (ks.signalDays || 0) + '일' +
+        (ks.dataUntil ? ' · 데이터 ' + fmtDay(ks.dataUntil) + '까지' : '') + '</p>' +
+        '<ul class="live-rows" aria-label="코스피 200일선 실전 성과">' + rows + '</ul>';
+}
+
 // list: 후보 배열(null = 서버 계산 실패), calendarAsOf: 거래일 달력 마지막 날
-function renderCandidates(list, calendarAsOf) {
+function renderCandidates(list, calendarAsOf, ksLive) {
     if (list === null) return '<h3 class="cand-head">검증 중 후보</h3><div class="empty-state">후보 정보를 불러오지 못했습니다.</div>';
     if (!Array.isArray(list) || list.length === 0) return "";
     const old = calendarAsOf ? staleDays(calendarAsOf) : 0;
@@ -21,6 +74,7 @@ function renderCandidates(list, calendarAsOf) {
             '<div class="cand-card__top"><b>' + m.name + '</b><span class="cand-card__badge">검증 중 · 매수 신호 아님</span></div>' +
             '<p class="cand-card__start">실전 시작 ' + fmtDay(c.liveStart) + (old ? ' · 기록이 ' + old + '일 전에서 멈춤' : '') + '</p>' +
             '<ul class="cand-card__rows">' + rows + '</ul>' +
+            (c.key === "KS_TREND" ? ksLiveRows(ksLive, c.needWindows) : '') +
             '<p class="tag-card__def">' + m.note + '</p></div>';
     }).join("");
     return cards && '<h3 class="cand-head">검증 중 후보</h3><div class="cand-cards">' + cards + '</div>';
@@ -42,7 +96,7 @@ function renderCandidates(list, calendarAsOf) {
         root.innerHTML = '<div class="empty-state">보드를 불러오지 못했습니다(네트워크 오류).</div>';
         return;
     }
-    const cand = renderCandidates(b.candidates, b.calendarAsOf);
+    const cand = renderCandidates(b.candidates, b.calendarAsOf, b.ksTrendLive);
     if (!b.firstDate) {
         root.innerHTML = '<div class="empty-state">아직 태그 기록이 없습니다. 대시보드에서 ② 분석 실행을 한 번 돌리면 그날 태그가 기록됩니다.</div>' + cand;
         return;
@@ -71,6 +125,7 @@ function renderCandidates(list, calendarAsOf) {
             '<div><b>' + t.totalRows + '</b><span>누적 부여 건수</span></div></div>' +
             '<p class="tag-card__def">' + m.desc + '</p>' +
             '<p class="tag-card__hyp">사전 가설: ' + m.hyp + '</p>' +
+            tagLiveRows(b.liveEvaluation, k, b.minWindows) +
             '</div>';
     }).join("");
 
@@ -79,6 +134,7 @@ function renderCandidates(list, calendarAsOf) {
         '<p class="prob-caveat" style="margin:10px 0 18px">판정 기준(미리 고정): 겹치지 않는 창 ' + b.minWindows + '개 이상, 사전 가설과 같은 방향인 창이 70% 이상, ' +
         '평균 초과수익이 5일 0.5% · 20일 1% · 50일 2% 이상. 분석을 돌린 날만 기록되고 빠진 날은 소급해 채우지 않으니, 서버를 켜 두는 날이 많을수록 판정이 빨라집니다. ' +
         '남은 기간은 주말만 뺀 어림값입니다.</p>' +
+        '<h3 class="cand-head">태그별 실전 성과 <span class="section-head__sub">' + evaluatedLabel(b.evaluatedAt) + '</span></h3>' +
         '<div class="tag-cards">' + cards + '</div>' +
         cand;
 })();

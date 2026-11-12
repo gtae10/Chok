@@ -9,6 +9,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -50,6 +52,10 @@ public class PythonEnvironment {
         return new File(baseDir, "collect.py").getAbsolutePath();
     }
 
+    public String evaluateTagsScriptPath() {
+        return new File(baseDir, "evaluate_tags.py").getAbsolutePath();
+    }
+
     public String trainScriptPath() {
         return new File(baseDir, "train_model.py").getAbsolutePath();
     }
@@ -73,8 +79,10 @@ public class PythonEnvironment {
      * 가상환경 파이썬으로 script를 실행하고 출력 전체를 반환한다. 제한 시간을 넘기거나
      * exitCode가 0이 아니면 RuntimeException. label은 로그 태그와 오류 메시지에 쓰인다.
      */
-    public String run(String script, int timeoutSeconds, String label, Map<String, String> env) {
-        ProcessBuilder pb = new ProcessBuilder(pythonExecutable(), script);
+    public String run(String script, int timeoutSeconds, String label, Map<String, String> env, String... args) {
+        List<String> cmd = new ArrayList<>(List.of(pythonExecutable(), script));
+        cmd.addAll(List.of(args));
+        ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(baseDir);
         pb.redirectErrorStream(true);
         pb.environment().putAll(env);

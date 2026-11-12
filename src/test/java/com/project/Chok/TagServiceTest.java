@@ -4,7 +4,10 @@ import com.project.Chok.domain.Recommendation;
 import com.project.Chok.service.TagService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -123,5 +126,26 @@ class TagServiceTest {
                 .isEqualTo(LocalDate.of(2026, 11, 16));
         assertThat(TagService.addTradingDays(LocalDate.of(2026, 12, 24), 1)) // 12/25 휴장 건너뜀
                 .isEqualTo(LocalDate.of(2026, 12, 28));
+    }
+
+    @Test
+    @DisplayName("성과 결과 파일: live·ksTrendLive를 그대로 싣고, 없거나 깨지면 셋 다 null")
+    @SuppressWarnings("unchecked")
+    void evaluationReadsResultFileOrNulls(@TempDir Path dir) throws Exception {
+        Path ok = dir.resolve("ok.json");
+        Files.writeString(ok, "{\"backtest\":{},\"liveAt\":\"2026-11-12T21:40:05+09:00\",\"live\":{\"20\":{\"BREAKOUT_52W\":{\"windows\":3,\"verdict\":\"창 부족\"}}},"
+                + "\"ksTrendLive\":{\"start\":\"2026-11-11\",\"horizons\":{\"20\":{\"windows\":0,\"verdict\":\"판정 불가\"}}}}");
+        Map<String, Object> e = TagService.evaluation(ok.toFile());
+        assertThat(((Map<String, Map<String, Map<String, Object>>>) e.get("liveEvaluation")).get("20").get("BREAKOUT_52W"))
+                .containsEntry("windows", 3).containsEntry("verdict", "창 부족");
+        assertThat((Map<String, Object>) e.get("ksTrendLive")).containsEntry("start", "2026-11-11");
+        assertThat(e.get("evaluatedAt")).isEqualTo("2026-11-12T21:40:05+09:00");
+
+        Path broken = dir.resolve("broken.json");
+        Files.writeString(broken, "{not json");
+        for (Path p : List.of(broken, dir.resolve("missing.json"))) {
+            assertThat(TagService.evaluation(p.toFile())).containsOnlyKeys("evaluatedAt", "liveEvaluation", "ksTrendLive")
+                    .allSatisfy((k, v) -> assertThat(v).isNull());
+        }
     }
 }

@@ -567,6 +567,15 @@ button.change-chip:hover { background: var(--line); }
 .cand-card__rows li { display: grid; grid-template-columns: 80px 110px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.82rem; }
 .cand-card__rows li span { color: var(--text-faint); }
 .cand-card__rows li b { font-weight: 800; }
+/* 실전 성과 줄 (태그 카드·코스피 후보 카드): 수익률 부호에 색 없음, 판정은 글자 — 통과만 남색 테두리, '아직'은 옅은 글자 */
+.live-rows { list-style: none; margin-top: 12px; border-top: 1px solid var(--line); }
+.live-rows li { display: grid; grid-template-columns: 52px 1fr auto; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 0.82rem; }
+.live-rows li > span:first-child { color: var(--text-faint); }
+.live-rows li > span:nth-child(2) { font-variant-numeric: tabular-nums; }
+.verdict { justify-self: end; padding: 1px 8px; border-radius: 999px; color: var(--text-muted); font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+.verdict--pass { color: var(--brand); box-shadow: inset 0 0 0 1.5px var(--brand); font-weight: 800; }
+.verdict--wait { color: var(--text-faint); font-weight: 600; }
+.live-none { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--text-faint); font-size: 0.8rem; }
 
 /* ── 반응형 ──────────────────────────────────────────────────── */
 
@@ -599,6 +608,8 @@ button.change-chip:hover { background: var(--line); }
     .rule-plan__table th, .rule-plan__table td { padding: 9px 6px; }
     .cand-card__rows li { grid-template-columns: 1fr auto; }
     .cand-card__rows li span:last-child { grid-column: 1 / -1; }
+    .live-rows li { grid-template-columns: 1fr auto; }
+    .live-rows li > span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
 }
 @media (max-width: 480px) {
     .feedback-panel { right: 16px; left: 16px; width: auto; bottom: 84px; }

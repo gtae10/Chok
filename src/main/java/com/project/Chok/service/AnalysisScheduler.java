@@ -64,6 +64,11 @@ public class AnalysisScheduler {
             }
             analysisStatus.markDone(result.processed());
             log.info("스케줄러: 자동 분석 완료 - {}", result.summary());
+            try {  // 집계 실패는 분석 실패가 아니다 - 보드는 이전 결과(liveAt)를 그대로 보여준다
+                dataCollectionService.runTagEvaluation();
+            } catch (Exception e) {
+                log.error("스케줄러: 태그 성과 집계 실패 (분석 결과는 정상)", e);
+            }
             return true;
         } catch (Exception e) {
             log.error("스케줄러: 자동 실행 중 오류", e);

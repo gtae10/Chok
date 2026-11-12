@@ -18,7 +18,8 @@
       "ISSUANCE_UP": -1,
       "BUYBACK": 1,
       "NEWS_POS": 1,
-      "NEWS_NEG": -1
+      "NEWS_NEG": -1,
+      "BREAKOUT_52W": 1
     }
   },
   "backtest": {
@@ -158,6 +159,186 @@
       "NEWS_NEG": {
         "events": 0,
         "verdict": "기록 없음"
+      }
+    }
+  },
+  "live": {
+    "5": {
+      "MOMENTUM_TOP20": {
+        "events": 74,
+        "dates": 4,
+        "allDatesMean": -0.0292,
+        "windows": 1,
+        "windowMean": 0.0204,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "LOW_VOL20": {
+        "events": 80,
+        "dates": 4,
+        "allDatesMean": 0.0451,
+        "windows": 1,
+        "windowMean": -0.0103,
+        "windowsExpectedSign": 0,
+        "verdict": "창 부족"
+      },
+      "ISSUANCE_UP": {
+        "events": 24,
+        "dates": 4,
+        "allDatesMean": -0.0028,
+        "windows": 1,
+        "windowMean": -0.0132,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "BUYBACK": {
+        "events": 75,
+        "dates": 4,
+        "allDatesMean": 0.0241,
+        "windows": 1,
+        "windowMean": -0.0127,
+        "windowsExpectedSign": 0,
+        "verdict": "창 부족"
+      },
+      "NEWS_POS": {
+        "events": 29,
+        "dates": 4,
+        "allDatesMean": 0.009,
+        "windows": 1,
+        "windowMean": 0.0373,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "NEWS_NEG": {
+        "events": 4,
+        "dates": 2,
+        "allDatesMean": -0.0094,
+        "windows": 1,
+        "windowMean": -0.0241,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "BREAKOUT_52W": {
+        "events": 2,
+        "dates": 1,
+        "allDatesMean": 0.0778,
+        "windows": 1,
+        "windowMean": 0.0778,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      }
+    },
+    "20": {
+      "MOMENTUM_TOP20": {
+        "events": 72,
+        "dates": 4,
+        "allDatesMean": -0.1061,
+        "windows": 1,
+        "windowMean": -0.0841,
+        "windowsExpectedSign": 0,
+        "verdict": "창 부족"
+      },
+      "LOW_VOL20": {
+        "events": 80,
+        "dates": 4,
+        "allDatesMean": 0.1271,
+        "windows": 1,
+        "windowMean": 0.1165,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "ISSUANCE_UP": {
+        "events": 24,
+        "dates": 4,
+        "allDatesMean": -0.059,
+        "windows": 1,
+        "windowMean": -0.0672,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "BUYBACK": {
+        "events": 75,
+        "dates": 4,
+        "allDatesMean": 0.0852,
+        "windows": 1,
+        "windowMean": 0.0812,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "NEWS_POS": {
+        "events": 29,
+        "dates": 4,
+        "allDatesMean": -0.0078,
+        "windows": 1,
+        "windowMean": 0.1001,
+        "windowsExpectedSign": 1,
+        "verdict": "창 부족"
+      },
+      "NEWS_NEG": {
+        "events": 4,
+        "dates": 2,
+        "allDatesMean": 0.0398,
+        "windows": 1,
+        "windowMean": 0.0409,
+        "windowsExpectedSign": 0,
+        "verdict": "창 부족"
+      },
+      "BREAKOUT_52W": {
+        "events": 2,
+        "dates": 1,
+        "allDatesMean": -0.1733,
+        "windows": 1,
+        "windowMean": -0.1733,
+        "windowsExpectedSign": 0,
+        "verdict": "창 부족"
+      }
+    },
+    "50": {
+      "MOMENTUM_TOP20": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "LOW_VOL20": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "ISSUANCE_UP": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "BUYBACK": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "NEWS_POS": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "NEWS_NEG": {
+        "events": 0,
+        "verdict": "기록 없음"
+      },
+      "BREAKOUT_52W": {
+        "events": 0,
+        "verdict": "기록 없음"
+      }
+    }
+  },
+  "liveAt": "2026-11-12T22:36:34+09:00",
+  "ksTrendLive": {
+    "start": "2026-11-11",
+    "dataUntil": "2026-11-12",
+    "signalDays": 0,
+    "horizons": {
+      "20": {
+        "windows": 0,
+        "baseline": null,
+        "verdict": "판정 불가"
+      },
+      "50": {
+        "windows": 0,
+        "baseline": null,
+        "verdict": "판정 불가"
       }
     }
   }

@@ -867,10 +867,19 @@ def horizon_model_path(horizon: int) -> str:
     return os.path.join(model_dir, f"rise_model_{horizon}d.json")
 
 
+# 저장 최소 holdout AUC - Java AppProperties.minAucForHighlight(src/main/java/com/project/Chok/config/AppProperties.java)와 같은 값
+MIN_AUC_TO_SAVE = 0.55
+
+
+def passes_auc_gate(auc) -> bool:
+    """holdout AUC가 기준 이상일 때만 True. None/NaN은 False (NaN 비교는 항상 False)."""
+    return auc is not None and auc >= MIN_AUC_TO_SAVE
+
+
 def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str, output_path: str,
                             candidate_groups=None):
     """한 예측기간에 대해 walk-forward 검증 + 최종 모델 학습 + 저장까지 수행한다.
-    샘플 부족이거나 유효 폴드가 하나도 없으면 저장을 건너뛰고 (None, None)을 반환한다."""
+    샘플 부족, 유효 폴드 없음, holdout AUC 기준 미달이면 저장을 건너뛰고 (None, None)을 반환한다."""
     sub = dataset_for_horizon(dataset, horizon, label_mode)
     if len(sub) < MIN_SAMPLES:
         log.info("[%d일] 샘플 부족(%d개)으로 배포 모델 학습 스킵", horizon, len(sub))
@@ -882,6 +891,10 @@ def train_and_save_horizon(dataset: pd.DataFrame, horizon: int, label_mode: str,
         return None, None
 
     result = train_final_model(sub, wf_summary, horizon, label_mode)
+    if not passes_auc_gate(result.get("holdoutAuc")):
+        log.warning("[%d일] holdoutAuc=%s가 기준(%.2f) 미달이라 저장 안 함 - 기존 %s 유지",
+                    horizon, result.get("holdoutAuc"), MIN_AUC_TO_SAVE, output_path)
+        return None, wf_summary  # 검증 요약은 남긴다 - 미달 이유를 진단할 자료
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
@@ -952,7 +965,7 @@ def main():
     sweep_result = sweep_horizons(dataset, horizons, LABEL_MODE, candidate_groups)
 
     log.info("=== 기간별 배포 모델 학습 시작 (기간 %d개: %s) ===", len(horizons), horizons)
-    deploy_wf_summary = None
+    deploy_wf_summary, deploy_saved = None, False
     saved_count, skipped_count = 0, 0
     for h in horizons:
         output_path = MODEL_OUTPUT_PATH if h == FORWARD_DAYS else horizon_model_path(h)
@@ -961,15 +974,15 @@ def main():
             skipped_count += 1
         else:
             saved_count += 1
-            if h == FORWARD_DAYS:
-                deploy_wf_summary = wf_summary
+        if h == FORWARD_DAYS:
+            deploy_wf_summary, deploy_saved = wf_summary, result is not None
 
     log.info(
         "=== 기간별 모델 학습 완료: %d개 저장, %d개 스킵 (전체 %d개 기간) ===",
         saved_count, skipped_count, len(horizons)
     )
-    if deploy_wf_summary is None:
-        log.warning("기본 배포 기간(%d일) 모델은 저장되지 않았습니다 - 기존 rise_model.json은 그대로 둡니다.", FORWARD_DAYS)
+    if not deploy_saved:
+        log.error("기본 배포 기간(%d일) 모델은 저장되지 않았습니다(샘플·폴드 부족 또는 AUC 기준 미달) - 기존 rise_model.json은 그대로 둡니다.", FORWARD_DAYS)
     else:
         full_auc = deploy_wf_summary.get("fullAucMean")
         log.info("=" * 70)

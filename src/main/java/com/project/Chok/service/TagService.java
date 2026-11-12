@@ -1,5 +1,7 @@
 package com.project.Chok.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.Chok.config.PythonEnvironment;
 import com.project.Chok.domain.MarketIndicator;
 import com.project.Chok.domain.Recommendation;
 import com.project.Chok.domain.TagSnapshot;
@@ -13,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,7 +39,7 @@ public class TagService {
     public static final String BUYBACK = "BUYBACK";
     public static final String NEWS_POS = "NEWS_POS";
     public static final String NEWS_NEG = "NEWS_NEG";
-    // 2026-10-02 추가(PROJECT_PLAN D14). 이 태그의 실전 기록은 추가일부터 시작한다.
+    // 2026-10-02 추가(PROJECT_PLAN D14b). 이 태그의 실전 기록은 추가일부터 시작한다.
     public static final String BREAKOUT_52W = "BREAKOUT_52W";
 
     static final double TOP_SHARE = 0.2;
@@ -48,15 +52,19 @@ public class TagService {
     private final TagSnapshotRepository tagSnapshotRepository;
     private final StockRepository stockRepository;
     private final MarketIndicatorRepository marketIndicatorRepository;
+    private final PythonEnvironment pythonEnvironment;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public TagService(RecommendationRepository recommendationRepository,
                       TagSnapshotRepository tagSnapshotRepository,
                       StockRepository stockRepository,
-                      MarketIndicatorRepository marketIndicatorRepository) {
+                      MarketIndicatorRepository marketIndicatorRepository,
+                      PythonEnvironment pythonEnvironment) {
         this.recommendationRepository = recommendationRepository;
         this.tagSnapshotRepository = tagSnapshotRepository;
         this.stockRepository = stockRepository;
         this.marketIndicatorRepository = marketIndicatorRepository;
+        this.pythonEnvironment = pythonEnvironment;
     }
 
     /** 그날 전 종목(recs)을 기준으로 종목별 태그를 계산한다. 순위형 태그는 필터 전 전체로 경계를 잡는다. */
@@ -166,6 +174,7 @@ public class TagService {
             log.error("검증 대기 후보 계산 실패", e);
             out.put("candidates", null);
         }
+        out.putAll(evaluation(new File(pythonEnvironment.modelDir(), "tag_evaluation_result.json")));
         if (latest == null) return out;
 
         LocalDate first = tagSnapshotRepository.findFirstSnapDate();
@@ -190,6 +199,29 @@ public class TagService {
 
         LocalDate prevDate = tagSnapshotRepository.findSnapDateBefore(latest);
         out.put("changes", prevDate == null ? null : withNames(diff(latest, prevDate, today, tagsOn(prevDate))));
+        return out;
+    }
+
+    /**
+     * evaluate_tags.py 결과(model/tag_evaluation_result.json)의 실전 성과를 그대로 싣는다:
+     * liveEvaluation = JSON "live"(기간 -> 태그 -> windows·windowMean·windowsExpectedSign·verdict ...),
+     * ksTrendLive = JSON "ksTrendLive", evaluatedAt = JSON "liveAt"(live 집계 성공 시각, +09:00 ISO). 없거나 못 읽으면 셋 다 null.
+     */
+    public static Map<String, Object> evaluation(File file) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("evaluatedAt", null);
+        out.put("liveEvaluation", null);
+        out.put("ksTrendLive", null);
+        if (!file.exists()) return out;  // 첫 집계 전 - 정상이라 WARN을 남기지 않는다
+        try {
+            Map<?, ?> raw = objectMapper.readValue(file, Map.class);
+            // 파일 시각이 아니라 live 집계가 성공한 시각 - 실패한 실행이 오래된 값을 최신처럼 보이게 하지 않도록
+            out.put("evaluatedAt", raw.get("liveAt"));
+            out.put("liveEvaluation", raw.get("live"));
+            out.put("ksTrendLive", raw.get("ksTrendLive"));
+        } catch (IOException | RuntimeException e) {
+            log.warn("태그 성과 결과 파일 읽기 실패 ({}): {}", file.getAbsolutePath(), e.getMessage());
+        }
         return out;
     }
 

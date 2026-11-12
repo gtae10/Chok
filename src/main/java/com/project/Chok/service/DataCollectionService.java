@@ -27,4 +27,10 @@ public class DataCollectionService {
         return pythonEnvironment.run(pythonEnvironment.collectScriptPath(),
                 appProperties.getCollector().getTimeoutSeconds(), "Python 수집기", dbEnv);
     }
+
+    /** 태그 실전 성과 집계(evaluate_tags.py --live-only) - 태그 보드의 실전 성과·KS_TREND 판정을 갱신한다. */
+    public String runTagEvaluation() {
+        return pythonEnvironment.run(pythonEnvironment.evaluateTagsScriptPath(),
+                appProperties.getCollector().getTimeoutSeconds(), "태그 성과 집계", dbEnv, "--live-only");
+    }
 }

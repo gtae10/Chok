@@ -13,7 +13,7 @@
 ## 프로젝트 소개
 
 촉(Chok)은 KOSPI/KOSDAQ 시가총액 상위 100개 종목을 대상으로
-**기술적 분석(거래량 포함) + OpenAI 뉴스 감성 분석**을 결합해
+**기술적 분석(거래량 포함) + LLM 뉴스 감성 분석**을 결합해
 종목별 추천 점수와 **사실 기반 태그**를 보여주는 웹 대시보드다.
 
 > **2026-09-30 방향 재설정** — 상승확률은 5년 검증에서 무작위 수준(AUC 0.50)을 넘지 못해 화면에서 내렸다.
@@ -35,9 +35,9 @@
 
 - 시가총액 상위 100개 종목 자동 수집 (FinanceDataReader)
 - 기술적 지표 계산: 이동평균(MA5/20/60), RSI, MACD, 볼린저밴드, **거래량비율 + OBV**
-- 네이버 금융 뉴스 크롤링 + OpenAI API 감성 분석
+- 네이버 금융 뉴스 크롤링 + LLM 감성 분석 (OpenAI 기본, Anthropic 선택: `chok.sentiment.provider`)
 - 기술점수 + 감성점수 가중 결합으로 최종 추천 등급 산출 (STRONG_BUY ~ STRONG_SELL)
-- **사실 태그**: 모멘텀 상위 20%, 저변동성, 주식수 증가/감소, 재료성 호재/악재 — 예측이 아니라
+- **사실 태그**: 모멘텀 상위 20%, 저변동성, 주식수 증가/감소, 52주 신고가 돌파, 재료성 호재/악재 — 예측이 아니라
   "지금 이런 상태다"라는 표시. 분석 때마다 `tag_snapshots`에 기록해 태그별 실전 성과를 잰다
   (`python-collector/evaluate_tags.py`, 정의·기준은 PROJECT_PLAN 4·5장)
 - 대시보드 종목명/티커 검색 + 등급 필터 + **컬럼 헤더 클릭 정렬**
@@ -60,7 +60,7 @@
 | Database | MySQL 8.0 |
 | 데이터 수집 | Python, FinanceDataReader |
 | 모델링 | Python, scikit-learn (로지스틱 회귀) |
-| AI 분석 | OpenAI API (gpt-4o-mini) |
+| AI 분석 | OpenAI API (gpt-4o-mini) 또는 Anthropic API (`chok.sentiment.provider`) |
 | Build | Gradle |
 
 ---
@@ -109,7 +109,7 @@
 - **거래량비율 + OBV 추세 (15%)** — 상승/하락을 거래량이 얼마나 "확인"해주는지 반영
 
 **감성점수 (0~100)**:
-- OpenAI API로 뉴스 헤드라인 분석
+- LLM API(OpenAI 또는 Anthropic)로 뉴스 헤드라인 분석
 - POSITIVE(+) / NEUTRAL(0) / NEGATIVE(-) 분류
 
 **상승확률**: 계산·저장은 하지만 화면에는 표시하지 않는다(2026-09-30). 배포 모델의 holdout
@@ -289,11 +289,15 @@ AUC가 0.50이었고, 라벨이 "그날 중앙값보다 잘했나"인데 "상승
     **사전에 정한 기준을 통과한 태그는 없었다**: 모멘텀은 크기는 크지만(50일 +3.4%) 구간별로 흔들렸고,
     순발행은 순위 전체로는 일관됐지만 ±2% 경계 태그로는 드러나지 않았다. 최종 판정은 앞으로 쌓이는
     실전 기록으로 한다 — 상세는 [PROJECT_PLAN 5장](docs/PROJECT_PLAN.md).
+16. **매수 신호·횡단면 실험과 전향 기록** (2026-11-10~11, PROJECT_PLAN D15~D19) — 매수 신호 후보 2회(7개)
+    모두 불통과라 매수 신호는 만들지 않고 후보를 "검증 대기"로만 표시한다(D15~D17). DART 재무를 넣은 횡단면
+    실험 9개도 개발 통과 0(D18). 그중 일관됐던 신호 4개(B/P·공매도·기관 순매수·변동성)를 고정해
+    `signal_snapshots`에 매일 기록하고 앞으로의 데이터로만 판정한다(D19) — 상세는 [PROJECT_PLAN 7장](docs/PROJECT_PLAN.md).
 
 **현재 결론**: purge 적용 + 5년치 재검증 후에도 AUC가 0.5 근처(랜덤 수준)에 머물러,
 지금 확보한 데이터/특징 조합으로는 뚜렷한 예측력을 확인하지 못했다. (이전 판에는
 "학습 모델은 검증을 통과할 때만 사용"이라고 적었지만 실제 코드에는 그런 기준이 없었다 — 2026-09-30
-점검에서 발견해 상승확률 자체를 화면에서 내렸다.)
+점검에서 발견해 상승확률 자체를 화면에서 내렸고, 2026-11-12부터 holdout AUC < 0.55면 모델을 저장하지 않는다.)
 `backtest.py`로 KOSPI/KOSDAQ을 나눠 기술점수 vs 무작위 선택도 비교했는데, 두 시장
 모두 무작위보다 뚜렷이 낫다는 근거를 찾지 못했다 — 결과가 기대에 못 미쳐도 그대로 보고한다.
 
@@ -386,14 +390,14 @@ Chok/
 ├── src/main/java/com/project/Chok/
 │   ├── config/            AppProperties (chok.* 설정 바인딩)
 │   ├── controller/        REST API, 대시보드 라우팅
-│   ├── domain/             Stock, PriceHistory, TechnicalScore, NewsSentiment, Recommendation, TagSnapshot
+│   ├── domain/             Stock, PriceHistory, TechnicalScore, NewsSentiment, Recommendation, TagSnapshot, ShortBalance, SignalSnapshot 등
 │   ├── dto/                데이터 전달 객체
 │   ├── repository/        Spring Data JPA
 │   └── service/
 │       ├── TechnicalAnalysisService     기술적 지표 + 거래량 지표 계산
 │       ├── RiseProbabilityService       학습모델 로드 및 상승확률 계산 (화면 미표시, 저장만)
 │       ├── TagService                   사실 태그 규칙(정본) + 그날 태그 스냅샷
-│       ├── SentimentAnalysisService     OpenAI API 뉴스 감성 분석
+│       ├── SentimentAnalysisService     뉴스 감성 분석 (sentiment/ OpenAiProvider·AnthropicProvider)
 │       ├── NewsCollectorService         네이버 금융 뉴스 크롤링
 │       ├── DataCollectionService        Python 수집기 실행 (ProcessBuilder)
 │       ├── ModelTrainingService         Python 학습 스크립트 실행
@@ -408,13 +412,16 @@ Chok/
 │   └── static/                           css, js
 └── python-collector/
     ├── collect.py                        시세 수집 (확정 종가만) + 순발행 갱신(marcap)
-    ├── evaluate_tags.py                  태그별 백테스트/실전 성과 집계·판정
+    ├── evaluate_tags.py                  태그별 백테스트/실전 성과 집계·판정 (+ KS_TREND 실전 판정)
+    ├── forward_signals.py                전향 검증 신호 기록 → signal_snapshots (collect.py가 호출)
+    ├── fundamentals_dart.py              DART 재무 PIT 패널 (OpenDART API 키 필요)
     ├── train_model.py                    상승확률 로지스틱 회귀 학습 (walk-forward 검증 포함)
     ├── backtest.py                       v1/v2 백테스트 + KOSPI/KOSDAQ 분리 비교
     ├── sample_sentiment_for_review.py    실제 감성분석 표본 사람 검토용 CSV 생성
     ├── sentiment_consistency_check.py    근접중복 헤드라인 간 감성점수 일관성 검증
     ├── sentiment_predictive_check.py     감성점수 vs 이후 수익률 추적 (장기 관찰용)
-    ├── test_collect.py / test_evaluate_tags.py   자가점검 (python test_*.py)
+    ├── experiment_*.py                   검증 실험 스크립트 (결과는 model/*_result.json)
+    ├── test_*.py                         자가점검 (collect·evaluate_tags·forward_signals·fundamentals_dart·train_model 등, python test_*.py)
     ├── config.py / db.py
     └── requirements.txt
 ```
@@ -433,13 +440,14 @@ Chok/
 
 ## 알려진 제한사항 / TODO
 
-- 뉴스 감성분석은 OpenAI API 크레딧이 있어야 실제로 동작 (`chok.openai.api-key`)
+- 뉴스 감성분석은 선택한 LLM API 키·크레딧이 있어야 실제로 동작 (`chok.openai.api-key` 또는 `chok.anthropic.api-key`)
 - 뉴스 수집기(`NewsCollectorService`)는 항상 "현재 시점" 최신 뉴스만 가져오는 구조라
   과거 날짜 뉴스를 소급 수집할 방법이 없음 — 감성분석의 예측 타당성 검증은 실시간으로
   쌓이는 데이터로만 가능 (위 [감성분석 정확도 검증](#감성분석-정확도-검증) 참고)
 - 5년치 데이터로 재검증해도 상승확률 모델과 기술점수 모두 무작위보다 뚜렷이 낫다는
   근거를 확인하지 못함 — 데이터가 더 쌓이거나 새로운 특징(밸류에이션 지표 등)을
-  구할 방법을 찾으면 재검토 필요 (PER/PBR은 현재 무료 데이터소스 부재로 보류)
+  구할 방법을 찾으면 재검토 필요 (밸류에이션은 DART 재무 수집(`fundamentals_dart.py`)으로 B/P·E/P를
+  검증했으나 개발 통과 없음(D18), B/P는 전향 기록으로 검증 중(D19))
 - "1일" 기간 버튼은 일별 시세 특성상 안내 문구만 표시 (의도된 동작)
 - [ ] 미국 주식(S&P 500) 분석 추가
 - [ ] Python 수집기 → FastAPI 서버로 마이그레이션

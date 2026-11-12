@@ -196,6 +196,38 @@ def insert_rows(rows):
         cur.close()
 
 
+def usable_gaps(rows, days, start) -> list:
+    """평가에 쓸 수 있는 행(recorded_at < 다음 거래일 15:30, D19)이 MIN_NAMES 미만인 (날짜, 신호) 목록.
+    rows: (trade_date, signal_name, recorded_at) / days: 거래일 정렬, 마지막이 이번 asof(오늘 short는 비는 게 정상이라 제외)
+    start: signal_snapshots 기록 시작일. 최근 10거래일 중 start 이후만 본다."""
+    counts = {}
+    for d, s, at in rows:
+        counts.setdefault((pd.Timestamp(d), s), []).append(pd.Timestamp(at))
+    out = []
+    for i in range(max(0, len(days) - 11), len(days) - 1):
+        d, deadline = days[i], days[i + 1] + pd.Timedelta(hours=15, minutes=30)
+        if d < pd.Timestamp(start):
+            continue
+        out += [(d.date(), s) for s in SIGNALS if sum(at < deadline for at in counts.get((d, s), [])) < MIN_NAMES]
+    return out
+
+
+def check_gaps(days):
+    # recorded_at 은 DB NOW() - MySQL 시간대가 KST라고 가정한다
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT MIN(trade_date) FROM signal_snapshots")
+        start = cur.fetchone()[0]
+        cur.execute("SELECT trade_date, signal_name, recorded_at FROM signal_snapshots WHERE trade_date >= %s",
+                    (days[-min(11, len(days))].date(),))
+        rows = cur.fetchall()
+        cur.close()
+    gaps = usable_gaps(rows, days, start) if start else []
+    if gaps:
+        log.warning("평가용 기록 부족(최근 10거래일, %d종목 미만): %s", MIN_NAMES,
+                    ", ".join(f"{d} {s}" for d, s in gaps))
+
+
 def record(stocks):
     """stocks: collect.get_top_n_stocks() 결과 (ticker, market_cap)."""
     tickers = [s["ticker"] for s in stocks]
@@ -219,6 +251,10 @@ def record(stocks):
     short_note = " - 공매도는 다음 실행에서 채움" if counts["short_ratio"] < MIN_NAMES else ""
     level = logging.ERROR if min(v for s, v in counts.items() if s != "short_ratio") < MIN_NAMES else logging.INFO
     log.log(level, "신호 기록 %s 기준: %s (종목 %d)%s", asof.date(), counts, len(tickers), short_note)
+    try:
+        check_gaps(days)
+    except Exception:
+        log.exception("기록 누락 점검 실패")
     return len(rows)
 
 

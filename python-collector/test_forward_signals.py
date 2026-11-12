@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from forward_signals import compute, latest_reports, parent_equity
+from forward_signals import compute, latest_reports, parent_equity, usable_gaps
 
 days = pd.bdate_range("2026-06-01", periods=70)
 asof = days[-2]  # 마지막 날(days[-1])은 asof 이후 = 미래 데이터
@@ -53,4 +53,14 @@ assert got[("000010", "inst20")] == 0.05
 assert ("000020", "bp") not in got and ("000020", "inst20") not in got and ("000020", "short_ratio") not in got
 assert ("000020", "vol60") in got and ("000030", "vol60") not in got
 assert all(d == asof.date() for d, *_ in rows)
+
+# 기록 누락 점검: days[-3]은 다음 거래일(days[-2]) 15:30 전 기록 20개 → 충분, short_ratio는 21개 중 2개가 늦어 19개 → 부족
+# days[-2]는 기록 없음 → 전 신호 부족, days[-1](asof)과 start 이전 날짜는 안 본다
+ok = days[-2] + pd.Timedelta(hours=9)
+late = days[-2] + pd.Timedelta(hours=15, minutes=30)
+snap = [(days[-3].date(), s, ok) for s in ["bp", "inst20", "vol60"] for _ in range(20)]
+snap += [(days[-3].date(), "short_ratio", ok)] * 19 + [(days[-3].date(), "short_ratio", late)] * 2
+gaps = usable_gaps(snap, days, days[-3].date())
+assert gaps == [(days[-3].date(), "short_ratio")] + [(days[-2].date(), s) for s in ["bp", "short_ratio", "inst20", "vol60"]], gaps
+assert usable_gaps(snap, days, days[-1].date()) == []
 print("test_forward_signals passed")

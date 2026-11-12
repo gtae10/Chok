@@ -12,11 +12,15 @@ evaluate_tags.py — 태그별 시장 대비 성과 집계 (C1). 태그 정의·
 판정은 겹치지 않는 창(h영업일 간격으로 뽑은 날짜)으로만 센다 - 매일의 관측은 h일씩 겹쳐서
 따로 세면 표본 수가 부풀려진다. 모든 날짜 평균(allDatesMean)은 참고로만 같이 적는다.
 
-실행: python evaluate_tags.py            (backtest + live)
-      python evaluate_tags.py --live-only
+  ksTrendLive : KS_TREND 실전 판정(PROJECT_PLAN D17 사전 등록) - market_indicators의 KS11 확정 종가.
+
+실행: python evaluate_tags.py            (backtest + live + ksTrendLive)
+      python evaluate_tags.py --live-only (기존 결과 파일의 backtest는 그대로 두고 live·ksTrendLive만 갈아끼운다)
+실패한 집계(DB 없음 등)는 기존 파일의 값을 지우지 않는다.
 결과: model/tag_evaluation_result.json
 """
 import argparse
+import datetime
 import json
 import logging
 import os
@@ -159,6 +163,56 @@ def live() -> dict:
     return {h: summarize(tag_rows, excess_returns(close, universe, h), close.index, h) for h in HORIZONS}
 
 
+# ── KS_TREND 실전 판정 (D17 사전 등록, 2026-11-10) ── 바꾸지 않는다
+KS_TREND_START = pd.Timestamp("2026-11-11")
+KS_TREND_HORIZONS = [20, 50]
+KS_TREND_MIN_REGIMES = 2
+
+
+def ks_trend_judge(ks: pd.Series) -> dict:
+    """ks: 거래일 인덱스 KS11 확정 종가. 신호 = 종가 > MA200(T 포함), 시작일 이후 신호만, T+1 종가 진입,
+    기준선 = 시작일 이후 모든 날 T+1 진입 h일 수익 평균. 판정·국면은 experiment_entry_round2 그대로."""
+    import experiment_entry_round1 as r1  # 지연 import - 두 실험 스크립트가 이 모듈을 import한다
+    import experiment_entry_round2 as r2
+    ks = ks.sort_index().astype(float)
+    days = ks.index
+    ma = ks.rolling(200).mean()
+    on = (ks > ma) &(days >= KS_TREND_START)
+    ids = r2.regime_ids(on)
+
+    def rows_where(mask):
+        return r1.to_entry(pd.DataFrame({"ticker": "KS11", "tag": "KS_TREND", "trade_date": days[mask]}), days)
+
+    on_rows, all_rows = rows_where(on.values), rows_where(days >= KS_TREND_START)
+    out = {"start": str(KS_TREND_START.date()), "dataUntil": str(days.max().date()) if len(days) else None,
+           "signalDays": int(on.sum()), "horizons": {}}
+    saved = r2.et.EXPECTED_SIGN  # r2.judge가 et.EXPECTED_SIGN을 덮어쓴다 - 같은 모듈이면 되돌린다
+    try:
+        for h in KS_TREND_HORIZONS:
+            fwd = ks.shift(-h) / ks - 1
+            base = r2.baseline(fwd, all_rows)
+            if np.isnan(base):  # 완성된 h일 수익이 아직 하나도 없다 (NaN을 JSON에 쓰지 않는다)
+                s = {"windows": 0, "baseline": None, "verdict": "판정 불가"}
+            else:
+                s = r2.judge(on_rows, fwd, base, days, h, "KS_TREND", ids, KS_TREND_MIN_REGIMES)
+                s.setdefault("windows", 0)
+                if s["verdict"] in ("창 부족", "기록 없음"):
+                    s["verdict"] = "판정 불가"
+            out["horizons"][h] = s
+    finally:
+        r2.et.EXPECTED_SIGN = saved
+    return out
+
+
+def ks_trend_live() -> dict:
+    with db.get_conn() as conn:
+        df = pd.read_sql("SELECT trade_date, kospi_close FROM market_indicators WHERE kospi_close IS NOT NULL", conn)
+    out = ks_trend_judge(df.set_index(pd.to_datetime(df["trade_date"]))["kospi_close"])
+    for h, s in out["horizons"].items():
+        log.info("ksTrendLive %d일: 창 %d개, 국면 %s, %s", h, s["windows"], s.get("regimes"), s["verdict"])
+    return out
+
+
 def print_table(name: str, result: dict):
     for h, tags in result.items():
         log.info("=== %s %d영업일 (창 %d개 이상, |창 평균| >= %.1f%%, 가설 방향 >= %d%%) ===",
@@ -177,6 +231,13 @@ def main():
     parser.add_argument("--live-only", action="store_true")
     args = parser.parse_args()
 
+    old = {}
+    try:  # 없을 때만 새로 시작. 깨진 파일은 여기서 멈춘다 - 덮어쓰면 backtest가 조용히 사라진다
+        with open(RESULT_PATH, encoding="utf-8") as f:
+            old = json.load(f)
+    except FileNotFoundError:
+        log.info("기존 결과 파일 없음 - 새로 만든다")
+
     result = {"horizons": HORIZONS, "criteria": {
         "minWindows": MIN_WINDOWS, "minSameSignShare": MIN_SAME_SIGN_SHARE,
         "minAbsExcess": MIN_ABS_EXCESS, "expectedSign": EXPECTED_SIGN}}
@@ -185,12 +246,20 @@ def main():
         print_table("backtest", result["backtest"])
     try:
         result["live"] = live()
+        result["liveAt"] = datetime.datetime.now().astimezone().isoformat(timespec="seconds")  # 화면의 '집계 시각' - 실패하면 이전 값 유지
         print_table("live", result["live"])
-    except Exception as e:  # DB 접속 정보(DB_USER/DB_PASSWORD) 없이 돌려도 backtest는 남긴다
-        log.error("live 집계 실패 - DB 접속 확인: %s", e)
+    except Exception:  # DB 접속 정보(DB_USER/DB_PASSWORD) 없이 돌려도 backtest는 남긴다
+        log.exception("live 집계 실패 (이전 live 값 유지)")
+    try:
+        result["ksTrendLive"] = ks_trend_live()
+    except Exception:
+        log.exception("ksTrendLive 집계 실패 (이전 값 유지)")
 
-    with open(RESULT_PATH, "w", encoding="utf-8") as f:
+    result = {**old, **result}  # --live-only의 backtest, 실패한 집계는 이전 값 유지
+    tmp = RESULT_PATH + ".tmp"  # 쓰다 죽어도 결과 파일이 잘리지 않게
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2, default=str)
+    os.replace(tmp, RESULT_PATH)
     log.info("결과 저장: %s", RESULT_PATH)
 
 
