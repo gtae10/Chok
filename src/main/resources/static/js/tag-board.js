@@ -105,6 +105,17 @@ function renderCandidates(list, calendarAsOf, ksLive) {
 
     // 판정에는 서로 겹치지 않는 창이 minWindows개 필요 -> h영업일 뒤 성과는 minWindows*h영업일 기록이 쌓여야 첫 판정이 가능하다
     const bars = b.horizons.map(function(h) {
+        // 실전 집계가 있으면 실제로 완성된 창 수로 잰다 - 경과일은 기록이 빠진 날(소급 불가)까지 세어 진행을 부풀린다
+        const ev = b.liveEvaluation && b.liveEvaluation[String(h.days)];
+        if (ev && Object.keys(ev).length) {
+            const w = Math.max.apply(null, Object.keys(ev).map(function(k) { return ev[k].windows || 0; }));
+            const wPct = Math.min(100, Math.round(w / b.minWindows * 100));
+            return '<div class="progress">' +
+                '<div class="progress__top"><b>' + h.days + '영업일 뒤 성과</b><span>' + (w >= b.minWindows ? "첫 판정 가능" : "완성된 창 " + w + " / " + b.minWindows) + '</span></div>' +
+                '<div class="progress__bar"><i style="--w:' + wPct + '%"></i></div>' +
+                '<div class="progress__sub">가장 많이 찬 태그 기준 · 창 하나에 기록 간격 ' + h.days + '영업일 이상 + 결과 확정 ' + h.days + '영업일</div>' +
+                '</div>';
+        }
         const pct = Math.min(100, Math.round(b.elapsedDays / h.needDays * 100));
         const left = Math.max(0, h.needDays - b.elapsedDays);
         const note = left === 0 ? "첫 판정 가능" : "약 " + left + "영업일 남음";
@@ -133,7 +144,7 @@ function renderCandidates(list, calendarAsOf, ksLive) {
         '<div class="progress-grid">' + bars + '</div>' +
         '<p class="prob-caveat" style="margin:10px 0 18px">판정 기준(미리 고정): 겹치지 않는 창 ' + b.minWindows + '개 이상, 사전 가설과 같은 방향인 창이 70% 이상, ' +
         '평균 초과수익이 5일 0.5% · 20일 1% · 50일 2% 이상. 분석을 돌린 날만 기록되고 빠진 날은 소급해 채우지 않으니, 서버를 켜 두는 날이 많을수록 판정이 빨라집니다. ' +
-        '남은 기간은 주말만 뺀 어림값입니다.</p>' +
+        '실전 집계 전에는 진행 막대가 주말만 뺀 경과일 어림값입니다.</p>' +
         '<h3 class="cand-head">태그별 실전 성과 <span class="section-head__sub">' + evaluatedLabel(b.evaluatedAt) + '</span></h3>' +
         '<div class="tag-cards">' + cards + '</div>' +
         cand;
